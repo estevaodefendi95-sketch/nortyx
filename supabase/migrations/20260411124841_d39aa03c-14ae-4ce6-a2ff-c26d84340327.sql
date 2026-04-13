@@ -1,0 +1,1 @@
+ALTER TABLE public.billing_charges ADD COLUMN meses_restantes integer;
