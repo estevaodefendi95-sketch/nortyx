@@ -1,23 +1,105 @@
 
 
-# Plano: Autocompletar dados de clientes já cadastrados
+# Plano: Transformar o sistema em SaaS multi-tenant
 
-## Objetivo
-Quando o usuário digita o nome de um cliente no formulário de cobrança, o sistema deve sugerir clientes já cadastrados na tabela `billing_clients` e preencher automaticamente e-mail, telefone e forma de cobrança.
+## Situação atual
+O sistema é single-tenant — todos os usuários autenticados compartilham os mesmos dados (transações, categorias, clientes, etc.). Personalização (nome/logo) é salva em localStorage. Não há isolamento de dados entre empresas.
 
-## Alterações
+## Visão geral da transformação
 
-### `src/components/TransactionForm.tsx`
+A migração será feita em **4 fases** para manter o sistema funcional a cada etapa.
 
-1. **Buscar clientes existentes**: Ao abrir a seção de cobrança (`showBilling = true`), carregar todos os clientes de `billing_clients` via query
-2. **Autocomplete no campo Nome**: Ao digitar no campo "Nome do cliente", filtrar e exibir uma lista dropdown com clientes que correspondem ao texto digitado
-3. **Preenchimento automático**: Ao selecionar um cliente da lista, preencher automaticamente `email`, `telefone` e `forma_cobranca` com os dados salvos
-4. **Permitir edição**: Os campos preenchidos continuam editáveis para ajustes pontuais
-5. **Permitir novo cliente**: Se o nome digitado não corresponder a nenhum existente, o formulário funciona normalmente para cadastro novo
+---
 
-A implementação usará um Popover/Command (componentes já existentes no projeto) para a lista de sugestões, filtrando por nome conforme o usuário digita.
+## Fase 1 — Estrutura multi-tenant (banco de dados)
 
-## Arquivos impactados
+**Criar tabela `organizations`:**
+- `id`, `name`, `logo_url`, `primary_color`, `slug` (subdomínio/identificador único), `created_at`, `plan` (free/pro/premium), `subscription_status`
 
-- **Editar**: `src/components/TransactionForm.tsx` (adicionar fetch de clientes e autocomplete)
+**Criar tabela `organization_members`:**
+- `user_id`, `organization_id`, `role` (owner/admin/member/viewer), com RLS
+
+**Adicionar coluna `organization_id`** em todas as tabelas de dados:
+- `transactions`, `daily_incomes`, `categories`, `subcategories`, `fornecedores`, `products`, `notes`, `billing_clients`, `billing_charges`, `push_subscriptions`, `tab_visibility`, `audit_log`
+
+**Atualizar todas as políticas RLS** para filtrar por `organization_id`, garantindo que cada empresa veja apenas seus dados.
+
+---
+
+## Fase 2 — Onboarding e gestão de organizações
+
+- Fluxo de criação de organização pós-cadastro (nome, logo, slug)
+- Tela de convite de membros por e-mail
+- Seletor de organização (para usuários que pertencem a múltiplas empresas)
+- Página de configurações da organização (nome, logo, cores, plano)
+- Substituir localStorage por dados do banco para branding
+
+---
+
+## Fase 3 — Personalização por cliente
+
+- Cores e tema personalizados por organização (primary color, logo no cabeçalho)
+- Configurações de abas visíveis por organização (não mais por usuário individual)
+- Cada organização terá suas próprias categorias, subcategorias e fornecedores padrão
+
+---
+
+## Fase 4 — Pagamentos e assinaturas
+
+- Integração de pagamentos via Lovable Payments (Stripe ou Paddle)
+- Planos com limites (ex: número de usuários, transações/mês)
+- Tela de billing para o owner da organização
+- Controle de acesso baseado no plano ativo
+
+---
+
+## Detalhes técnicos
+
+### Novas tabelas (migração SQL)
+
+```text
+organizations
+├── id (uuid, PK)
+├── name (text)
+├── slug (text, unique)
+├── logo_url (text, nullable)
+├── primary_color (text, default '#3B82F6')
+├── plan (text, default 'free')
+├── subscription_status (text, default 'active')
+├── created_at (timestamptz)
+└── updated_at (timestamptz)
+
+organization_members
+├── id (uuid, PK)
+├── organization_id (uuid, FK → organizations)
+├── user_id (uuid, FK → auth.users)
+├── role (enum: owner/admin/member/viewer)
+├── created_at (timestamptz)
+└── UNIQUE(organization_id, user_id)
+```
+
+### Alterações em tabelas existentes
+- Adicionar `organization_id (uuid, NOT NULL)` em todas as tabelas de dados
+- Criar função `get_user_org_id(uuid)` (SECURITY DEFINER) para uso nas RLS policies
+- Atualizar todas as RLS policies para usar `organization_id = get_user_org_id(auth.uid())`
+
+### Alterações no frontend
+- Novo contexto `OrganizationContext` com dados da org ativa
+- Todos os queries/inserts passam a incluir `organization_id`
+- Branding dinâmico no cabeçalho baseado na org
+- Novas páginas: `/onboarding`, `/settings/organization`, `/settings/billing`, `/settings/members`
+
+### Fluxo de autenticação atualizado
+```text
+Cadastro → Criar organização → Dashboard (com dados isolados)
+Login → Selecionar organização (se múltiplas) → Dashboard
+```
+
+---
+
+## Ordem de implementação sugerida
+
+Recomendo começar pela **Fase 1** (banco de dados), seguida da **Fase 2** (onboarding). Cada fase será implementada incrementalmente para manter o sistema funcional.
+
+Deseja aprovar este plano para iniciar a implementação pela Fase 1?
 
