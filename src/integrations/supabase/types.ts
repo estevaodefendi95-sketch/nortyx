@@ -827,6 +827,14 @@ export type Database = {
         Args: { payload: Json; queue_name: string }
         Returns: number
       }
+      get_login_branding: {
+        Args: never
+        Returns: {
+          logo_url: string
+          name: string
+          primary_color: string
+        }[]
+      }
       get_push_schedule_hour: { Args: never; Returns: number }
       get_user_org_id: { Args: { _user_id: string }; Returns: string }
       has_role: {
