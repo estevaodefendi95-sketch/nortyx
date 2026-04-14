@@ -8,9 +8,8 @@ export interface DashboardSettings {
   show_top_foods: boolean;
   show_top_drinks: boolean;
   cmv_categories: string[];
-  cmv_title: string;
-  top_foods_title: string;
-  top_drinks_title: string;
+  faturamento_medio_title: string;
+  ranking_title: string;
 }
 
 const DEFAULTS: DashboardSettings = {
@@ -19,9 +18,8 @@ const DEFAULTS: DashboardSettings = {
   show_top_foods: true,
   show_top_drinks: true,
   cmv_categories: ["C", "B"],
-  cmv_title: "CMV",
-  top_foods_title: "Top 10 Comidas",
-  top_drinks_title: "Top 10 Bebidas",
+  faturamento_medio_title: "Faturamento Médio / Dia",
+  ranking_title: "Top 10",
 };
 
 export const useDashboardSettings = () => {
@@ -49,9 +47,8 @@ export const useDashboardSettings = () => {
           show_top_foods: data.show_top_foods,
           show_top_drinks: data.show_top_drinks,
           cmv_categories: data.cmv_categories || DEFAULTS.cmv_categories,
-          cmv_title: data.cmv_title || DEFAULTS.cmv_title,
-          top_foods_title: data.top_foods_title || DEFAULTS.top_foods_title,
-          top_drinks_title: data.top_drinks_title || DEFAULTS.top_drinks_title,
+          faturamento_medio_title: (data as any).faturamento_medio_title || DEFAULTS.faturamento_medio_title,
+          ranking_title: (data as any).ranking_title || DEFAULTS.ranking_title,
         });
       } else {
         setSettings(DEFAULTS);
