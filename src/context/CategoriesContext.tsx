@@ -2,6 +2,7 @@ import { createContext, useContext, useState, useCallback, useEffect, type React
 import { DEFAULT_CATEGORIES, type CategoryInfo, type CategoryCode } from "@/data/cashflow";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { useOrganization } from "@/context/OrganizationContext";
 
 const STORAGE_KEY_MAP = "paggio_category_mappings";
 
@@ -52,6 +53,9 @@ const colorOverrides: Record<string, string> = {};
 
 export const CategoriesProvider = ({ children }: { children: ReactNode }) => {
   const { user, loading: authLoading } = useAuth();
+  const { organization } = useOrganization();
+  const orgId = organization?.id;
+  const [cats, setCats] = useState<CategoryInfo[]>(DEFAULT_CATEGORIES);
   const [cats, setCats] = useState<CategoryInfo[]>(DEFAULT_CATEGORIES);
   const [dbLoaded, setDbLoaded] = useState(false);
 
@@ -69,7 +73,7 @@ export const CategoriesProvider = ({ children }: { children: ReactNode }) => {
 
   // Load categories from DB and migrate any orphaned categories from transactions
   useEffect(() => {
-    if (authLoading || !user) return;
+    if (authLoading || !user || !orgId) return;
 
     const loadCategories = async () => {
       const { data, error } = await supabase
@@ -89,8 +93,9 @@ export const CategoriesProvider = ({ children }: { children: ReactNode }) => {
           code: cat.code,
           name: cat.name,
           color: DEFAULT_COLORS[cat.colorVar] || "hsl(215, 12%, 50%)",
+          organization_id: orgId,
         }));
-        await supabase.from("categories").insert(toInsert);
+        await supabase.from("categories").insert(toInsert as any);
         DEFAULT_CATEGORIES.forEach((cat) => {
           colorOverrides[cat.code] = DEFAULT_COLORS[cat.colorVar] || "hsl(215, 12%, 50%)";
         });
@@ -138,7 +143,7 @@ export const CategoriesProvider = ({ children }: { children: ReactNode }) => {
             };
           });
 
-          await supabase.from("categories").insert(toInsert);
+          await supabase.from("categories").insert(toInsert.map(t => ({ ...t, organization_id: orgId })) as any);
 
           // Update local state with new categories
           const newCats = toInsert.map((row) => ({
@@ -162,7 +167,7 @@ export const CategoriesProvider = ({ children }: { children: ReactNode }) => {
     };
 
     loadCategories();
-  }, [user, authLoading]);
+  }, [user, authLoading, orgId]);
 
   // Realtime sync
   useEffect(() => {
@@ -212,12 +217,12 @@ export const CategoriesProvider = ({ children }: { children: ReactNode }) => {
     setCats((prev) => [...prev, newCat]);
 
     // Save to DB
-    supabase.from("categories").insert({ code, name, color }).then(({ error }) => {
+    supabase.from("categories").insert({ code, name, color, organization_id: orgId } as any).then(({ error }) => {
       if (error) console.error("Error saving category:", error);
     });
 
     return newCat;
-  }, [cats]);
+  }, [cats, orgId]);
 
   const updateCategoryColor = useCallback(async (code: CategoryCode, color: string) => {
     colorOverrides[code] = color;
