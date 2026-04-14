@@ -121,53 +121,18 @@ const Index = () => {
             {/* Logo + Name */}
             <div className="flex items-center gap-3 min-w-0">
               {/* Company Logo */}
-              <div className="relative group">
-                <button
-                  onClick={() => !isViewer && logoInputRef.current?.click()}
-                  className="w-9 h-9 sm:w-10 sm:h-10 rounded-lg border border-border bg-secondary/50 flex items-center justify-center overflow-hidden hover:border-primary/50 transition-colors flex-shrink-0"
-                >
-                  {companyLogo ? (
-                    <img src={companyLogo} alt="Logo" className="w-full h-full object-cover" />
-                  ) : (
-                    <Camera className="w-4 h-4 text-muted-foreground" />
-                  )}
-                </button>
-                {companyLogo && !isViewer && (
-                  <button
-                    onClick={(e) => { e.stopPropagation(); setCompanyLogo(null); }}
-                    className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-destructive text-destructive-foreground flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
-                  >
-                    <X className="w-2.5 h-2.5" />
-                  </button>
+              <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-lg border border-border bg-secondary/50 flex items-center justify-center overflow-hidden flex-shrink-0">
+                {companyLogo ? (
+                  <img src={companyLogo} alt="Logo" className="w-full h-full object-cover" />
+                ) : (
+                  <Camera className="w-4 h-4 text-muted-foreground" />
                 )}
-                <input
-                  ref={logoInputRef}
-                  type="file"
-                  accept="image/*"
-                  className="hidden"
-                  onChange={handleLogoUpload}
-                />
               </div>
 
               <div className="min-w-0">
-                {isEditingName && !isViewer ? (
-                  <Input
-                    value={editNameValue}
-                    onChange={(e) => setEditNameValue(e.target.value)}
-                    onKeyDown={(e) => { if (e.key === "Enter") saveCompanyName(); if (e.key === "Escape") setIsEditingName(false); }}
-                    className="h-7 w-28 sm:w-32 text-base sm:text-lg font-bold text-primary"
-                    autoFocus
-                    onBlur={saveCompanyName}
-                  />
-                ) : (
-                  <button
-                    onClick={() => { if (!isViewer) { setEditNameValue(companyName); setIsEditingName(true); } }}
-                    className="text-xl sm:text-2xl font-display font-bold transition-colors cursor-pointer truncate text-primary"
-                    title={isViewer ? companyName : "Clique para editar o nome"}
-                  >
-                    {companyName}
-                  </button>
-                )}
+                <span className="text-xl sm:text-2xl font-display font-bold truncate text-primary">
+                  {companyName}
+                </span>
               </div>
             </div>
 
