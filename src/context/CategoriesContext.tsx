@@ -78,6 +78,7 @@ export const CategoriesProvider = ({ children }: { children: ReactNode }) => {
       const { data, error } = await supabase
         .from("categories")
         .select("*")
+        .eq("organization_id", orgId)
         .order("created_at", { ascending: true });
 
       if (error) {
@@ -114,7 +115,8 @@ export const CategoriesProvider = ({ children }: { children: ReactNode }) => {
       const existingCodes = new Set((data || []).map((r) => r.code));
       const { data: txCats } = await supabase
         .from("transactions")
-        .select("categoria");
+        .select("categoria")
+        .eq("organization_id", orgId);
       
       if (txCats) {
         const orphanedCodes = new Set<string>();

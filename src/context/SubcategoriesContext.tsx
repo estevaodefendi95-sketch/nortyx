@@ -46,6 +46,7 @@ export const SubcategoriesProvider = ({ children }: { children: ReactNode }) => 
       const { data, error } = await supabase
         .from("subcategories")
         .select("*")
+        .eq("organization_id", orgId)
         .order("created_at", { ascending: true });
 
       if (!error && data) {
