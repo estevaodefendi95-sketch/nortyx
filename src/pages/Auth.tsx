@@ -168,7 +168,7 @@ const Auth = () => {
             </button>
           )}
 
-          <Button type="submit" className="w-full bg-[#989ea4]/[0.84] hover:bg-[#989ea4]/90" disabled={loading}>
+          <Button type="submit" className="w-full" style={branding?.primary_color ? { backgroundColor: branding.primary_color } : undefined} disabled={loading}>
             {loading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
             {resetMode ? "Enviar link" : isLogin ? "Entrar" : "Cadastrar"}
           </Button>
