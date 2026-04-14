@@ -245,11 +245,12 @@ export const TransactionsProvider = ({ children }: { children: ReactNode }) => {
         old_data: oldData || null,
         new_data: newData || null,
         user_email: user?.email || null,
-      });
+        organization_id: orgId,
+      } as any);
     } catch (e) {
       console.error("Audit log error:", e);
     }
-  }, [user]);
+  }, [user, orgId]);
 
   const addTransaction = useCallback(async (t: Omit<Transaction, "id">) => {
     const tempId = Date.now() + Math.random();
@@ -292,7 +293,7 @@ export const TransactionsProvider = ({ children }: { children: ReactNode }) => {
       logAudit("INSERT", "transactions", String(data.id), null, mapped);
     }
     return true;
-  }, [logAudit]);
+  }, [logAudit, orgId]);
 
   const updateTransaction = useCallback(async (id: number, updates: Partial<Transaction>) => {
     const oldTx = txns.find((t) => t.id === id);
@@ -382,7 +383,7 @@ export const TransactionsProvider = ({ children }: { children: ReactNode }) => {
 
     const { data, error } = await supabase
       .from("daily_incomes")
-      .insert({ data: normalizedIncome.data, valor: normalizedIncome.valor })
+      .insert({ data: normalizedIncome.data, valor: normalizedIncome.valor, organization_id: orgId } as any)
       .select()
       .single();
 
