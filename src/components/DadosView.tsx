@@ -517,14 +517,14 @@ const DadosView = ({ selectedMonths, selectedYear, isViewer = false }: DadosView
       <div className={`grid grid-cols-1 ${dashSettings.show_top_foods && dashSettings.show_top_drinks ? "lg:grid-cols-2" : ""} gap-6`}>
         {dashSettings.show_top_foods && (
         <RankingList
-          title={`${dashSettings.ranking_title} 1`}
+          title={dashSettings.ranking_title}
           items={topFoods}
           emptyText="Nenhum item cadastrado para este mês"
         />
         )}
         {dashSettings.show_top_drinks && (
         <RankingList
-          title={`${dashSettings.ranking_title_2} 2`}
+          title={dashSettings.ranking_title_2}
           items={topDrinks}
           emptyText="Nenhum item cadastrado para este mês"
         />
@@ -532,7 +532,7 @@ const DadosView = ({ selectedMonths, selectedYear, isViewer = false }: DadosView
       </div>
       )}
 
-      {!isViewer && (
+      {!isViewer && (dashSettings.show_top_foods || dashSettings.show_top_drinks) && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Manual Product Entry */}
           <div className="rounded-xl bg-card border border-border p-5">
@@ -556,8 +556,8 @@ const DadosView = ({ selectedMonths, selectedYear, isViewer = false }: DadosView
                 <Select value={newProduct.tipo} onValueChange={(v) => setNewProduct((f) => ({ ...f, tipo: v as "comida" | "bebida" }))}>
                   <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="comida">{dashSettings.ranking_title} 1</SelectItem>
-                    <SelectItem value="bebida">{dashSettings.ranking_title_2} 2</SelectItem>
+                    <SelectItem value="comida">{dashSettings.ranking_title}</SelectItem>
+                    <SelectItem value="bebida">{dashSettings.ranking_title_2}</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -628,7 +628,7 @@ const DadosView = ({ selectedMonths, selectedYear, isViewer = false }: DadosView
                     className="flex items-center justify-between p-2 rounded-lg bg-secondary/20 text-sm"
                   >
                     <div className="flex items-center gap-2 min-w-0">
-                      <span className="text-xs text-muted-foreground flex-shrink-0">{p.tipo === "comida" ? `${dashSettings.ranking_title} 1` : `${dashSettings.ranking_title_2} 2`}</span>
+                      <span className="text-xs text-muted-foreground flex-shrink-0">{p.tipo === "comida" ? dashSettings.ranking_title : dashSettings.ranking_title_2}</span>
                       <span className="truncate">{p.nome}</span>
                       <span className="text-xs text-muted-foreground">x{p.quantidade}</span>
                     </div>
