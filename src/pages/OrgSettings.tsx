@@ -43,8 +43,8 @@ const OrgSettings = () => {
   const [showTopFoods, setShowTopFoods] = useState(true);
   const [showTopDrinks, setShowTopDrinks] = useState(true);
   const [cmvCategories, setCmvCategories] = useState<string[]>(["C", "B"]);
-  const [faturamentoMedioTitle, setFaturamentoMedioTitle] = useState("Faturamento Médio / Dia");
   const [rankingTitle, setRankingTitle] = useState("Top 10");
+  const [rankingTitle2, setRankingTitle2] = useState("Top 10");
 
   const isOwner = membership?.role === "owner" || membership?.role === "admin";
   const isSuperUser = user?.email === SUPER_EMAIL;
@@ -84,8 +84,8 @@ const OrgSettings = () => {
         setShowTopFoods(data.show_top_foods);
         setShowTopDrinks(data.show_top_drinks);
         setCmvCategories(data.cmv_categories || ["C", "B"]);
-        setFaturamentoMedioTitle((data as any).faturamento_medio_title || "Faturamento Médio / Dia");
         setRankingTitle((data as any).ranking_title || "Top 10");
+        setRankingTitle2((data as any).ranking_title_2 || "Top 10");
       }
     };
     load();
@@ -178,8 +178,8 @@ const OrgSettings = () => {
             show_top_foods: showTopFoods,
             show_top_drinks: showTopDrinks,
             cmv_categories: cmvCategories,
-            faturamento_medio_title: faturamentoMedioTitle,
             ranking_title: rankingTitle,
+            ranking_title_2: rankingTitle2,
           } as any,
           { onConflict: "organization_id" }
         );
@@ -305,42 +305,46 @@ const OrgSettings = () => {
               <Label className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Visibilidade dos Cards</Label>
               
               {/* Faturamento Médio */}
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <Label>{faturamentoMedioTitle || "Faturamento Médio / Dia"}</Label>
-                  <Switch checked={showFaturamentoMedio} onCheckedChange={setShowFaturamentoMedio} />
-                </div>
-                {showFaturamentoMedio && isSuperUser && (
-                  <div className="ml-4">
-                    <Input
-                      value={faturamentoMedioTitle}
-                      onChange={(e) => setFaturamentoMedioTitle(e.target.value)}
-                      placeholder="Faturamento Médio / Dia"
-                      className="h-8 text-sm"
-                    />
-                  </div>
-                )}
+              <div className="flex items-center justify-between">
+                <Label>Faturamento Médio / Dia</Label>
+                <Switch checked={showFaturamentoMedio} onCheckedChange={setShowFaturamentoMedio} />
               </div>
 
               {/* Porcentagem (CMV) */}
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <Label>Porcentagem</Label>
-                  <Switch checked={showCmv} onCheckedChange={setShowCmv} />
-                </div>
+              <div className="flex items-center justify-between">
+                <Label>Porcentagem</Label>
+                <Switch checked={showCmv} onCheckedChange={setShowCmv} />
               </div>
 
-              {/* Ranking */}
+              {/* Ranking 1 */}
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
-                  <Label>{rankingTitle || "Top 10"}</Label>
-                  <Switch checked={showTopFoods} onCheckedChange={(checked) => { setShowTopFoods(checked); setShowTopDrinks(checked); }} />
+                  <Label>{rankingTitle || "Top 10"} 1</Label>
+                  <Switch checked={showTopFoods} onCheckedChange={setShowTopFoods} />
                 </div>
                 {showTopFoods && isSuperUser && (
                   <div className="ml-4">
                     <Input
                       value={rankingTitle}
                       onChange={(e) => setRankingTitle(e.target.value)}
+                      placeholder="Top 10"
+                      className="h-8 text-sm"
+                    />
+                  </div>
+                )}
+              </div>
+
+              {/* Ranking 2 */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <Label>{rankingTitle2 || "Top 10"} 2</Label>
+                  <Switch checked={showTopDrinks} onCheckedChange={setShowTopDrinks} />
+                </div>
+                {showTopDrinks && isSuperUser && (
+                  <div className="ml-4">
+                    <Input
+                      value={rankingTitle2}
+                      onChange={(e) => setRankingTitle2(e.target.value)}
                       placeholder="Top 10"
                       className="h-8 text-sm"
                     />
