@@ -1,56 +1,41 @@
 
 
-# Tornar o sistema de produtos/rankings universal
+# Simplificar dashboard e restringir personalização
 
-## Problema
-1. O nome do card CMV não é editável nas configurações (imagem 1)
-2. O ranking "Top 10" mostra ícone de comida/bebida desnecessário (imagem 2)
-3. O formulário de produto tem seletor "Comida/Bebida" hardcoded — precisa ser genérico (imagem 3)
+## Resumo
+1. Rankings usam título único (sem "comida"/"bebida")
+2. CMV vira "Porcentagem" fixo, sem campo de personalização
+3. Nos toggles de visibilidade, permitir personalizar nome e logo — mas apenas para a conta `estevaodefendi95@gmail.com`
 
-## Solução
+## Alterações
 
-### 1. Migração SQL — adicionar campo `cmv_title` na tabela `org_dashboard_settings`
+### 1. Migração SQL
+Adicionar colunas à `org_dashboard_settings`:
+- `faturamento_medio_title text NOT NULL DEFAULT 'Faturamento Médio / Dia'`
+- `ranking_title text NOT NULL DEFAULT 'Top 10'`
 
-Adicionar coluna para permitir renomear o card CMV:
-```sql
-ALTER TABLE public.org_dashboard_settings
-  ADD COLUMN cmv_title text NOT NULL DEFAULT 'CMV';
-```
+### 2. `useDashboardSettings.ts`
+- Adicionar `faturamento_medio_title` e `ranking_title` à interface
+- Remover `cmv_title` da interface (usar "Porcentagem" fixo no código)
+- Ambos os rankings usam `ranking_title`
 
-### 2. Atualizar `useDashboardSettings.ts`
+### 3. `OrgSettings.tsx`
+- **Seção "Painel de Dados"**: cada switch mostra input de nome quando ativo:
+  - Faturamento Médio → input `faturamento_medio_title`
+  - Porcentagem → sem input (nome fixo)
+  - Ranking → input único `ranking_title` (sem separação comida/bebida)
+- Remover seção separada "Títulos dos Rankings"
+- Remover campo `cmv_title`
+- **Restrição**: toda a seção de personalização do dashboard (ou apenas os inputs de nome/logo) só aparece se `user?.email === "estevaodefendi95@gmail.com"`. Demais usuários admin/owner veem apenas os switches de visibilidade.
 
-- Adicionar `cmv_title: string` à interface `DashboardSettings`
-- Default: `"CMV"`
-- Carregar do banco
-
-### 3. Atualizar `OrgSettings.tsx`
-
-- Adicionar input de texto para renomear o CMV (ao lado do switch de visibilidade)
-- Campo: "Título do card CMV"
-
-### 4. Atualizar `DadosView.tsx` — tornar universal
-
-**Card CMV (imagem 1):**
-- Usar `dashSettings.cmv_title` no lugar de "CMV" hardcoded
-
-**Rankings (imagem 2):**
-- Remover ícones emoji (🍽️ e 🍹) dos títulos dos rankings
-- Remover ícones emoji da listagem de produtos recentes
-- Usar apenas o texto do título configurado
-
-**Formulário de produto (imagem 3):**
-- Remover os botões "Comida" / "Bebida"
-- Associar o produto ao ranking pela posição: primeiro ranking = tipo "comida" (internamente), segundo = "bebida"
-- Trocar para um **Select** com as opções sendo os títulos configurados dos rankings (ex: "Top 10 Comidas" e "Top 10 Bebidas", ou o que o cliente definir)
-- Placeholder do nome: "Ex: Produto, Cliente, Item..." em vez de "Ex: Picanha, Caipirinha..."
-- Remover emojis da listagem de produtos do mês
-
-### 5. Atualizar importação por IA
-
-- Na listagem de resultados da IA, remover emojis e mostrar o nome do tipo configurado em vez de "comida"/"bebida"
+### 4. `DadosView.tsx`
+- Card CMV: título fixo **"Porcentagem"**
+- Ambos os rankings: usar `dashSettings.ranking_title`
+- Faturamento Médio: usar `dashSettings.faturamento_medio_title`
+- No Select do formulário de produto: usar `ranking_title + " 1"` e `ranking_title + " 2"` ou apenas o `ranking_title` como label genérico
 
 ### Detalhes técnicos
-- O campo `tipo` no banco (`products.tipo`) continua como `"comida"` e `"bebida"` internamente — apenas a apresentação muda
-- O Select no formulário mapeia o título do ranking para o tipo interno
-- Uma coluna nova (`cmv_title`) na tabela existente, sem breaking changes
+- A restrição por email é feita no frontend (OrgSettings) comparando `user.email`
+- O banco continua acessível por qualquer admin via RLS — a restrição é apenas de UI
+- Campos `top_foods_title` e `top_drinks_title` no banco continuam existindo mas não são mais editáveis separadamente
 
