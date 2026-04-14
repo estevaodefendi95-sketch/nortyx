@@ -1,28 +1,27 @@
 
 
-# Corrigir recursão infinita nas políticas de `organization_members`
+# Corrigir erro RLS ao criar organização no onboarding
 
 ## Problema
-As políticas RLS da tabela `organization_members` fazem subqueries na própria tabela `organization_members`, causando recursão infinita. Por exemplo, a policy de SELECT verifica `organization_id IN (SELECT ... FROM organization_members WHERE user_id = auth.uid())` — isso dispara a própria policy de SELECT novamente, em loop.
+O erro "new row violates row-level security policy for table organizations" ocorre porque o código faz `.insert().select().single()`. O Supabase precisa que a policy de SELECT também passe ao usar `.select()` após INSERT. Porém, a policy de SELECT exige que o usuário já seja membro da organização — e neste momento ele ainda não foi adicionado à `organization_members`.
 
 ## Solução
-Substituir todas as subqueries auto-referentes por chamadas à função `get_user_org_id(auth.uid())` que já existe como SECURITY DEFINER (bypassa RLS).
 
-## Alterações
+Criar uma função SQL `SECURITY DEFINER` que faz tudo atomicamente numa única transação:
+1. Cria a organização
+2. Adiciona o usuário como `owner` em `organization_members`
+3. Atualiza o `profiles` com o `organization_id`
+4. Retorna o ID da organização criada
 
-### 1. Migração SQL — recriar as políticas de `organization_members`
+### Alterações
 
-Dropar e recriar as 5 políticas existentes:
+**1. Migração SQL** — criar função `create_organization_with_owner`:
+- Parâmetros: `_name text`, `_slug text`, `_user_id uuid`
+- SECURITY DEFINER para bypassar RLS
+- Retorna o `id` da organização criada
+- Faz INSERT em `organizations`, `organization_members` e UPDATE em `profiles`
 
-- **SELECT**: `user_id = auth.uid() OR organization_id = get_user_org_id(auth.uid())`
-- **INSERT (owners)**: `organization_id = get_user_org_id(auth.uid()) AND has_role(...)` (para admins adicionarem membros)
-- **INSERT (self)**: `user_id = auth.uid()` (manter — sem subquery)
-- **UPDATE**: `organization_id = get_user_org_id(auth.uid()) AND has_role(...)`
-- **DELETE**: `organization_id = get_user_org_id(auth.uid()) AND has_role(...)`
-
-### 2. Atualizar `get_user_org_id` para suportar múltiplas orgs (opcional)
-
-A função atual retorna apenas 1 org. Para o caso do onboarding (usuário acabou de criar a org e inserir a si mesmo como membro), a policy de INSERT self (`user_id = auth.uid()`) já cobre o cenário sem precisar da função.
-
-Nenhuma alteração no frontend é necessária.
+**2. Atualizar `src/pages/Onboarding.tsx`**:
+- Substituir os 3 queries separados por uma chamada `supabase.rpc('create_organization_with_owner', { ... })`
+- Simplifica o código e elimina o problema de RLS
 
