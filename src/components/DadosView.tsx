@@ -36,6 +36,7 @@ const WEEKDAYS_PT = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
 const DadosView = ({ selectedMonths, selectedYear, isViewer = false }: DadosViewProps) => {
   const isAllSelected = selectedMonths.length === 0;
   const { transactions, dailyIncomes } = useTransactions();
+  const { settings: dashSettings } = useDashboardSettings();
   const [selectedWeekdays, setSelectedWeekdays] = useState<number[]>([]);
   const { toast } = useToast();
   const [products, setProducts] = useState<Product[]>([]);
@@ -257,10 +258,10 @@ const DadosView = ({ selectedMonths, selectedYear, isViewer = false }: DadosView
   // CMV = (Comida + Bebida expenses) / Faturamento
   const cmv = useMemo(() => {
     const gastosCB = transactions
-      .filter((t) => t.tipo === "saida" && (t.categoria === "C" || t.categoria === "B") && matchMonth(t.data))
+      .filter((t) => t.tipo === "saida" && dashSettings.cmv_categories.includes(t.categoria) && matchMonth(t.data))
       .reduce((s, t) => s + t.valor, 0);
     return { gastosCB, percentual: faturamento > 0 ? (gastosCB / faturamento) * 100 : 0 };
-  }, [transactions, faturamento, selectedMonths, isAllSelected]);
+  }, [transactions, faturamento, selectedMonths, isAllSelected, dashSettings.cmv_categories]);
 
   // Parse DD/MM/YYYY to Date
   const parseDate = (dateStr: string) => {
