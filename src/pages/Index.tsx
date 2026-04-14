@@ -201,6 +201,16 @@ const Index = () => {
                 </>
               )}
 
+              {isOrgOwner && (
+                <button
+                  onClick={() => navigate("/settings")}
+                  className="p-2 rounded-lg hover:bg-secondary transition-colors flex-shrink-0"
+                  title="Configurações da Organização"
+                >
+                  <Settings className="w-5 h-5 text-muted-foreground" />
+                </button>
+              )}
+
               <button
                 onClick={signOut}
                 className="p-2 rounded-lg hover:bg-secondary transition-colors flex-shrink-0"

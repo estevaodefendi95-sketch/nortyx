@@ -17,6 +17,7 @@ import PendingApproval from "./pages/PendingApproval";
 import AdminApproval from "./pages/AdminApproval";
 import AdminHistory from "./pages/AdminHistory";
 import Onboarding from "./pages/Onboarding";
+import OrgSettings from "./pages/OrgSettings";
 import NotFound from "./pages/NotFound";
 import Unsubscribe from "./pages/Unsubscribe";
 import { Loader2 } from "lucide-react";
