@@ -385,8 +385,10 @@ export type Database = {
           cmv_categories: string[]
           cmv_title: string
           created_at: string
+          faturamento_medio_title: string
           id: string
           organization_id: string
+          ranking_title: string
           show_cmv: boolean
           show_faturamento_medio: boolean
           show_top_drinks: boolean
@@ -399,8 +401,10 @@ export type Database = {
           cmv_categories?: string[]
           cmv_title?: string
           created_at?: string
+          faturamento_medio_title?: string
           id?: string
           organization_id: string
+          ranking_title?: string
           show_cmv?: boolean
           show_faturamento_medio?: boolean
           show_top_drinks?: boolean
@@ -413,8 +417,10 @@ export type Database = {
           cmv_categories?: string[]
           cmv_title?: string
           created_at?: string
+          faturamento_medio_title?: string
           id?: string
           organization_id?: string
+          ranking_title?: string
           show_cmv?: boolean
           show_faturamento_medio?: boolean
           show_top_drinks?: boolean
