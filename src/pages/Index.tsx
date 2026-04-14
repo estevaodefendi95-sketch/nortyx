@@ -21,6 +21,7 @@ import { useTabVisibility } from "@/hooks/useTabVisibility";
 import { useOrgBranding } from "@/hooks/useOrgBranding";
 import { useOrganization } from "@/context/OrganizationContext";
 import { supabase } from "@/integrations/supabase/client";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 const MONTHS_PT = [
   "Jan", "Fev", "Mar", "Abr", "Mai", "Jun",
