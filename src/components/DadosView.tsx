@@ -453,7 +453,7 @@ const DadosView = ({ selectedMonths, selectedYear, isViewer = false }: DadosView
             <Calendar className="w-4 h-4" />
             <span className="text-xs font-medium uppercase tracking-wider">
               {selectedWeekdays.length === 0
-                ? dashSettings.faturamento_medio_title
+                ? "Faturamento Médio / Dia"
                 : `Média ${selectedWeekdays.map((w) => WEEKDAYS_PT[w]).join(" + ")}`}
             </span>
           </div>
@@ -524,7 +524,7 @@ const DadosView = ({ selectedMonths, selectedYear, isViewer = false }: DadosView
         )}
         {dashSettings.show_top_drinks && (
         <RankingList
-          title={`${dashSettings.ranking_title} 2`}
+          title={`${dashSettings.ranking_title_2} 2`}
           items={topDrinks}
           emptyText="Nenhum item cadastrado para este mês"
         />
@@ -557,7 +557,7 @@ const DadosView = ({ selectedMonths, selectedYear, isViewer = false }: DadosView
                   <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="comida">{dashSettings.ranking_title} 1</SelectItem>
-                    <SelectItem value="bebida">{dashSettings.ranking_title} 2</SelectItem>
+                    <SelectItem value="bebida">{dashSettings.ranking_title_2} 2</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -628,7 +628,7 @@ const DadosView = ({ selectedMonths, selectedYear, isViewer = false }: DadosView
                     className="flex items-center justify-between p-2 rounded-lg bg-secondary/20 text-sm"
                   >
                     <div className="flex items-center gap-2 min-w-0">
-                      <span className="text-xs text-muted-foreground flex-shrink-0">{p.tipo === "comida" ? `${dashSettings.ranking_title} 1` : `${dashSettings.ranking_title} 2`}</span>
+                      <span className="text-xs text-muted-foreground flex-shrink-0">{p.tipo === "comida" ? `${dashSettings.ranking_title} 1` : `${dashSettings.ranking_title_2} 2`}</span>
                       <span className="truncate">{p.nome}</span>
                       <span className="text-xs text-muted-foreground">x{p.quantidade}</span>
                     </div>
