@@ -56,7 +56,6 @@ export const CategoriesProvider = ({ children }: { children: ReactNode }) => {
   const { organization } = useOrganization();
   const orgId = organization?.id;
   const [cats, setCats] = useState<CategoryInfo[]>(DEFAULT_CATEGORIES);
-  const [cats, setCats] = useState<CategoryInfo[]>(DEFAULT_CATEGORIES);
   const [dbLoaded, setDbLoaded] = useState(false);
 
   const [mappings, setMappings] = useState<Record<string, CategoryCode>>(() => {
