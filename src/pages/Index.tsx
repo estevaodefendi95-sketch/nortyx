@@ -1,5 +1,5 @@
-import { useState, useRef, useEffect, useMemo, useCallback } from "react";
-import { CalendarDays, Tags, Plus, ArrowUpDown, Camera, X, BarChart3, Bell, LogOut, Shield, Clock, Sparkles, History, Users } from "lucide-react";
+import { useState, useEffect, useMemo, useCallback } from "react";
+import { CalendarDays, Tags, Plus, ArrowUpDown, Camera, X, BarChart3, Bell, LogOut, Shield, Clock, Sparkles, History, Users, Settings } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import CalendarView from "@/components/CalendarView";
@@ -18,6 +18,8 @@ import ClientsView from "@/components/ClientsView";
 import NotificationBanner from "@/components/NotificationBanner";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useTabVisibility } from "@/hooks/useTabVisibility";
+import { useOrgBranding } from "@/hooks/useOrgBranding";
+import { useOrganization } from "@/context/OrganizationContext";
 import { supabase } from "@/integrations/supabase/client";
 
 const MONTHS_PT = [
@@ -39,6 +41,8 @@ const Index = () => {
   const navigate = useNavigate();
   const isMobile = useIsMobile();
   const { visibleTabs } = useTabVisibility();
+  const { logoUrl: companyLogo, companyName } = useOrgBranding();
+  const { membership } = useOrganization();
   const pendingBills = useMemo(() => getPendingBills(), [getPendingBills]);
   const [pendingUsersCount, setPendingUsersCount] = useState(0);
   const [activeTab, setActiveTab] = useState<Tab>("dados");
@@ -55,53 +59,8 @@ const Index = () => {
     }
     return years.sort((a, b) => b - a);
   }, []);
-  const [companyName, setCompanyName] = useState(() => localStorage.getItem("companyName") || "PAGGIO");
-  const [companyLogo, setCompanyLogo] = useState<string | null>(() => localStorage.getItem("companyLogo"));
-  const [isEditingName, setIsEditingName] = useState(false);
-  const [editNameValue, setEditNameValue] = useState(companyName);
-  const logoInputRef = useRef<HTMLInputElement>(null);
 
-  // Fetch pending users count for admin badge
-  useEffect(() => {
-    if (!isAdmin) return;
-    const fetchPending = async () => {
-      const { count } = await supabase
-        .from("profiles")
-        .select("*", { count: "exact", head: true })
-        .eq("approved", false);
-      setPendingUsersCount(count ?? 0);
-    };
-    fetchPending();
-    const interval = setInterval(fetchPending, 30000);
-    return () => clearInterval(interval);
-  }, [isAdmin]);
-
-  useEffect(() => {
-    localStorage.setItem("companyName", companyName);
-  }, [companyName]);
-
-  useEffect(() => {
-    if (companyLogo) localStorage.setItem("companyLogo", companyLogo);
-    else localStorage.removeItem("companyLogo");
-  }, [companyLogo]);
-
-  const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      setCompanyLogo(reader.result as string);
-    };
-    reader.readAsDataURL(file);
-    e.target.value = "";
-  };
-
-  const saveCompanyName = () => {
-    if (editNameValue.trim()) {
-      setCompanyName(editNameValue.trim());
-    }
-    setIsEditingName(false);
-  };
+  const isOrgOwner = membership?.role === "owner" || membership?.role === "admin";
 
   const toggleMonth = (month: number) => {
     setSelectedMonths((prev) => {
@@ -162,53 +121,18 @@ const Index = () => {
             {/* Logo + Name */}
             <div className="flex items-center gap-3 min-w-0">
               {/* Company Logo */}
-              <div className="relative group">
-                <button
-                  onClick={() => !isViewer && logoInputRef.current?.click()}
-                  className="w-9 h-9 sm:w-10 sm:h-10 rounded-lg border border-border bg-secondary/50 flex items-center justify-center overflow-hidden hover:border-primary/50 transition-colors flex-shrink-0"
-                >
-                  {companyLogo ? (
-                    <img src={companyLogo} alt="Logo" className="w-full h-full object-cover" />
-                  ) : (
-                    <Camera className="w-4 h-4 text-muted-foreground" />
-                  )}
-                </button>
-                {companyLogo && !isViewer && (
-                  <button
-                    onClick={(e) => { e.stopPropagation(); setCompanyLogo(null); }}
-                    className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-destructive text-destructive-foreground flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
-                  >
-                    <X className="w-2.5 h-2.5" />
-                  </button>
+              <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-lg border border-border bg-secondary/50 flex items-center justify-center overflow-hidden flex-shrink-0">
+                {companyLogo ? (
+                  <img src={companyLogo} alt="Logo" className="w-full h-full object-cover" />
+                ) : (
+                  <Camera className="w-4 h-4 text-muted-foreground" />
                 )}
-                <input
-                  ref={logoInputRef}
-                  type="file"
-                  accept="image/*"
-                  className="hidden"
-                  onChange={handleLogoUpload}
-                />
               </div>
 
               <div className="min-w-0">
-                {isEditingName && !isViewer ? (
-                  <Input
-                    value={editNameValue}
-                    onChange={(e) => setEditNameValue(e.target.value)}
-                    onKeyDown={(e) => { if (e.key === "Enter") saveCompanyName(); if (e.key === "Escape") setIsEditingName(false); }}
-                    className="h-7 w-28 sm:w-32 text-base sm:text-lg font-bold text-primary"
-                    autoFocus
-                    onBlur={saveCompanyName}
-                  />
-                ) : (
-                  <button
-                    onClick={() => { if (!isViewer) { setEditNameValue(companyName); setIsEditingName(true); } }}
-                    className="text-xl sm:text-2xl font-display font-bold transition-colors cursor-pointer truncate text-primary"
-                    title={isViewer ? companyName : "Clique para editar o nome"}
-                  >
-                    {companyName}
-                  </button>
-                )}
+                <span className="text-xl sm:text-2xl font-display font-bold truncate text-primary">
+                  {companyName}
+                </span>
               </div>
             </div>
 
@@ -275,6 +199,16 @@ const Index = () => {
                     )}
                   </button>
                 </>
+              )}
+
+              {isOrgOwner && (
+                <button
+                  onClick={() => navigate("/settings")}
+                  className="p-2 rounded-lg hover:bg-secondary transition-colors flex-shrink-0"
+                  title="Configurações da Organização"
+                >
+                  <Settings className="w-5 h-5 text-muted-foreground" />
+                </button>
               )}
 
               <button
