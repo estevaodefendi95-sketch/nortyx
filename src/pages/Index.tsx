@@ -59,53 +59,8 @@ const Index = () => {
     }
     return years.sort((a, b) => b - a);
   }, []);
-  const [companyName, setCompanyName] = useState(() => localStorage.getItem("companyName") || "PAGGIO");
-  const [companyLogo, setCompanyLogo] = useState<string | null>(() => localStorage.getItem("companyLogo"));
-  const [isEditingName, setIsEditingName] = useState(false);
-  const [editNameValue, setEditNameValue] = useState(companyName);
-  const logoInputRef = useRef<HTMLInputElement>(null);
 
-  // Fetch pending users count for admin badge
-  useEffect(() => {
-    if (!isAdmin) return;
-    const fetchPending = async () => {
-      const { count } = await supabase
-        .from("profiles")
-        .select("*", { count: "exact", head: true })
-        .eq("approved", false);
-      setPendingUsersCount(count ?? 0);
-    };
-    fetchPending();
-    const interval = setInterval(fetchPending, 30000);
-    return () => clearInterval(interval);
-  }, [isAdmin]);
-
-  useEffect(() => {
-    localStorage.setItem("companyName", companyName);
-  }, [companyName]);
-
-  useEffect(() => {
-    if (companyLogo) localStorage.setItem("companyLogo", companyLogo);
-    else localStorage.removeItem("companyLogo");
-  }, [companyLogo]);
-
-  const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      setCompanyLogo(reader.result as string);
-    };
-    reader.readAsDataURL(file);
-    e.target.value = "";
-  };
-
-  const saveCompanyName = () => {
-    if (editNameValue.trim()) {
-      setCompanyName(editNameValue.trim());
-    }
-    setIsEditingName(false);
-  };
+  const isOrgOwner = membership?.role === "owner" || membership?.role === "admin";
 
   const toggleMonth = (month: number) => {
     setSelectedMonths((prev) => {
