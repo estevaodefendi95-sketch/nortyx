@@ -319,7 +319,7 @@ const OrgSettings = () => {
               {/* Ranking 1 */}
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
-                  <Label>{rankingTitle || "Top 10"} 1</Label>
+                  <Label>{rankingTitle || "Top 10"}</Label>
                   <Switch checked={showTopFoods} onCheckedChange={setShowTopFoods} />
                 </div>
                 {showTopFoods && isSuperUser && (
@@ -337,7 +337,7 @@ const OrgSettings = () => {
               {/* Ranking 2 */}
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
-                  <Label>{rankingTitle2 || "Top 10"} 2</Label>
+                  <Label>{rankingTitle2 || "Top 10"}</Label>
                   <Switch checked={showTopDrinks} onCheckedChange={setShowTopDrinks} />
                 </div>
                 {showTopDrinks && isSuperUser && (
