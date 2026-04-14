@@ -9,6 +9,7 @@ import {
 } from "@/data/cashflow";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { useOrganization } from "@/context/OrganizationContext";
 
 // Helper to fetch all rows from a table (bypasses 1000 row limit)
 async function fetchAllFromTable(table: "transactions" | "daily_incomes", orderCol: string) {
@@ -105,6 +106,8 @@ const parseDate = (d: string) => {
 
 export const TransactionsProvider = ({ children }: { children: ReactNode }) => {
   const { user, loading: authLoading } = useAuth();
+  const { organization } = useOrganization();
+  const orgId = organization?.id;
   const [txns, setTxns] = useState<Transaction[]>([]);
   const [incomes, setIncomes] = useState<DailyIncome[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -112,7 +115,7 @@ export const TransactionsProvider = ({ children }: { children: ReactNode }) => {
   // Load data from Supabase once authenticated
   useEffect(() => {
     if (authLoading) return;
-    if (!user) {
+    if (!user || !orgId) {
       setTxns([]);
       setIncomes([]);
       setIsLoading(false);
@@ -143,8 +146,8 @@ export const TransactionsProvider = ({ children }: { children: ReactNode }) => {
           console.log("Seeding transactions...");
           const batchSize = 50;
           for (let i = 0; i < initialTransactions.length; i += batchSize) {
-            const batch = initialTransactions.slice(i, i + batchSize).map(({ id, ...rest }) => rest);
-            await supabase.from("transactions").insert(batch);
+            const batch = initialTransactions.slice(i, i + batchSize).map(({ id, ...rest }) => ({ ...rest, organization_id: orgId }));
+            await supabase.from("transactions").insert(batch as any);
           }
           const seeded = await fetchAllFromTable("transactions", "id");
           setTxns(seeded.map(mapTransactionRow));
@@ -156,8 +159,8 @@ export const TransactionsProvider = ({ children }: { children: ReactNode }) => {
           console.log("Seeding daily incomes...");
           const batchSize = 50;
           for (let i = 0; i < initialDailyIncomes.length; i += batchSize) {
-            const batch = initialDailyIncomes.slice(i, i + batchSize).map(({ id, ...rest }) => rest);
-            await supabase.from("daily_incomes").insert(batch);
+            const batch = initialDailyIncomes.slice(i, i + batchSize).map(({ id, ...rest }) => ({ ...rest, organization_id: orgId }));
+            await supabase.from("daily_incomes").insert(batch as any);
           }
           const seeded = await fetchAllFromTable("daily_incomes", "id");
           setIncomes(seeded.map(mapDailyIncomeRow));
@@ -174,7 +177,7 @@ export const TransactionsProvider = ({ children }: { children: ReactNode }) => {
     };
 
     loadData();
-  }, [user, authLoading]);
+  }, [user, authLoading, orgId]);
 
   // Subscribe to realtime changes
   useEffect(() => {
@@ -242,11 +245,12 @@ export const TransactionsProvider = ({ children }: { children: ReactNode }) => {
         old_data: oldData || null,
         new_data: newData || null,
         user_email: user?.email || null,
-      });
+        organization_id: orgId,
+      } as any);
     } catch (e) {
       console.error("Audit log error:", e);
     }
-  }, [user]);
+  }, [user, orgId]);
 
   const addTransaction = useCallback(async (t: Omit<Transaction, "id">) => {
     const tempId = Date.now() + Math.random();
@@ -269,7 +273,8 @@ export const TransactionsProvider = ({ children }: { children: ReactNode }) => {
         pix_code: normalizedTransaction.pix_code || null,
         recurrence_type: normalizedTransaction.recurrence_type || null,
         recurrence_group_id: normalizedTransaction.recurrence_group_id || null,
-      })
+        organization_id: orgId,
+      } as any)
       .select()
       .single();
 
@@ -288,7 +293,7 @@ export const TransactionsProvider = ({ children }: { children: ReactNode }) => {
       logAudit("INSERT", "transactions", String(data.id), null, mapped);
     }
     return true;
-  }, [logAudit]);
+  }, [logAudit, orgId]);
 
   const updateTransaction = useCallback(async (id: number, updates: Partial<Transaction>) => {
     const oldTx = txns.find((t) => t.id === id);
@@ -378,7 +383,7 @@ export const TransactionsProvider = ({ children }: { children: ReactNode }) => {
 
     const { data, error } = await supabase
       .from("daily_incomes")
-      .insert({ data: normalizedIncome.data, valor: normalizedIncome.valor })
+      .insert({ data: normalizedIncome.data, valor: normalizedIncome.valor, organization_id: orgId } as any)
       .select()
       .single();
 
