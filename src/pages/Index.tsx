@@ -1,5 +1,5 @@
-import { useState, useRef, useEffect, useMemo, useCallback } from "react";
-import { CalendarDays, Tags, Plus, ArrowUpDown, Camera, X, BarChart3, Bell, LogOut, Shield, Clock, Sparkles, History, Users } from "lucide-react";
+import { useState, useEffect, useMemo, useCallback } from "react";
+import { CalendarDays, Tags, Plus, ArrowUpDown, Camera, X, BarChart3, Bell, LogOut, Shield, Clock, Sparkles, History, Users, Settings } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import CalendarView from "@/components/CalendarView";
