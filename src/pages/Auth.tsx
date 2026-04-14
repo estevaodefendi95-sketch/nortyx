@@ -88,7 +88,7 @@ const Auth = () => {
           {branding?.logo_url && (
             <img src={branding.logo_url} alt={branding.name} className="w-16 h-16 mx-auto rounded-lg object-cover" />
           )}
-          <h1 className="text-3xl font-display font-bold text-primary">{branding?.name || "PAGGIO"}</h1>
+          <h1 className="text-3xl font-display font-bold text-secondary-foreground">{branding?.name || "PAGGIO"}</h1>
           <p className="text-muted-foreground text-sm">
             {resetMode ? "Recuperar senha" : isLogin ? "Entre na sua conta" : "Crie sua conta"}
           </p>
@@ -136,12 +136,12 @@ const Auth = () => {
           )}
 
           {isLogin && !resetMode && (
-            <button type="button" onClick={() => setResetMode(true)} className="text-xs text-primary hover:underline">
+            <button type="button" onClick={() => setResetMode(true)} className="text-xs hover:underline text-secondary-foreground">
               Esqueceu a senha?
             </button>
           )}
 
-          <Button type="submit" className="w-full" disabled={loading}>
+          <Button type="submit" className="w-full bg-[#989ea4]/[0.84] hover:bg-[#989ea4]/90" disabled={loading}>
             {loading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
             {resetMode ? "Enviar link" : isLogin ? "Entrar" : "Cadastrar"}
           </Button>
