@@ -9,6 +9,7 @@ import {
 } from "@/data/cashflow";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { useOrganization } from "@/context/OrganizationContext";
 
 // Helper to fetch all rows from a table (bypasses 1000 row limit)
 async function fetchAllFromTable(table: "transactions" | "daily_incomes", orderCol: string) {
