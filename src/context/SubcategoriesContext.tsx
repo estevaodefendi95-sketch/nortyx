@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { useOrganization } from "@/context/OrganizationContext";
 
 export interface Subcategory {
   id: string;
@@ -34,10 +35,12 @@ const EXTRA_COLORS = [
 
 export const SubcategoriesProvider = ({ children }: { children: ReactNode }) => {
   const { user, loading: authLoading } = useAuth();
+  const { organization } = useOrganization();
+  const orgId = organization?.id;
   const [subcategories, setSubcategories] = useState<Subcategory[]>([]);
 
   useEffect(() => {
-    if (authLoading || !user) return;
+    if (authLoading || !user || !orgId) return;
 
     const load = async () => {
       const { data, error } = await supabase
@@ -56,7 +59,7 @@ export const SubcategoriesProvider = ({ children }: { children: ReactNode }) => 
     };
 
     load();
-  }, [user, authLoading]);
+  }, [user, authLoading, orgId]);
 
   // Realtime
   useEffect(() => {
@@ -83,7 +86,7 @@ export const SubcategoriesProvider = ({ children }: { children: ReactNode }) => 
     const color = EXTRA_COLORS[subcategories.length % EXTRA_COLORS.length];
     const { data, error } = await supabase
       .from("subcategories")
-      .insert({ category_code: categoryCode, name, color })
+      .insert({ category_code: categoryCode, name, color, organization_id: orgId } as any)
       .select()
       .single();
 
