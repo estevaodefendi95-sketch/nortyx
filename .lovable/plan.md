@@ -1,105 +1,28 @@
 
 
-# Plano: Transformar o sistema em SaaS multi-tenant
+# Corrigir recursão infinita nas políticas de `organization_members`
 
-## Situação atual
-O sistema é single-tenant — todos os usuários autenticados compartilham os mesmos dados (transações, categorias, clientes, etc.). Personalização (nome/logo) é salva em localStorage. Não há isolamento de dados entre empresas.
+## Problema
+As políticas RLS da tabela `organization_members` fazem subqueries na própria tabela `organization_members`, causando recursão infinita. Por exemplo, a policy de SELECT verifica `organization_id IN (SELECT ... FROM organization_members WHERE user_id = auth.uid())` — isso dispara a própria policy de SELECT novamente, em loop.
 
-## Visão geral da transformação
+## Solução
+Substituir todas as subqueries auto-referentes por chamadas à função `get_user_org_id(auth.uid())` que já existe como SECURITY DEFINER (bypassa RLS).
 
-A migração será feita em **4 fases** para manter o sistema funcional a cada etapa.
+## Alterações
 
----
+### 1. Migração SQL — recriar as políticas de `organization_members`
 
-## Fase 1 — Estrutura multi-tenant (banco de dados)
+Dropar e recriar as 5 políticas existentes:
 
-**Criar tabela `organizations`:**
-- `id`, `name`, `logo_url`, `primary_color`, `slug` (subdomínio/identificador único), `created_at`, `plan` (free/pro/premium), `subscription_status`
+- **SELECT**: `user_id = auth.uid() OR organization_id = get_user_org_id(auth.uid())`
+- **INSERT (owners)**: `organization_id = get_user_org_id(auth.uid()) AND has_role(...)` (para admins adicionarem membros)
+- **INSERT (self)**: `user_id = auth.uid()` (manter — sem subquery)
+- **UPDATE**: `organization_id = get_user_org_id(auth.uid()) AND has_role(...)`
+- **DELETE**: `organization_id = get_user_org_id(auth.uid()) AND has_role(...)`
 
-**Criar tabela `organization_members`:**
-- `user_id`, `organization_id`, `role` (owner/admin/member/viewer), com RLS
+### 2. Atualizar `get_user_org_id` para suportar múltiplas orgs (opcional)
 
-**Adicionar coluna `organization_id`** em todas as tabelas de dados:
-- `transactions`, `daily_incomes`, `categories`, `subcategories`, `fornecedores`, `products`, `notes`, `billing_clients`, `billing_charges`, `push_subscriptions`, `tab_visibility`, `audit_log`
+A função atual retorna apenas 1 org. Para o caso do onboarding (usuário acabou de criar a org e inserir a si mesmo como membro), a policy de INSERT self (`user_id = auth.uid()`) já cobre o cenário sem precisar da função.
 
-**Atualizar todas as políticas RLS** para filtrar por `organization_id`, garantindo que cada empresa veja apenas seus dados.
-
----
-
-## Fase 2 — Onboarding e gestão de organizações
-
-- Fluxo de criação de organização pós-cadastro (nome, logo, slug)
-- Tela de convite de membros por e-mail
-- Seletor de organização (para usuários que pertencem a múltiplas empresas)
-- Página de configurações da organização (nome, logo, cores, plano)
-- Substituir localStorage por dados do banco para branding
-
----
-
-## Fase 3 — Personalização por cliente
-
-- Cores e tema personalizados por organização (primary color, logo no cabeçalho)
-- Configurações de abas visíveis por organização (não mais por usuário individual)
-- Cada organização terá suas próprias categorias, subcategorias e fornecedores padrão
-
----
-
-## Fase 4 — Pagamentos e assinaturas
-
-- Integração de pagamentos via Lovable Payments (Stripe ou Paddle)
-- Planos com limites (ex: número de usuários, transações/mês)
-- Tela de billing para o owner da organização
-- Controle de acesso baseado no plano ativo
-
----
-
-## Detalhes técnicos
-
-### Novas tabelas (migração SQL)
-
-```text
-organizations
-├── id (uuid, PK)
-├── name (text)
-├── slug (text, unique)
-├── logo_url (text, nullable)
-├── primary_color (text, default '#3B82F6')
-├── plan (text, default 'free')
-├── subscription_status (text, default 'active')
-├── created_at (timestamptz)
-└── updated_at (timestamptz)
-
-organization_members
-├── id (uuid, PK)
-├── organization_id (uuid, FK → organizations)
-├── user_id (uuid, FK → auth.users)
-├── role (enum: owner/admin/member/viewer)
-├── created_at (timestamptz)
-└── UNIQUE(organization_id, user_id)
-```
-
-### Alterações em tabelas existentes
-- Adicionar `organization_id (uuid, NOT NULL)` em todas as tabelas de dados
-- Criar função `get_user_org_id(uuid)` (SECURITY DEFINER) para uso nas RLS policies
-- Atualizar todas as RLS policies para usar `organization_id = get_user_org_id(auth.uid())`
-
-### Alterações no frontend
-- Novo contexto `OrganizationContext` com dados da org ativa
-- Todos os queries/inserts passam a incluir `organization_id`
-- Branding dinâmico no cabeçalho baseado na org
-- Novas páginas: `/onboarding`, `/settings/organization`, `/settings/billing`, `/settings/members`
-
-### Fluxo de autenticação atualizado
-```text
-Cadastro → Criar organização → Dashboard (com dados isolados)
-Login → Selecionar organização (se múltiplas) → Dashboard
-```
-
----
-
-## Ordem de implementação sugerida
-
-Recomendo começar pela **Fase 1** (banco de dados), seguida da **Fase 2** (onboarding). Cada fase será implementada incrementalmente para manter o sistema funcional.
-
-Deseja aprovar este plano para iniciar a implementação pela Fase 1?
+Nenhuma alteração no frontend é necessária.
 
