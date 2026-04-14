@@ -328,17 +328,15 @@ const DadosView = ({ selectedMonths, selectedYear, isViewer = false }: DadosView
   const RankingList = ({
     title,
     items,
-    icon,
     emptyText,
   }: {
     title: string;
     items: { nome: string; quantidade: number; valorTotal: number }[];
-    icon: string;
     emptyText: string;
   }) => (
     <div className="rounded-xl bg-card border border-border p-5">
       <h3 className="font-display font-semibold text-base mb-4 flex items-center gap-2">
-        <span>{icon}</span> {title}
+        <Trophy className="w-4 h-4" /> {title}
       </h3>
       {items.length === 0 ? (
         <p className="text-sm text-muted-foreground text-center py-8">{emptyText}</p>
@@ -494,7 +492,7 @@ const DadosView = ({ selectedMonths, selectedYear, isViewer = false }: DadosView
           <div>
             <div className="flex items-center gap-2 text-muted-foreground mb-2">
               <Percent className="w-4 h-4" />
-              <span className="text-xs font-medium uppercase tracking-wider">CMV</span>
+              <span className="text-xs font-medium uppercase tracking-wider">{dashSettings.cmv_title}</span>
             </div>
             <p className={`text-2xl font-display font-bold ${cmv.percentual <= 35 ? "text-income" : cmv.percentual <= 45 ? "text-yellow-400" : "text-expense"}`}>
               {cmv.percentual.toFixed(1)}%
@@ -521,16 +519,14 @@ const DadosView = ({ selectedMonths, selectedYear, isViewer = false }: DadosView
         <RankingList
           title={dashSettings.top_foods_title}
           items={topFoods}
-          icon="🍽️"
-          emptyText="Nenhuma comida cadastrada para este mês"
+          emptyText="Nenhum item cadastrado para este mês"
         />
         )}
         {dashSettings.show_top_drinks && (
         <RankingList
           title={dashSettings.top_drinks_title}
           items={topDrinks}
-          icon="🍹"
-          emptyText="Nenhuma bebida cadastrada para este mês"
+          emptyText="Nenhum item cadastrado para este mês"
         />
         )}
       </div>
@@ -546,36 +542,24 @@ const DadosView = ({ selectedMonths, selectedYear, isViewer = false }: DadosView
 
             <div className="space-y-3">
               <div>
-                <Label>Nome do Produto *</Label>
+                <Label>Nome *</Label>
                 <Input
                   value={newProduct.nome}
                   onChange={(e) => setNewProduct((f) => ({ ...f, nome: e.target.value }))}
-                  placeholder="Ex: Picanha, Caipirinha..."
+                  placeholder="Ex: Produto, Cliente, Item..."
                   className="mt-1"
                 />
               </div>
 
-              <div className="flex gap-2">
-                <button
-                  onClick={() => setNewProduct((f) => ({ ...f, tipo: "comida" }))}
-                  className={`flex-1 py-2 rounded-lg text-xs font-medium transition-all border ${
-                    newProduct.tipo === "comida"
-                      ? "bg-primary/15 border-primary/40 text-primary"
-                      : "bg-secondary/40 border-transparent text-muted-foreground"
-                  }`}
-                >
-                  🍽️ Comida
-                </button>
-                <button
-                  onClick={() => setNewProduct((f) => ({ ...f, tipo: "bebida" }))}
-                  className={`flex-1 py-2 rounded-lg text-xs font-medium transition-all border ${
-                    newProduct.tipo === "bebida"
-                      ? "bg-primary/15 border-primary/40 text-primary"
-                      : "bg-secondary/40 border-transparent text-muted-foreground"
-                  }`}
-                >
-                  🍹 Bebida
-                </button>
+              <div>
+                <Label>Categoria</Label>
+                <Select value={newProduct.tipo} onValueChange={(v) => setNewProduct((f) => ({ ...f, tipo: v as "comida" | "bebida" }))}>
+                  <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="comida">{dashSettings.top_foods_title}</SelectItem>
+                    <SelectItem value="bebida">{dashSettings.top_drinks_title}</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
 
               <div className="grid grid-cols-2 gap-2">
@@ -644,7 +628,7 @@ const DadosView = ({ selectedMonths, selectedYear, isViewer = false }: DadosView
                     className="flex items-center justify-between p-2 rounded-lg bg-secondary/20 text-sm"
                   >
                     <div className="flex items-center gap-2 min-w-0">
-                      <span>{p.tipo === "comida" ? "🍽️" : "🍹"}</span>
+                      <span className="text-xs text-muted-foreground flex-shrink-0">{p.tipo === "comida" ? dashSettings.top_foods_title : dashSettings.top_drinks_title}</span>
                       <span className="truncate">{p.nome}</span>
                       <span className="text-xs text-muted-foreground">x{p.quantidade}</span>
                     </div>
@@ -714,7 +698,7 @@ const DadosView = ({ selectedMonths, selectedYear, isViewer = false }: DadosView
                       <div className="space-y-1">
                         {f.results.map((p, pIdx) => (
                           <div key={pIdx} className="flex items-center justify-between text-xs bg-secondary/20 rounded p-1.5">
-                            <span>{p.tipo === "comida" ? "🍽️" : "🍹"} {p.nome} x{p.quantidade}</span>
+                            <span>{p.nome} x{p.quantidade}</span>
                             <span className="font-medium">{formatCurrency(p.valorTotal)}</span>
                           </div>
                         ))}

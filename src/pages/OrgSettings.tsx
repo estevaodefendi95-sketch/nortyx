@@ -41,6 +41,7 @@ const OrgSettings = () => {
   const [showTopFoods, setShowTopFoods] = useState(true);
   const [showTopDrinks, setShowTopDrinks] = useState(true);
   const [cmvCategories, setCmvCategories] = useState<string[]>(["C", "B"]);
+  const [cmvTitle, setCmvTitle] = useState("CMV");
   const [topFoodsTitle, setTopFoodsTitle] = useState("Top 10 Comidas");
   const [topDrinksTitle, setTopDrinksTitle] = useState("Top 10 Bebidas");
 
@@ -81,6 +82,7 @@ const OrgSettings = () => {
         setShowTopFoods(data.show_top_foods);
         setShowTopDrinks(data.show_top_drinks);
         setCmvCategories(data.cmv_categories || ["C", "B"]);
+        setCmvTitle(data.cmv_title || "CMV");
         setTopFoodsTitle(data.top_foods_title || "Top 10 Comidas");
         setTopDrinksTitle(data.top_drinks_title || "Top 10 Bebidas");
       }
@@ -175,6 +177,7 @@ const OrgSettings = () => {
             show_top_foods: showTopFoods,
             show_top_drinks: showTopDrinks,
             cmv_categories: cmvCategories,
+            cmv_title: cmvTitle,
             top_foods_title: topFoodsTitle,
             top_drinks_title: topDrinksTitle,
           },
@@ -308,6 +311,17 @@ const OrgSettings = () => {
                 <Label>CMV</Label>
                 <Switch checked={showCmv} onCheckedChange={setShowCmv} />
               </div>
+              {showCmv && (
+                <div className="ml-4 space-y-1">
+                  <Label className="text-xs text-muted-foreground">Título do card</Label>
+                  <Input
+                    value={cmvTitle}
+                    onChange={(e) => setCmvTitle(e.target.value)}
+                    placeholder="CMV"
+                    className="h-8 text-sm"
+                  />
+                </div>
+              )}
               <div className="flex items-center justify-between">
                 <Label>{topFoodsTitle || "Top Comidas"}</Label>
                 <Switch checked={showTopFoods} onCheckedChange={setShowTopFoods} />
