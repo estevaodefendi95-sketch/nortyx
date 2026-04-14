@@ -146,8 +146,8 @@ export const TransactionsProvider = ({ children }: { children: ReactNode }) => {
           console.log("Seeding transactions...");
           const batchSize = 50;
           for (let i = 0; i < initialTransactions.length; i += batchSize) {
-            const batch = initialTransactions.slice(i, i + batchSize).map(({ id, ...rest }) => rest);
-            await supabase.from("transactions").insert(batch);
+            const batch = initialTransactions.slice(i, i + batchSize).map(({ id, ...rest }) => ({ ...rest, organization_id: orgId }));
+            await supabase.from("transactions").insert(batch as any);
           }
           const seeded = await fetchAllFromTable("transactions", "id");
           setTxns(seeded.map(mapTransactionRow));
@@ -159,8 +159,8 @@ export const TransactionsProvider = ({ children }: { children: ReactNode }) => {
           console.log("Seeding daily incomes...");
           const batchSize = 50;
           for (let i = 0; i < initialDailyIncomes.length; i += batchSize) {
-            const batch = initialDailyIncomes.slice(i, i + batchSize).map(({ id, ...rest }) => rest);
-            await supabase.from("daily_incomes").insert(batch);
+            const batch = initialDailyIncomes.slice(i, i + batchSize).map(({ id, ...rest }) => ({ ...rest, organization_id: orgId }));
+            await supabase.from("daily_incomes").insert(batch as any);
           }
           const seeded = await fetchAllFromTable("daily_incomes", "id");
           setIncomes(seeded.map(mapDailyIncomeRow));
@@ -177,7 +177,7 @@ export const TransactionsProvider = ({ children }: { children: ReactNode }) => {
     };
 
     loadData();
-  }, [user, authLoading]);
+  }, [user, authLoading, orgId]);
 
   // Subscribe to realtime changes
   useEffect(() => {
