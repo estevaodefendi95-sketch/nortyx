@@ -453,7 +453,7 @@ const DadosView = ({ selectedMonths, selectedYear, isViewer = false }: DadosView
             <Calendar className="w-4 h-4" />
             <span className="text-xs font-medium uppercase tracking-wider">
               {selectedWeekdays.length === 0
-                ? "Faturamento Médio / Dia"
+                ? dashSettings.faturamento_medio_title
                 : `Média ${selectedWeekdays.map((w) => WEEKDAYS_PT[w]).join(" + ")}`}
             </span>
           </div>
