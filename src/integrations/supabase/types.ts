@@ -380,6 +380,56 @@ export type Database = {
           },
         ]
       }
+      org_dashboard_settings: {
+        Row: {
+          cmv_categories: string[]
+          created_at: string
+          id: string
+          organization_id: string
+          show_cmv: boolean
+          show_faturamento_medio: boolean
+          show_top_drinks: boolean
+          show_top_foods: boolean
+          top_drinks_title: string
+          top_foods_title: string
+          updated_at: string
+        }
+        Insert: {
+          cmv_categories?: string[]
+          created_at?: string
+          id?: string
+          organization_id: string
+          show_cmv?: boolean
+          show_faturamento_medio?: boolean
+          show_top_drinks?: boolean
+          show_top_foods?: boolean
+          top_drinks_title?: string
+          top_foods_title?: string
+          updated_at?: string
+        }
+        Update: {
+          cmv_categories?: string[]
+          created_at?: string
+          id?: string
+          organization_id?: string
+          show_cmv?: boolean
+          show_faturamento_medio?: boolean
+          show_top_drinks?: boolean
+          show_top_foods?: boolean
+          top_drinks_title?: string
+          top_foods_title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "org_dashboard_settings_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: true
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       organization_members: {
         Row: {
           created_at: string
