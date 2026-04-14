@@ -154,7 +154,7 @@ export const TransactionsProvider = ({ children }: { children: ReactNode }) => {
         "postgres_changes",
         { event: "*", schema: "public", table: "transactions" },
         (payload) => {
-          const payloadOrgId = payload.new?.organization_id ?? payload.old?.organization_id;
+          const payloadOrgId = (payload.new as any)?.organization_id ?? (payload.old as any)?.organization_id;
           if (payloadOrgId !== orgId) return;
 
           if (payload.eventType === "INSERT") {
@@ -179,7 +179,7 @@ export const TransactionsProvider = ({ children }: { children: ReactNode }) => {
         "postgres_changes",
         { event: "*", schema: "public", table: "daily_incomes" },
         (payload) => {
-          const payloadOrgId = payload.new?.organization_id ?? payload.old?.organization_id;
+          const payloadOrgId = (payload.new as any)?.organization_id ?? (payload.old as any)?.organization_id;
           if (payloadOrgId !== orgId) return;
 
           if (payload.eventType === "INSERT") {
