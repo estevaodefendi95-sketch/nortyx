@@ -106,6 +106,8 @@ const parseDate = (d: string) => {
 
 export const TransactionsProvider = ({ children }: { children: ReactNode }) => {
   const { user, loading: authLoading } = useAuth();
+  const { organization } = useOrganization();
+  const orgId = organization?.id;
   const [txns, setTxns] = useState<Transaction[]>([]);
   const [incomes, setIncomes] = useState<DailyIncome[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -113,7 +115,7 @@ export const TransactionsProvider = ({ children }: { children: ReactNode }) => {
   // Load data from Supabase once authenticated
   useEffect(() => {
     if (authLoading) return;
-    if (!user) {
+    if (!user || !orgId) {
       setTxns([]);
       setIncomes([]);
       setIsLoading(false);
