@@ -389,6 +389,7 @@ export type Database = {
           id: string
           organization_id: string
           ranking_title: string
+          ranking_title_2: string
           show_cmv: boolean
           show_faturamento_medio: boolean
           show_top_drinks: boolean
@@ -405,6 +406,7 @@ export type Database = {
           id?: string
           organization_id: string
           ranking_title?: string
+          ranking_title_2?: string
           show_cmv?: boolean
           show_faturamento_medio?: boolean
           show_top_drinks?: boolean
@@ -421,6 +423,7 @@ export type Database = {
           id?: string
           organization_id?: string
           ranking_title?: string
+          ranking_title_2?: string
           show_cmv?: boolean
           show_faturamento_medio?: boolean
           show_top_drinks?: boolean
