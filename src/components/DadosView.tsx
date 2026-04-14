@@ -421,8 +421,10 @@ const DadosView = ({ selectedMonths, selectedYear, isViewer = false }: DadosView
       </div>
 
       {/* Faturamento Médio + CMV */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      {(dashSettings.show_faturamento_medio || dashSettings.show_cmv) && (
+      <div className={`grid grid-cols-1 ${dashSettings.show_faturamento_medio && dashSettings.show_cmv ? "sm:grid-cols-2" : ""} gap-4`}>
         {/* Faturamento Médio por Dia */}
+        {dashSettings.show_faturamento_medio && (
         <div className="rounded-xl bg-card border border-border p-5">
           {/* Weekday filter on top */}
           <div className="flex gap-1 sm:gap-1.5 mb-4 flex-nowrap overflow-x-auto">
@@ -484,8 +486,10 @@ const DadosView = ({ selectedMonths, selectedYear, isViewer = false }: DadosView
             </>
           )}
         </div>
+        )}
 
         {/* CMV Card */}
+        {dashSettings.show_cmv && (
         <div className="rounded-xl bg-card border border-border p-5 flex flex-col justify-between">
           <div>
             <div className="flex items-center gap-2 text-muted-foreground mb-2">
@@ -498,7 +502,9 @@ const DadosView = ({ selectedMonths, selectedYear, isViewer = false }: DadosView
           </div>
           <div className="mt-2">
             <p className="text-xs text-muted-foreground">
-              Comida + Bebida: {formatCurrency(cmv.gastosCB)}
+              {dashSettings.cmv_categories.length > 0
+                ? `Categorias: ${dashSettings.cmv_categories.join(" + ")}`
+                : "Nenhuma categoria selecionada"}: {formatCurrency(cmv.gastosCB)}
             </p>
             <p className="text-xs text-muted-foreground">
               Faturamento: {formatCurrency(faturamento)}
@@ -506,7 +512,9 @@ const DadosView = ({ selectedMonths, selectedYear, isViewer = false }: DadosView
             <p className="text-xs text-muted-foreground mt-1">{monthLabel}</p>
           </div>
         </div>
+        )}
       </div>
+      )}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <RankingList
           title="Top 10 Comidas"
