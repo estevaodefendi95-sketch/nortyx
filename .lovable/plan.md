@@ -1,77 +1,56 @@
 
 
-# Personalização de Cards do Dashboard (Dados)
+# Tornar o sistema de produtos/rankings universal
 
-## Resumo
-Três funcionalidades novas: (1) visibilidade dos cards no Settings, (2) seleção de categorias no CMV, (3) títulos editáveis nos Top 10.
+## Problema
+1. O nome do card CMV não é editável nas configurações (imagem 1)
+2. O ranking "Top 10" mostra ícone de comida/bebida desnecessário (imagem 2)
+3. O formulário de produto tem seletor "Comida/Bebida" hardcoded — precisa ser genérico (imagem 3)
 
-## Alterações
+## Solução
 
-### 1. Migração SQL — nova tabela `org_dashboard_settings`
+### 1. Migração SQL — adicionar campo `cmv_title` na tabela `org_dashboard_settings`
 
-Armazenar preferências do dashboard por organização:
-
+Adicionar coluna para permitir renomear o card CMV:
 ```sql
-CREATE TABLE public.org_dashboard_settings (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  organization_id uuid NOT NULL,
-  -- Visibilidade dos cards
-  show_faturamento_medio boolean NOT NULL DEFAULT true,
-  show_cmv boolean NOT NULL DEFAULT true,
-  show_top_foods boolean NOT NULL DEFAULT true,
-  show_top_drinks boolean NOT NULL DEFAULT true,
-  -- Categorias do CMV (array de códigos de categoria)
-  cmv_categories text[] NOT NULL DEFAULT '{C,B}',
-  -- Títulos customizados
-  top_foods_title text NOT NULL DEFAULT 'Top 10 Comidas',
-  top_drinks_title text NOT NULL DEFAULT 'Top 10 Bebidas',
-  created_at timestamptz NOT NULL DEFAULT now(),
-  updated_at timestamptz NOT NULL DEFAULT now(),
-  UNIQUE(organization_id)
-);
-
-ALTER TABLE public.org_dashboard_settings ENABLE ROW LEVEL SECURITY;
-
--- RLS: membros da org podem ler
-CREATE POLICY "Org members can read dashboard settings"
-  ON public.org_dashboard_settings FOR SELECT TO authenticated
-  USING (organization_id = get_user_org_id(auth.uid()));
-
--- RLS: owners/admins podem inserir/atualizar
-CREATE POLICY "Org owners can insert dashboard settings"
-  ON public.org_dashboard_settings FOR INSERT TO authenticated
-  WITH CHECK (organization_id = get_user_org_id(auth.uid()) AND has_role(auth.uid(), 'admin'));
-
-CREATE POLICY "Org owners can update dashboard settings"
-  ON public.org_dashboard_settings FOR UPDATE TO authenticated
-  USING (organization_id = get_user_org_id(auth.uid()) AND has_role(auth.uid(), 'admin'));
+ALTER TABLE public.org_dashboard_settings
+  ADD COLUMN cmv_title text NOT NULL DEFAULT 'CMV';
 ```
 
-### 2. Atualizar `src/pages/OrgSettings.tsx`
+### 2. Atualizar `useDashboardSettings.ts`
 
-Adicionar novo Card "Painel de Dados" com:
-- **Switches** para mostrar/esconder: Faturamento Médio, CMV, Top Comidas, Top Bebidas
-- **Multi-select de categorias** para o CMV (listar categorias do CategoriesContext)
-- **Inputs de texto** para renomear os títulos dos Top 10
-- Carregar/salvar de `org_dashboard_settings`
+- Adicionar `cmv_title: string` à interface `DashboardSettings`
+- Default: `"CMV"`
+- Carregar do banco
 
-### 3. Criar hook `src/hooks/useDashboardSettings.ts`
+### 3. Atualizar `OrgSettings.tsx`
 
-- Busca as configurações de `org_dashboard_settings` para a org atual
-- Retorna valores com defaults caso não exista registro
-- Expõe `settings` para o DadosView consumir
+- Adicionar input de texto para renomear o CMV (ao lado do switch de visibilidade)
+- Campo: "Título do card CMV"
 
-### 4. Atualizar `src/components/DadosView.tsx`
+### 4. Atualizar `DadosView.tsx` — tornar universal
 
-- Consumir o hook `useDashboardSettings`
-- Condicionar renderização dos cards com `show_faturamento_medio`, `show_cmv`, `show_top_foods`, `show_top_drinks`
-- No CMV: filtrar transações por `cmv_categories` em vez de hardcoded `"C"` e `"B"`
-- Nos Top 10: usar `top_foods_title` e `top_drinks_title` como títulos
+**Card CMV (imagem 1):**
+- Usar `dashSettings.cmv_title` no lugar de "CMV" hardcoded
+
+**Rankings (imagem 2):**
+- Remover ícones emoji (🍽️ e 🍹) dos títulos dos rankings
+- Remover ícones emoji da listagem de produtos recentes
+- Usar apenas o texto do título configurado
+
+**Formulário de produto (imagem 3):**
+- Remover os botões "Comida" / "Bebida"
+- Associar o produto ao ranking pela posição: primeiro ranking = tipo "comida" (internamente), segundo = "bebida"
+- Trocar para um **Select** com as opções sendo os títulos configurados dos rankings (ex: "Top 10 Comidas" e "Top 10 Bebidas", ou o que o cliente definir)
+- Placeholder do nome: "Ex: Produto, Cliente, Item..." em vez de "Ex: Picanha, Caipirinha..."
+- Remover emojis da listagem de produtos do mês
+
+### 5. Atualizar importação por IA
+
+- Na listagem de resultados da IA, remover emojis e mostrar o nome do tipo configurado em vez de "comida"/"bebida"
 
 ### Detalhes técnicos
-
-- A tabela usa `UNIQUE(organization_id)` para garantir um registro por org
-- O save no OrgSettings faz upsert (`INSERT ... ON CONFLICT`)
-- O hook usa `useOrganization()` para obter o `organization.id`
-- As categorias do CMV são armazenadas como array de códigos (ex: `{C,B,F}`)
+- O campo `tipo` no banco (`products.tipo`) continua como `"comida"` e `"bebida"` internamente — apenas a apresentação muda
+- O Select no formulário mapeia o título do ranking para o tipo interno
+- Uma coluna nova (`cmv_title`) na tabela existente, sem breaking changes
 
