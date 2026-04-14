@@ -2,6 +2,8 @@ import { createContext, useContext, useState, useEffect, useCallback, type React
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 
+const SUPER_USER_EMAIL = "estevaodefendi95@gmail.com";
+
 export interface Organization {
   id: string;
   name: string;
@@ -25,6 +27,8 @@ interface OrganizationContextType {
   membership: OrgMember | null;
   loading: boolean;
   hasOrg: boolean;
+  availableOrganizations: Organization[];
+  isSuperUser: boolean;
   switchOrganization: (orgId: string) => Promise<void>;
   refreshOrganization: () => Promise<void>;
 }
@@ -41,12 +45,16 @@ export const OrganizationProvider = ({ children }: { children: ReactNode }) => {
   const { user, loading: authLoading } = useAuth();
   const [organization, setOrganization] = useState<Organization | null>(null);
   const [membership, setMembership] = useState<OrgMember | null>(null);
+  const [availableOrganizations, setAvailableOrganizations] = useState<Organization[]>([]);
   const [loading, setLoading] = useState(true);
+
+  const isSuperUser = user?.email === SUPER_USER_EMAIL;
 
   const loadOrganization = useCallback(async () => {
     if (!user) {
       setOrganization(null);
       setMembership(null);
+      setAvailableOrganizations([]);
       setLoading(false);
       return;
     }
@@ -60,7 +68,30 @@ export const OrganizationProvider = ({ children }: { children: ReactNode }) => {
 
       if (memError) throw memError;
 
-      if (!memberships || memberships.length === 0) {
+      // For super user, load all organizations
+      let allOrgs: Organization[] = [];
+      if (user.email === SUPER_USER_EMAIL) {
+        const { data: orgs, error: orgsError } = await supabase
+          .from("organizations")
+          .select("*")
+          .order("name");
+        if (!orgsError && orgs) {
+          allOrgs = orgs.map((o) => ({
+            id: o.id,
+            name: o.name,
+            slug: o.slug,
+            logo_url: o.logo_url,
+            primary_color: o.primary_color,
+            plan: o.plan,
+            subscription_status: o.subscription_status,
+          }));
+        }
+        setAvailableOrganizations(allOrgs);
+      } else {
+        setAvailableOrganizations([]);
+      }
+
+      if ((!memberships || memberships.length === 0) && allOrgs.length === 0) {
         setOrganization(null);
         setMembership(null);
         setLoading(false);
@@ -69,34 +100,65 @@ export const OrganizationProvider = ({ children }: { children: ReactNode }) => {
 
       // Check localStorage for preferred org
       const preferredOrgId = localStorage.getItem("paggio_active_org");
-      const activeMembership = memberships.find((m) => m.organization_id === preferredOrgId) || memberships[0];
 
-      // Load the organization
-      const { data: org, error: orgError } = await supabase
-        .from("organizations")
-        .select("*")
-        .eq("id", activeMembership.organization_id)
-        .single();
+      // For super user, allow selecting any org
+      if (user.email === SUPER_USER_EMAIL && allOrgs.length > 0) {
+        const selectedOrg = allOrgs.find((o) => o.id === preferredOrgId) || allOrgs[0];
+        setOrganization(selectedOrg);
 
-      if (orgError) throw orgError;
+        // Check if user has real membership
+        const realMembership = memberships?.find((m) => m.organization_id === selectedOrg.id);
+        if (realMembership) {
+          setMembership({
+            id: realMembership.id,
+            organization_id: realMembership.organization_id,
+            user_id: realMembership.user_id,
+            role: realMembership.role as OrgMember["role"],
+            created_at: realMembership.created_at,
+          });
+        } else {
+          // Virtual membership for super user
+          setMembership({
+            id: "virtual-super-user",
+            organization_id: selectedOrg.id,
+            user_id: user.id,
+            role: "owner",
+            created_at: new Date().toISOString(),
+          });
+        }
+        localStorage.setItem("paggio_active_org", selectedOrg.id);
+      } else if (memberships && memberships.length > 0) {
+        const activeMembership = memberships.find((m) => m.organization_id === preferredOrgId) || memberships[0];
 
-      setOrganization({
-        id: org.id,
-        name: org.name,
-        slug: org.slug,
-        logo_url: org.logo_url,
-        primary_color: org.primary_color,
-        plan: org.plan,
-        subscription_status: org.subscription_status,
-      });
-      setMembership({
-        id: activeMembership.id,
-        organization_id: activeMembership.organization_id,
-        user_id: activeMembership.user_id,
-        role: activeMembership.role as OrgMember["role"],
-        created_at: activeMembership.created_at,
-      });
-      localStorage.setItem("paggio_active_org", activeMembership.organization_id);
+        const { data: org, error: orgError } = await supabase
+          .from("organizations")
+          .select("*")
+          .eq("id", activeMembership.organization_id)
+          .single();
+
+        if (orgError) throw orgError;
+
+        setOrganization({
+          id: org.id,
+          name: org.name,
+          slug: org.slug,
+          logo_url: org.logo_url,
+          primary_color: org.primary_color,
+          plan: org.plan,
+          subscription_status: org.subscription_status,
+        });
+        setMembership({
+          id: activeMembership.id,
+          organization_id: activeMembership.organization_id,
+          user_id: activeMembership.user_id,
+          role: activeMembership.role as OrgMember["role"],
+          created_at: activeMembership.created_at,
+        });
+        localStorage.setItem("paggio_active_org", activeMembership.organization_id);
+      } else {
+        setOrganization(null);
+        setMembership(null);
+      }
     } catch (err) {
       console.error("Error loading organization:", err);
       setOrganization(null);
@@ -127,6 +189,8 @@ export const OrganizationProvider = ({ children }: { children: ReactNode }) => {
         membership,
         loading,
         hasOrg: !!organization,
+        availableOrganizations,
+        isSuperUser,
         switchOrganization,
         refreshOrganization,
       }}
