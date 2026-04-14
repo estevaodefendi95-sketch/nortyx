@@ -3,6 +3,7 @@ import { useTransactions } from "@/context/TransactionsContext";
 import { formatCurrency, type CategoryCode } from "@/data/cashflow";
 import { supabase } from "@/integrations/supabase/client";
 import { useCategories } from "@/context/CategoriesContext";
+import { useDashboardSettings } from "@/hooks/useDashboardSettings";
 import { FileText, Upload, Trophy, TrendingUp, Wallet, X, Plus, Trash2, Calendar, Percent, Image, Loader2, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -35,6 +36,7 @@ const WEEKDAYS_PT = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
 const DadosView = ({ selectedMonths, selectedYear, isViewer = false }: DadosViewProps) => {
   const isAllSelected = selectedMonths.length === 0;
   const { transactions, dailyIncomes } = useTransactions();
+  const { settings: dashSettings } = useDashboardSettings();
   const [selectedWeekdays, setSelectedWeekdays] = useState<number[]>([]);
   const { toast } = useToast();
   const [products, setProducts] = useState<Product[]>([]);
@@ -256,10 +258,10 @@ const DadosView = ({ selectedMonths, selectedYear, isViewer = false }: DadosView
   // CMV = (Comida + Bebida expenses) / Faturamento
   const cmv = useMemo(() => {
     const gastosCB = transactions
-      .filter((t) => t.tipo === "saida" && (t.categoria === "C" || t.categoria === "B") && matchMonth(t.data))
+      .filter((t) => t.tipo === "saida" && dashSettings.cmv_categories.includes(t.categoria) && matchMonth(t.data))
       .reduce((s, t) => s + t.valor, 0);
     return { gastosCB, percentual: faturamento > 0 ? (gastosCB / faturamento) * 100 : 0 };
-  }, [transactions, faturamento, selectedMonths, isAllSelected]);
+  }, [transactions, faturamento, selectedMonths, isAllSelected, dashSettings.cmv_categories]);
 
   // Parse DD/MM/YYYY to Date
   const parseDate = (dateStr: string) => {
@@ -419,8 +421,10 @@ const DadosView = ({ selectedMonths, selectedYear, isViewer = false }: DadosView
       </div>
 
       {/* Faturamento Médio + CMV */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      {(dashSettings.show_faturamento_medio || dashSettings.show_cmv) && (
+      <div className={`grid grid-cols-1 ${dashSettings.show_faturamento_medio && dashSettings.show_cmv ? "sm:grid-cols-2" : ""} gap-4`}>
         {/* Faturamento Médio por Dia */}
+        {dashSettings.show_faturamento_medio && (
         <div className="rounded-xl bg-card border border-border p-5">
           {/* Weekday filter on top */}
           <div className="flex gap-1 sm:gap-1.5 mb-4 flex-nowrap overflow-x-auto">
@@ -482,8 +486,10 @@ const DadosView = ({ selectedMonths, selectedYear, isViewer = false }: DadosView
             </>
           )}
         </div>
+        )}
 
         {/* CMV Card */}
+        {dashSettings.show_cmv && (
         <div className="rounded-xl bg-card border border-border p-5 flex flex-col justify-between">
           <div>
             <div className="flex items-center gap-2 text-muted-foreground mb-2">
@@ -496,7 +502,9 @@ const DadosView = ({ selectedMonths, selectedYear, isViewer = false }: DadosView
           </div>
           <div className="mt-2">
             <p className="text-xs text-muted-foreground">
-              Comida + Bebida: {formatCurrency(cmv.gastosCB)}
+              {dashSettings.cmv_categories.length > 0
+                ? `Categorias: ${dashSettings.cmv_categories.join(" + ")}`
+                : "Nenhuma categoria selecionada"}: {formatCurrency(cmv.gastosCB)}
             </p>
             <p className="text-xs text-muted-foreground">
               Faturamento: {formatCurrency(faturamento)}
@@ -504,21 +512,29 @@ const DadosView = ({ selectedMonths, selectedYear, isViewer = false }: DadosView
             <p className="text-xs text-muted-foreground mt-1">{monthLabel}</p>
           </div>
         </div>
+        )}
       </div>
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      )}
+      {(dashSettings.show_top_foods || dashSettings.show_top_drinks) && (
+      <div className={`grid grid-cols-1 ${dashSettings.show_top_foods && dashSettings.show_top_drinks ? "lg:grid-cols-2" : ""} gap-6`}>
+        {dashSettings.show_top_foods && (
         <RankingList
-          title="Top 10 Comidas"
+          title={dashSettings.top_foods_title}
           items={topFoods}
           icon="🍽️"
           emptyText="Nenhuma comida cadastrada para este mês"
         />
+        )}
+        {dashSettings.show_top_drinks && (
         <RankingList
-          title="Top 10 Bebidas"
+          title={dashSettings.top_drinks_title}
           items={topDrinks}
           icon="🍹"
           emptyText="Nenhuma bebida cadastrada para este mês"
         />
+        )}
       </div>
+      )}
 
       {!isViewer && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
