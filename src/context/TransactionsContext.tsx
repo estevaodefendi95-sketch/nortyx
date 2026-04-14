@@ -1,7 +1,5 @@
 import { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from "react";
 import {
-  transactions as initialTransactions,
-  dailyIncomes as initialDailyIncomes,
   type Transaction,
   type DailyIncome,
   type FormaPagamento,
@@ -11,8 +9,11 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useOrganization } from "@/context/OrganizationContext";
 
-// Helper to fetch all rows from a table (bypasses 1000 row limit)
-async function fetchAllFromTable(table: "transactions" | "daily_incomes", orderCol: string) {
+async function fetchAllFromTable(
+  table: "transactions" | "daily_incomes",
+  orderCol: string,
+  organizationId: string,
+) {
   const PAGE_SIZE = 1000;
   let allData: any[] = [];
   let from = 0;
@@ -22,6 +23,7 @@ async function fetchAllFromTable(table: "transactions" | "daily_incomes", orderC
     const { data, error } = await supabase
       .from(table)
       .select("*")
+      .eq("organization_id", organizationId)
       .order(orderCol, { ascending: true })
       .range(from, from + PAGE_SIZE - 1);
 
@@ -97,7 +99,6 @@ const mapDailyIncomeRow = (r: any): DailyIncome => ({
   valor: Number(r.valor),
 });
 
-// Helper to parse DD/MM/YYYY to comparable YYYY-MM-DD
 const parseDate = (d: string) => {
   if (isIsoDate(d)) return d;
   const [day, month, year] = d.split("/");
@@ -112,9 +113,9 @@ export const TransactionsProvider = ({ children }: { children: ReactNode }) => {
   const [incomes, setIncomes] = useState<DailyIncome[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Load data from Supabase once authenticated
   useEffect(() => {
     if (authLoading) return;
+
     if (!user || !orgId) {
       setTxns([]);
       setIncomes([]);
@@ -123,54 +124,19 @@ export const TransactionsProvider = ({ children }: { children: ReactNode }) => {
     }
 
     const loadData = async () => {
+      setIsLoading(true);
       try {
-        // Load ALL transactions and daily incomes (paginated to bypass 1000 row limit)
-        let txData: any[];
-        let incData: any[];
+        const [txData, incData] = await Promise.all([
+          fetchAllFromTable("transactions", "id", orgId),
+          fetchAllFromTable("daily_incomes", "id", orgId),
+        ]);
 
-        try {
-          [txData, incData] = await Promise.all([
-            fetchAllFromTable("transactions", "id"),
-            fetchAllFromTable("daily_incomes", "id"),
-          ]);
-        } catch (err) {
-          console.error("Error loading data:", err);
-          setTxns(initialTransactions);
-          setIncomes(initialDailyIncomes);
-          setIsLoading(false);
-          return;
-        }
-
-        // If tables are empty, seed from initial data
-        if (txData.length === 0) {
-          console.log("Seeding transactions...");
-          const batchSize = 50;
-          for (let i = 0; i < initialTransactions.length; i += batchSize) {
-            const batch = initialTransactions.slice(i, i + batchSize).map(({ id, ...rest }) => ({ ...rest, organization_id: orgId }));
-            await supabase.from("transactions").insert(batch as any);
-          }
-          const seeded = await fetchAllFromTable("transactions", "id");
-          setTxns(seeded.map(mapTransactionRow));
-        } else {
-          setTxns(txData.map(mapTransactionRow));
-        }
-
-        if (incData.length === 0) {
-          console.log("Seeding daily incomes...");
-          const batchSize = 50;
-          for (let i = 0; i < initialDailyIncomes.length; i += batchSize) {
-            const batch = initialDailyIncomes.slice(i, i + batchSize).map(({ id, ...rest }) => ({ ...rest, organization_id: orgId }));
-            await supabase.from("daily_incomes").insert(batch as any);
-          }
-          const seeded = await fetchAllFromTable("daily_incomes", "id");
-          setIncomes(seeded.map(mapDailyIncomeRow));
-        } else {
-          setIncomes(incData.map(mapDailyIncomeRow));
-        }
+        setTxns(txData.map(mapTransactionRow));
+        setIncomes(incData.map(mapDailyIncomeRow));
       } catch (err) {
         console.error("Failed to load from database:", err);
-        setTxns(initialTransactions);
-        setIncomes(initialDailyIncomes);
+        setTxns([]);
+        setIncomes([]);
       } finally {
         setIsLoading(false);
       }
@@ -179,14 +145,18 @@ export const TransactionsProvider = ({ children }: { children: ReactNode }) => {
     loadData();
   }, [user, authLoading, orgId]);
 
-  // Subscribe to realtime changes
   useEffect(() => {
+    if (!orgId) return;
+
     const txChannel = supabase
-      .channel("transactions-realtime")
+      .channel(`transactions-realtime-${orgId}`)
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "transactions" },
         (payload) => {
+          const payloadOrgId = payload.new?.organization_id ?? payload.old?.organization_id;
+          if (payloadOrgId !== orgId) return;
+
           if (payload.eventType === "INSERT") {
             setTxns((prev) => {
               if (prev.some((t) => t.id === Number(payload.new.id))) return prev;
@@ -204,11 +174,14 @@ export const TransactionsProvider = ({ children }: { children: ReactNode }) => {
       .subscribe();
 
     const incChannel = supabase
-      .channel("daily-incomes-realtime")
+      .channel(`daily-incomes-realtime-${orgId}`)
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "daily_incomes" },
         (payload) => {
+          const payloadOrgId = payload.new?.organization_id ?? payload.old?.organization_id;
+          if (payloadOrgId !== orgId) return;
+
           if (payload.eventType === "INSERT") {
             setIncomes((prev) => {
               const newId = Number(payload.new.id);
@@ -234,7 +207,7 @@ export const TransactionsProvider = ({ children }: { children: ReactNode }) => {
       supabase.removeChannel(txChannel);
       supabase.removeChannel(incChannel);
     };
-  }, []);
+  }, [orgId]);
 
   const logAudit = useCallback(async (action: string, tableName: string, recordId: string, oldData?: any, newData?: any) => {
     try {
@@ -253,6 +226,8 @@ export const TransactionsProvider = ({ children }: { children: ReactNode }) => {
   }, [user, orgId]);
 
   const addTransaction = useCallback(async (t: Omit<Transaction, "id">) => {
+    if (!orgId) return false;
+
     const tempId = Date.now() + Math.random();
     const normalizedTransaction = { ...t, data: normalizeDate(t.data) };
     const optimisticTx: Transaction = { ...normalizedTransaction, id: tempId };
@@ -330,15 +305,14 @@ export const TransactionsProvider = ({ children }: { children: ReactNode }) => {
   }, [txns, logAudit]);
 
   const deleteTransactionsByDateRange = useCallback(async (startDate: string, endDate: string) => {
-    // Optimistic
+    if (!orgId) return;
+
     setTxns((prev) => prev.filter((t) => {
       const iso = parseDate(t.data);
       return iso < startDate || iso > endDate;
     }));
 
-    // Get all transactions and filter by date range on client side
-    // since data is stored as DD/MM/YYYY text
-    const allTxns = await fetchAllFromTable("transactions", "id") as any[];
+    const allTxns = await fetchAllFromTable("transactions", "id", orgId) as any[];
     if (allTxns) {
       const idsToDelete = allTxns
         .filter((t) => {
@@ -351,16 +325,17 @@ export const TransactionsProvider = ({ children }: { children: ReactNode }) => {
         await supabase.from("transactions").delete().in("id", idsToDelete);
       }
     }
-  }, []);
+  }, [orgId]);
 
   const deleteDailyIncomesByDateRange = useCallback(async (startDate: string, endDate: string) => {
-    // Optimistic
+    if (!orgId) return;
+
     setIncomes((prev) => prev.filter((i) => {
       const iso = parseDate(i.data);
       return iso < startDate || iso > endDate;
     }));
 
-    const allInc = await fetchAllFromTable("daily_incomes", "id") as any[];
+    const allInc = await fetchAllFromTable("daily_incomes", "id", orgId) as any[];
     if (allInc) {
       const idsToDelete = allInc
         .filter((i) => {
@@ -373,9 +348,11 @@ export const TransactionsProvider = ({ children }: { children: ReactNode }) => {
         await supabase.from("daily_incomes").delete().in("id", idsToDelete);
       }
     }
-  }, []);
+  }, [orgId]);
 
   const addDailyIncome = useCallback(async (d: DailyIncome) => {
+    if (!orgId) return false;
+
     const tempId = Date.now() + Math.random();
     const normalizedIncome = { ...d, data: normalizeDate(d.data) };
     const optimistic = { ...normalizedIncome, id: tempId };
@@ -401,7 +378,7 @@ export const TransactionsProvider = ({ children }: { children: ReactNode }) => {
       });
     }
     return true;
-  }, []);
+  }, [orgId]);
 
   const reassignCategory = useCallback((fromCode: string, toCode: string) => {
     setTxns((prev) =>
@@ -438,7 +415,6 @@ export const TransactionsProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   const deleteRecurringFromDate = useCallback(async (groupId: string, fromDate: string) => {
-    // Delete all transactions in this recurrence group with date >= fromDate
     const toDelete = txns.filter(t => 
       t.recurrence_group_id === groupId && parseDate(t.data) >= fromDate
     );
