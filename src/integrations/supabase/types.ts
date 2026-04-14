@@ -383,6 +383,7 @@ export type Database = {
       org_dashboard_settings: {
         Row: {
           cmv_categories: string[]
+          cmv_title: string
           created_at: string
           id: string
           organization_id: string
@@ -396,6 +397,7 @@ export type Database = {
         }
         Insert: {
           cmv_categories?: string[]
+          cmv_title?: string
           created_at?: string
           id?: string
           organization_id: string
@@ -409,6 +411,7 @@ export type Database = {
         }
         Update: {
           cmv_categories?: string[]
+          cmv_title?: string
           created_at?: string
           id?: string
           organization_id?: string
