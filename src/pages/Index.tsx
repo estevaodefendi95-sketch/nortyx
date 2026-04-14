@@ -135,6 +135,24 @@ const Index = () => {
                   {companyName}
                 </span>
               </div>
+
+              {isSuperUser && availableOrganizations.length > 1 && (
+                <Select
+                  value={organization?.id || ""}
+                  onValueChange={(val) => switchOrganization(val)}
+                >
+                  <SelectTrigger className="w-[180px] h-8 text-xs">
+                    <SelectValue placeholder="Trocar org" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {availableOrganizations.map((org) => (
+                      <SelectItem key={org.id} value={org.id}>
+                        {org.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
             </div>
 
             {/* Action icons - always top right */}
