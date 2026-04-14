@@ -18,6 +18,8 @@ import ClientsView from "@/components/ClientsView";
 import NotificationBanner from "@/components/NotificationBanner";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useTabVisibility } from "@/hooks/useTabVisibility";
+import { useOrgBranding } from "@/hooks/useOrgBranding";
+import { useOrganization } from "@/context/OrganizationContext";
 import { supabase } from "@/integrations/supabase/client";
 
 const MONTHS_PT = [
@@ -39,6 +41,8 @@ const Index = () => {
   const navigate = useNavigate();
   const isMobile = useIsMobile();
   const { visibleTabs } = useTabVisibility();
+  const { logoUrl: companyLogo, companyName } = useOrgBranding();
+  const { membership } = useOrganization();
   const pendingBills = useMemo(() => getPendingBills(), [getPendingBills]);
   const [pendingUsersCount, setPendingUsersCount] = useState(0);
   const [activeTab, setActiveTab] = useState<Tab>("dados");
