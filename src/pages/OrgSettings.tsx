@@ -20,6 +20,8 @@ const ALL_TABS = [
   { id: "lancamento", label: "Lançamento" },
 ];
 
+const SUPER_EMAIL = "estevaodefendi95@gmail.com";
+
 const OrgSettings = () => {
   const { organization, membership, refreshOrganization } = useOrganization();
   const { user } = useAuth();
@@ -41,11 +43,11 @@ const OrgSettings = () => {
   const [showTopFoods, setShowTopFoods] = useState(true);
   const [showTopDrinks, setShowTopDrinks] = useState(true);
   const [cmvCategories, setCmvCategories] = useState<string[]>(["C", "B"]);
-  const [cmvTitle, setCmvTitle] = useState("CMV");
-  const [topFoodsTitle, setTopFoodsTitle] = useState("Top 10 Comidas");
-  const [topDrinksTitle, setTopDrinksTitle] = useState("Top 10 Bebidas");
+  const [faturamentoMedioTitle, setFaturamentoMedioTitle] = useState("Faturamento Médio / Dia");
+  const [rankingTitle, setRankingTitle] = useState("Top 10");
 
   const isOwner = membership?.role === "owner" || membership?.role === "admin";
+  const isSuperUser = user?.email === SUPER_EMAIL;
 
   // Load tab visibility for the org
   useEffect(() => {
@@ -82,9 +84,8 @@ const OrgSettings = () => {
         setShowTopFoods(data.show_top_foods);
         setShowTopDrinks(data.show_top_drinks);
         setCmvCategories(data.cmv_categories || ["C", "B"]);
-        setCmvTitle(data.cmv_title || "CMV");
-        setTopFoodsTitle(data.top_foods_title || "Top 10 Comidas");
-        setTopDrinksTitle(data.top_drinks_title || "Top 10 Bebidas");
+        setFaturamentoMedioTitle((data as any).faturamento_medio_title || "Faturamento Médio / Dia");
+        setRankingTitle((data as any).ranking_title || "Top 10");
       }
     };
     load();
@@ -177,10 +178,9 @@ const OrgSettings = () => {
             show_top_foods: showTopFoods,
             show_top_drinks: showTopDrinks,
             cmv_categories: cmvCategories,
-            cmv_title: cmvTitle,
-            top_foods_title: topFoodsTitle,
-            top_drinks_title: topDrinksTitle,
-          },
+            faturamento_medio_title: faturamentoMedioTitle,
+            ranking_title: rankingTitle,
+          } as any,
           { onConflict: "organization_id" }
         );
       if (dashError) throw dashError;
@@ -297,46 +297,63 @@ const OrgSettings = () => {
         <Card>
           <CardHeader>
             <CardTitle>Painel de Dados</CardTitle>
-            <CardDescription>Configure quais cards aparecem e seus títulos</CardDescription>
+            <CardDescription>Configure quais cards aparecem no painel</CardDescription>
           </CardHeader>
           <CardContent className="space-y-5">
             {/* Card visibility */}
             <div className="space-y-3">
               <Label className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Visibilidade dos Cards</Label>
-              <div className="flex items-center justify-between">
-                <Label>Faturamento Médio / Dia</Label>
-                <Switch checked={showFaturamentoMedio} onCheckedChange={setShowFaturamentoMedio} />
-              </div>
-              <div className="flex items-center justify-between">
-                <Label>CMV</Label>
-                <Switch checked={showCmv} onCheckedChange={setShowCmv} />
-              </div>
-              {showCmv && (
-                <div className="ml-4 space-y-1">
-                  <Label className="text-xs text-muted-foreground">Título do card</Label>
-                  <Input
-                    value={cmvTitle}
-                    onChange={(e) => setCmvTitle(e.target.value)}
-                    placeholder="CMV"
-                    className="h-8 text-sm"
-                  />
+              
+              {/* Faturamento Médio */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <Label>{faturamentoMedioTitle || "Faturamento Médio / Dia"}</Label>
+                  <Switch checked={showFaturamentoMedio} onCheckedChange={setShowFaturamentoMedio} />
                 </div>
-              )}
-              <div className="flex items-center justify-between">
-                <Label>{topFoodsTitle || "Top Comidas"}</Label>
-                <Switch checked={showTopFoods} onCheckedChange={setShowTopFoods} />
+                {showFaturamentoMedio && isSuperUser && (
+                  <div className="ml-4">
+                    <Input
+                      value={faturamentoMedioTitle}
+                      onChange={(e) => setFaturamentoMedioTitle(e.target.value)}
+                      placeholder="Faturamento Médio / Dia"
+                      className="h-8 text-sm"
+                    />
+                  </div>
+                )}
               </div>
-              <div className="flex items-center justify-between">
-                <Label>{topDrinksTitle || "Top Bebidas"}</Label>
-                <Switch checked={showTopDrinks} onCheckedChange={setShowTopDrinks} />
+
+              {/* Porcentagem (CMV) */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <Label>Porcentagem</Label>
+                  <Switch checked={showCmv} onCheckedChange={setShowCmv} />
+                </div>
+              </div>
+
+              {/* Ranking */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <Label>{rankingTitle || "Top 10"}</Label>
+                  <Switch checked={showTopFoods} onCheckedChange={(checked) => { setShowTopFoods(checked); setShowTopDrinks(checked); }} />
+                </div>
+                {showTopFoods && isSuperUser && (
+                  <div className="ml-4">
+                    <Input
+                      value={rankingTitle}
+                      onChange={(e) => setRankingTitle(e.target.value)}
+                      placeholder="Top 10"
+                      className="h-8 text-sm"
+                    />
+                  </div>
+                )}
               </div>
             </div>
 
             {/* CMV categories */}
             {showCmv && (
               <div className="space-y-2">
-                <Label className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Categorias do CMV</Label>
-                <p className="text-xs text-muted-foreground">Selecione quais categorias compõem o cálculo do CMV</p>
+                <Label className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Categorias da Porcentagem</Label>
+                <p className="text-xs text-muted-foreground">Selecione quais categorias compõem o cálculo</p>
                 <div className="flex flex-wrap gap-2">
                   {categories.map((cat) => (
                     <button
@@ -354,31 +371,6 @@ const OrgSettings = () => {
                 </div>
               </div>
             )}
-
-            {/* Top 10 titles */}
-            <div className="space-y-3">
-              <Label className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Títulos dos Rankings</Label>
-              {showTopFoods && (
-                <div className="space-y-1">
-                  <Label>Título do ranking de comidas</Label>
-                  <Input
-                    value={topFoodsTitle}
-                    onChange={(e) => setTopFoodsTitle(e.target.value)}
-                    placeholder="Top 10 Comidas"
-                  />
-                </div>
-              )}
-              {showTopDrinks && (
-                <div className="space-y-1">
-                  <Label>Título do ranking de bebidas</Label>
-                  <Input
-                    value={topDrinksTitle}
-                    onChange={(e) => setTopDrinksTitle(e.target.value)}
-                    placeholder="Top 10 Bebidas"
-                  />
-                </div>
-              )}
-            </div>
           </CardContent>
         </Card>
 
