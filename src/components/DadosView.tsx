@@ -515,20 +515,26 @@ const DadosView = ({ selectedMonths, selectedYear, isViewer = false }: DadosView
         )}
       </div>
       )}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      {(dashSettings.show_top_foods || dashSettings.show_top_drinks) && (
+      <div className={`grid grid-cols-1 ${dashSettings.show_top_foods && dashSettings.show_top_drinks ? "lg:grid-cols-2" : ""} gap-6`}>
+        {dashSettings.show_top_foods && (
         <RankingList
-          title="Top 10 Comidas"
+          title={dashSettings.top_foods_title}
           items={topFoods}
           icon="🍽️"
           emptyText="Nenhuma comida cadastrada para este mês"
         />
+        )}
+        {dashSettings.show_top_drinks && (
         <RankingList
-          title="Top 10 Bebidas"
+          title={dashSettings.top_drinks_title}
           items={topDrinks}
           icon="🍹"
           emptyText="Nenhuma bebida cadastrada para este mês"
         />
+        )}
       </div>
+      )}
 
       {!isViewer && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
