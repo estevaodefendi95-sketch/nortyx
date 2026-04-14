@@ -43,7 +43,7 @@ const Index = () => {
   const isMobile = useIsMobile();
   const { visibleTabs } = useTabVisibility();
   const { logoUrl: companyLogo, companyName } = useOrgBranding();
-  const { membership } = useOrganization();
+  const { membership, availableOrganizations, isSuperUser, switchOrganization, organization } = useOrganization();
   const pendingBills = useMemo(() => getPendingBills(), [getPendingBills]);
   const [pendingUsersCount, setPendingUsersCount] = useState(0);
   const [activeTab, setActiveTab] = useState<Tab>("dados");
