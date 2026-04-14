@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { useOrganization } from "@/context/OrganizationContext";
 import { useAuth } from "@/hooks/useAuth";
+import { useCategories } from "@/context/CategoriesContext";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -22,6 +23,7 @@ const ALL_TABS = [
 const OrgSettings = () => {
   const { organization, membership, refreshOrganization } = useOrganization();
   const { user } = useAuth();
+  const { categories } = useCategories();
   const { toast } = useToast();
   const navigate = useNavigate();
   const logoInputRef = useRef<HTMLInputElement>(null);
@@ -32,6 +34,15 @@ const OrgSettings = () => {
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const [tabVisibility, setTabVisibility] = useState<Record<string, boolean>>({});
   const [saving, setSaving] = useState(false);
+
+  // Dashboard settings state
+  const [showFaturamentoMedio, setShowFaturamentoMedio] = useState(true);
+  const [showCmv, setShowCmv] = useState(true);
+  const [showTopFoods, setShowTopFoods] = useState(true);
+  const [showTopDrinks, setShowTopDrinks] = useState(true);
+  const [cmvCategories, setCmvCategories] = useState<string[]>(["C", "B"]);
+  const [topFoodsTitle, setTopFoodsTitle] = useState("Top 10 Comidas");
+  const [topDrinksTitle, setTopDrinksTitle] = useState("Top 10 Bebidas");
 
   const isOwner = membership?.role === "owner" || membership?.role === "admin";
 
@@ -54,6 +65,29 @@ const OrgSettings = () => {
     load();
   }, [organization]);
 
+  // Load dashboard settings
+  useEffect(() => {
+    if (!organization) return;
+    const load = async () => {
+      const { data } = await supabase
+        .from("org_dashboard_settings")
+        .select("*")
+        .eq("organization_id", organization.id)
+        .maybeSingle();
+
+      if (data) {
+        setShowFaturamentoMedio(data.show_faturamento_medio);
+        setShowCmv(data.show_cmv);
+        setShowTopFoods(data.show_top_foods);
+        setShowTopDrinks(data.show_top_drinks);
+        setCmvCategories(data.cmv_categories || ["C", "B"]);
+        setTopFoodsTitle(data.top_foods_title || "Top 10 Comidas");
+        setTopDrinksTitle(data.top_drinks_title || "Top 10 Bebidas");
+      }
+    };
+    load();
+  }, [organization]);
+
   useEffect(() => {
     if (organization) {
       setName(organization.name);
@@ -72,6 +106,12 @@ const OrgSettings = () => {
     e.target.value = "";
   };
 
+  const toggleCmvCategory = (code: string) => {
+    setCmvCategories((prev) =>
+      prev.includes(code) ? prev.filter((c) => c !== code) : [...prev, code]
+    );
+  };
+
   const handleSave = async () => {
     if (!organization || !user) return;
     setSaving(true);
@@ -79,20 +119,14 @@ const OrgSettings = () => {
     try {
       let logoUrl = organization.logo_url;
 
-      // Upload logo if changed
       if (logoFile) {
         const ext = logoFile.name.split(".").pop();
         const path = `${organization.id}/logo.${ext}`;
-
-        // Ensure bucket exists (will fail silently if exists)
         const { error: uploadError } = await supabase.storage
           .from("org-logos")
           .upload(path, logoFile, { upsert: true });
-
         if (!uploadError) {
-          const { data: urlData } = supabase.storage
-            .from("org-logos")
-            .getPublicUrl(path);
+          const { data: urlData } = supabase.storage.from("org-logos").getPublicUrl(path);
           logoUrl = urlData.publicUrl;
         }
       }
@@ -101,16 +135,10 @@ const OrgSettings = () => {
         logoUrl = null;
       }
 
-      // Update organization
       const { error } = await supabase
         .from("organizations")
-        .update({
-          name,
-          primary_color: primaryColor,
-          logo_url: logoUrl,
-        })
+        .update({ name, primary_color: primaryColor, logo_url: logoUrl })
         .eq("id", organization.id);
-
       if (error) throw error;
 
       // Save tab visibility
@@ -125,21 +153,34 @@ const OrgSettings = () => {
           .maybeSingle();
 
         if (existing) {
-          await supabase
-            .from("tab_visibility")
-            .update({ visible })
-            .eq("id", existing.id);
+          await supabase.from("tab_visibility").update({ visible }).eq("id", existing.id);
         } else {
-          await supabase
-            .from("tab_visibility")
-            .insert({
-              organization_id: organization.id,
-              tab_id: tab.id,
-              user_id: user.id,
-              visible,
-            });
+          await supabase.from("tab_visibility").insert({
+            organization_id: organization.id,
+            tab_id: tab.id,
+            user_id: user.id,
+            visible,
+          });
         }
       }
+
+      // Save dashboard settings (upsert)
+      const { error: dashError } = await supabase
+        .from("org_dashboard_settings")
+        .upsert(
+          {
+            organization_id: organization.id,
+            show_faturamento_medio: showFaturamentoMedio,
+            show_cmv: showCmv,
+            show_top_foods: showTopFoods,
+            show_top_drinks: showTopDrinks,
+            cmv_categories: cmvCategories,
+            top_foods_title: topFoodsTitle,
+            top_drinks_title: topDrinksTitle,
+          },
+          { onConflict: "organization_id" }
+        );
+      if (dashError) throw dashError;
 
       await refreshOrganization();
       toast({ title: "Configurações salvas com sucesso!" });
@@ -177,7 +218,6 @@ const OrgSettings = () => {
             <CardDescription>Logo, nome e cor principal da sua empresa</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            {/* Logo */}
             <div className="flex items-center gap-4">
               <div className="relative group">
                 <button
@@ -200,18 +240,14 @@ const OrgSettings = () => {
                 )}
                 <input ref={logoInputRef} type="file" accept="image/*" className="hidden" onChange={handleLogoChange} />
               </div>
-              <div className="text-sm text-muted-foreground">
-                Clique para alterar o logotipo
-              </div>
+              <div className="text-sm text-muted-foreground">Clique para alterar o logotipo</div>
             </div>
 
-            {/* Name */}
             <div className="space-y-2">
               <Label>Nome da Empresa</Label>
               <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Nome da empresa" />
             </div>
 
-            {/* Primary Color */}
             <div className="space-y-2">
               <Label>Cor Principal</Label>
               <div className="flex items-center gap-3">
@@ -227,10 +263,7 @@ const OrgSettings = () => {
                   className="w-32"
                   placeholder="#3B82F6"
                 />
-                <div
-                  className="w-10 h-10 rounded-lg border border-border"
-                  style={{ backgroundColor: primaryColor }}
-                />
+                <div className="w-10 h-10 rounded-lg border border-border" style={{ backgroundColor: primaryColor }} />
               </div>
             </div>
           </CardContent>
@@ -254,6 +287,84 @@ const OrgSettings = () => {
                 />
               </div>
             ))}
+          </CardContent>
+        </Card>
+
+        {/* Dashboard Settings */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Painel de Dados</CardTitle>
+            <CardDescription>Configure quais cards aparecem e seus títulos</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-5">
+            {/* Card visibility */}
+            <div className="space-y-3">
+              <Label className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Visibilidade dos Cards</Label>
+              <div className="flex items-center justify-between">
+                <Label>Faturamento Médio / Dia</Label>
+                <Switch checked={showFaturamentoMedio} onCheckedChange={setShowFaturamentoMedio} />
+              </div>
+              <div className="flex items-center justify-between">
+                <Label>CMV</Label>
+                <Switch checked={showCmv} onCheckedChange={setShowCmv} />
+              </div>
+              <div className="flex items-center justify-between">
+                <Label>{topFoodsTitle || "Top Comidas"}</Label>
+                <Switch checked={showTopFoods} onCheckedChange={setShowTopFoods} />
+              </div>
+              <div className="flex items-center justify-between">
+                <Label>{topDrinksTitle || "Top Bebidas"}</Label>
+                <Switch checked={showTopDrinks} onCheckedChange={setShowTopDrinks} />
+              </div>
+            </div>
+
+            {/* CMV categories */}
+            {showCmv && (
+              <div className="space-y-2">
+                <Label className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Categorias do CMV</Label>
+                <p className="text-xs text-muted-foreground">Selecione quais categorias compõem o cálculo do CMV</p>
+                <div className="flex flex-wrap gap-2">
+                  {categories.map((cat) => (
+                    <button
+                      key={cat.code}
+                      onClick={() => toggleCmvCategory(cat.code)}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all border ${
+                        cmvCategories.includes(cat.code)
+                          ? "bg-primary/15 border-primary/40 text-primary"
+                          : "bg-secondary/40 border-transparent text-muted-foreground"
+                      }`}
+                    >
+                      {cat.name}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Top 10 titles */}
+            <div className="space-y-3">
+              <Label className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Títulos dos Rankings</Label>
+              {showTopFoods && (
+                <div className="space-y-1">
+                  <Label>Título do ranking de comidas</Label>
+                  <Input
+                    value={topFoodsTitle}
+                    onChange={(e) => setTopFoodsTitle(e.target.value)}
+                    placeholder="Top 10 Comidas"
+                  />
+                </div>
+              )}
+              {showTopDrinks && (
+                <div className="space-y-1">
+                  <Label>Título do ranking de bebidas</Label>
+                  <Input
+                    value={topDrinksTitle}
+                    onChange={(e) => setTopDrinksTitle(e.target.value)}
+                    placeholder="Top 10 Bebidas"
+                  />
+                </div>
+              )}
+            </div>
           </CardContent>
         </Card>
 

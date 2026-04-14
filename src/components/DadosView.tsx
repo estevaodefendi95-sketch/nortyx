@@ -3,6 +3,7 @@ import { useTransactions } from "@/context/TransactionsContext";
 import { formatCurrency, type CategoryCode } from "@/data/cashflow";
 import { supabase } from "@/integrations/supabase/client";
 import { useCategories } from "@/context/CategoriesContext";
+import { useDashboardSettings } from "@/hooks/useDashboardSettings";
 import { FileText, Upload, Trophy, TrendingUp, Wallet, X, Plus, Trash2, Calendar, Percent, Image, Loader2, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
