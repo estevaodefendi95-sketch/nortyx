@@ -1,41 +1,43 @@
 
 
-# Simplificar dashboard e restringir personalização
+# Ajustar configurações do Painel de Dados
 
 ## Resumo
-1. Rankings usam título único (sem "comida"/"bebida")
-2. CMV vira "Porcentagem" fixo, sem campo de personalização
-3. Nos toggles de visibilidade, permitir personalizar nome e logo — mas apenas para a conta `estevaodefendi95@gmail.com`
+1. **Faturamento Médio / Dia** — remover input de personalização do nome, deixar fixo
+2. **Ranking** — permitir o cliente escolher entre 1 ou 2 visualizações, com nome customizável para cada
 
 ## Alterações
 
 ### 1. Migração SQL
-Adicionar colunas à `org_dashboard_settings`:
-- `faturamento_medio_title text NOT NULL DEFAULT 'Faturamento Médio / Dia'`
-- `ranking_title text NOT NULL DEFAULT 'Top 10'`
+Adicionar colunas para suportar nomes separados e controle independente dos dois rankings:
+```sql
+ALTER TABLE public.org_dashboard_settings
+  ADD COLUMN ranking_title_2 text NOT NULL DEFAULT 'Top 10';
+```
+(A coluna `ranking_title` já existe para o primeiro ranking. `show_top_foods` e `show_top_drinks` já controlam visibilidade individual.)
 
 ### 2. `useDashboardSettings.ts`
-- Adicionar `faturamento_medio_title` e `ranking_title` à interface
-- Remover `cmv_title` da interface (usar "Porcentagem" fixo no código)
-- Ambos os rankings usam `ranking_title`
+- Remover `faturamento_medio_title` da interface (nome fixo)
+- Adicionar `ranking_title_2: string` à interface
+- Carregar `ranking_title_2` do banco
 
 ### 3. `OrgSettings.tsx`
-- **Seção "Painel de Dados"**: cada switch mostra input de nome quando ativo:
-  - Faturamento Médio → input `faturamento_medio_title`
-  - Porcentagem → sem input (nome fixo)
-  - Ranking → input único `ranking_title` (sem separação comida/bebida)
-- Remover seção separada "Títulos dos Rankings"
-- Remover campo `cmv_title`
-- **Restrição**: toda a seção de personalização do dashboard (ou apenas os inputs de nome/logo) só aparece se `user?.email === "estevaodefendi95@gmail.com"`. Demais usuários admin/owner veem apenas os switches de visibilidade.
+- **Faturamento Médio**: remover o input de nome (mesmo para super user). Label fixo "Faturamento Médio / Dia"
+- **Ranking**: separar em dois switches independentes:
+  - Switch 1: liga/desliga o primeiro ranking + input para nome (`ranking_title`)
+  - Switch 2: liga/desliga o segundo ranking + input para nome (`ranking_title_2`)
+  - Inputs de nome visíveis apenas para `isSuperUser`, como já funciona
+- Salvar `ranking_title_2` no upsert
 
 ### 4. `DadosView.tsx`
-- Card CMV: título fixo **"Porcentagem"**
-- Ambos os rankings: usar `dashSettings.ranking_title`
-- Faturamento Médio: usar `dashSettings.faturamento_medio_title`
-- No Select do formulário de produto: usar `ranking_title + " 1"` e `ranking_title + " 2"` ou apenas o `ranking_title` como label genérico
+- Substituir `dashSettings.faturamento_medio_title` por string fixa "Faturamento Médio / Dia"
+- Primeiro ranking usa `dashSettings.ranking_title`
+- Segundo ranking usa `dashSettings.ranking_title_2`
+- Select do formulário de produto: usar os nomes configurados de cada ranking
+- Listagem de produtos: mostrar o nome do ranking correspondente
 
 ### Detalhes técnicos
-- A restrição por email é feita no frontend (OrgSettings) comparando `user.email`
-- O banco continua acessível por qualquer admin via RLS — a restrição é apenas de UI
-- Campos `top_foods_title` e `top_drinks_title` no banco continuam existindo mas não são mais editáveis separadamente
+- `show_top_foods` controla o primeiro ranking, `show_top_drinks` o segundo (internamente mantém os nomes de coluna)
+- A coluna `faturamento_medio_title` permanece no banco mas não é mais usada na UI
+- O cliente pode ter apenas 1 ranking (desligando o segundo) ou 2, cada um com nome próprio
 
