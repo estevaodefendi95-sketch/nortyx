@@ -17,6 +17,7 @@ const Auth = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [resetMode, setResetMode] = useState(false);
+  const [branding, setBranding] = useState<{ name: string; logo_url: string | null; primary_color: string } | null>(null);
   const { toast } = useToast();
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -24,6 +25,12 @@ const Auth = () => {
   useEffect(() => {
     if (user) navigate("/", { replace: true });
   }, [user, navigate]);
+
+  useEffect(() => {
+    supabase.rpc("get_login_branding").then(({ data }) => {
+      if (data && data.length > 0) setBranding(data[0]);
+    });
+  }, []);
 
   const handleEmailAuth = async (e: React.FormEvent) => {
     e.preventDefault();
