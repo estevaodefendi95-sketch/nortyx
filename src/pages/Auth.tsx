@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { lovable } from "@/integrations/lovable";
 import { Button } from "@/components/ui/button";
@@ -8,7 +8,6 @@ import { useToast } from "@/hooks/use-toast";
 import { Eye, EyeOff, Mail, Lock, User, Loader2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
-import { useEffect } from "react";
 
 const Auth = () => {
   const [isLogin, setIsLogin] = useState(true);
@@ -18,6 +17,7 @@ const Auth = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [resetMode, setResetMode] = useState(false);
+  const [branding, setBranding] = useState<{ name: string; logo_url: string | null; primary_color: string } | null>(null);
   const { toast } = useToast();
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -25,6 +25,12 @@ const Auth = () => {
   useEffect(() => {
     if (user) navigate("/", { replace: true });
   }, [user, navigate]);
+
+  useEffect(() => {
+    supabase.rpc("get_login_branding").then(({ data }) => {
+      if (data && data.length > 0) setBranding(data[0]);
+    });
+  }, []);
 
   const handleEmailAuth = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -78,8 +84,11 @@ const Auth = () => {
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-4">
       <div className="w-full max-w-sm space-y-6">
-        <div className="text-center space-y-2">
-          <h1 className="text-3xl font-display font-bold text-primary">PAGGIO</h1>
+        <div className="text-center space-y-3">
+          {branding?.logo_url && (
+            <img src={branding.logo_url} alt={branding.name} className="w-16 h-16 mx-auto rounded-lg object-cover" />
+          )}
+          <h1 className="text-3xl font-display font-bold text-primary">{branding?.name || "PAGGIO"}</h1>
           <p className="text-muted-foreground text-sm">
             {resetMode ? "Recuperar senha" : isLogin ? "Entre na sua conta" : "Crie sua conta"}
           </p>
