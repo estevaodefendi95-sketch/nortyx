@@ -39,38 +39,20 @@ const Onboarding = () => {
 
     setLoading(true);
     try {
-      // Create organization
-      const { data: org, error: orgError } = await supabase
-        .from("organizations")
-        .insert({ name: name.trim(), slug: slug.trim() })
-        .select()
-        .single();
+      const { data: orgId, error } = await supabase.rpc("create_organization_with_owner", {
+        _name: name.trim(),
+        _slug: slug.trim(),
+        _user_id: user.id,
+      });
 
-      if (orgError) {
-        if (orgError.message.includes("duplicate") || orgError.message.includes("unique")) {
+      if (error) {
+        if (error.message.includes("duplicate") || error.message.includes("unique")) {
           toast({ title: "Erro", description: "Este identificador já está em uso. Escolha outro.", variant: "destructive" });
           setLoading(false);
           return;
         }
-        throw orgError;
+        throw error;
       }
-
-      // Add user as owner
-      const { error: memberError } = await supabase
-        .from("organization_members")
-        .insert({
-          organization_id: org.id,
-          user_id: user.id,
-          role: "owner",
-        });
-
-      if (memberError) throw memberError;
-
-      // Update profile with organization_id
-      await supabase
-        .from("profiles")
-        .update({ organization_id: org.id })
-        .eq("user_id", user.id);
 
       await refreshOrganization();
       toast({ title: "Organização criada!", description: `${name} está pronta para uso.` });
