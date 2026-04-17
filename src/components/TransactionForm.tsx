@@ -2010,6 +2010,103 @@ const TransactionForm = () => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Date-change Approval Dialog */}
+      <AlertDialog open={showDateApprovalDialog} onOpenChange={(open) => {
+        if (!open) {
+          setShowDateApprovalDialog(false);
+          setDateCandidates([]);
+          setApprovedKeys(new Set());
+          setPendingCommit(null);
+          setShowImportModeDialog(false);
+          setPendingParsedEntries([]);
+          setPendingImportPeriod(null);
+          setImportFilter("all");
+        }
+      }}>
+        <AlertDialogContent className="max-w-[calc(100%-2rem)] sm:max-w-lg mx-auto">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Aprovar mudanças de data</AlertDialogTitle>
+            <AlertDialogDescription>
+              Algumas contas lançadas estão em datas diferentes do extrato. Selecione quais alterações deseja aplicar.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="max-h-[50vh] overflow-y-auto space-y-2 my-2">
+            {dateCandidates.map((c) => {
+              const checked = approvedKeys.has(c.key);
+              return (
+                <label
+                  key={c.key}
+                  className="flex items-start gap-3 p-3 rounded-lg border bg-secondary/30 cursor-pointer hover:bg-secondary/50"
+                >
+                  <input
+                    type="checkbox"
+                    checked={checked}
+                    onChange={(e) => {
+                      setApprovedKeys((prev) => {
+                        const next = new Set(prev);
+                        if (e.target.checked) next.add(c.key);
+                        else next.delete(c.key);
+                        return next;
+                      });
+                    }}
+                    className="mt-1"
+                  />
+                  <div className="flex-1 text-left text-sm">
+                    <div className="font-medium">{c.empresa}</div>
+                    <div className="text-xs text-muted-foreground">
+                      {formatCurrency(c.valor)} · {c.kind === "move" ? "Mover do extrato" : "Reagendar (não pago)"}
+                    </div>
+                    <div className="text-xs mt-1">
+                      <span className="line-through text-muted-foreground">{c.oldDate}</span>
+                      {" → "}
+                      <span className="font-semibold text-primary">{c.newDate}</span>
+                    </div>
+                  </div>
+                </label>
+              );
+            })}
+          </div>
+          <AlertDialogFooter className="flex-col sm:flex-row gap-2">
+            <AlertDialogCancel className="mt-0">Cancelar importação</AlertDialogCancel>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                if (!pendingCommit) return;
+                finalizeImport(pendingCommit.enriched, []);
+                setShowDateApprovalDialog(false);
+                setDateCandidates([]);
+                setApprovedKeys(new Set());
+                setPendingCommit(null);
+              }}
+            >
+              Manter datas originais
+            </Button>
+            <Button
+              size="sm"
+              onClick={() => {
+                if (!pendingCommit) return;
+                dateCandidates
+                  .filter((c) => c.kind === "move" && approvedKeys.has(c.key))
+                  .forEach((c) => {
+                    updateTransaction(c.existingId, { data: c.newDate });
+                  });
+                const approvedReschedules = pendingCommit.scheduledUnpaid.filter((t) =>
+                  approvedKeys.has(`resched-${t.id}`),
+                );
+                finalizeImport(pendingCommit.enriched, approvedReschedules);
+                setShowDateApprovalDialog(false);
+                setDateCandidates([]);
+                setApprovedKeys(new Set());
+                setPendingCommit(null);
+              }}
+            >
+              Aplicar selecionadas ({approvedKeys.size})
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
