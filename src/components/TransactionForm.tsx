@@ -162,9 +162,73 @@ const TransactionForm = () => {
   const [pendingImportPeriod, setPendingImportPeriod] = useState<{ start: string; end: string } | null>(null);
   const [importFilter, setImportFilter] = useState<"all" | "entrada" | "saida">("all");
 
+  // Date-change approval dialog state
+  type DateChangeCandidate = {
+    key: string;
+    kind: "move" | "reschedule";
+    existingId: number;
+    empresa: string;
+    valor: number;
+    oldDate: string; // BR dd/mm/yyyy
+    newDate: string; // BR dd/mm/yyyy
+    categoria: CategoryCode;
+    subcategoria: string | null;
+    entryId?: number;
+  };
+  const [showDateApprovalDialog, setShowDateApprovalDialog] = useState(false);
+  const [dateCandidates, setDateCandidates] = useState<DateChangeCandidate[]>([]);
+  const [approvedKeys, setApprovedKeys] = useState<Set<string>>(new Set());
+  const [pendingCommit, setPendingCommit] = useState<{
+    enriched: ParsedBankEntry[];
+    scheduledUnpaid: Array<{ id: number; empresa: string; valor: number; data: string; categoria: string; subcategoria: string | null }>;
+  } | null>(null);
+
   const getDateRange = (entries: ParsedBankEntry[]): { start: string; end: string } => {
     const dates = entries.map((e) => e.data).sort();
     return { start: dates[0], end: dates[dates.length - 1] };
+  };
+
+  const isoToBR = (iso: string) => {
+    const [y, m, d] = iso.split("-");
+    return `${d}/${m}/${y}`;
+  };
+  const brToISO = (br: string) => {
+    const [d, m, y] = br.split("/");
+    return `${y}-${m}-${d}`;
+  };
+
+  const finalizeImport = (
+    enriched: ParsedBankEntry[],
+    scheduledUnpaidToReschedule: Array<{ id: number; empresa: string; valor: number; data: string; categoria: string; subcategoria: string | null }>,
+  ) => {
+    // Reschedule approved unpaid scheduled bills (move to next day)
+    if (scheduledUnpaidToReschedule.length > 0) {
+      scheduledUnpaidToReschedule.forEach((t) => {
+        const [day, month, year] = t.data.split("/").map(Number);
+        const nextDay = new Date(year, month - 1, day + 1);
+        const newDate = `${String(nextDay.getDate()).padStart(2, "0")}/${String(nextDay.getMonth() + 1).padStart(2, "0")}/${nextDay.getFullYear()}`;
+        addTransaction({
+          empresa: t.empresa,
+          valor: t.valor,
+          data: newDate,
+          categoria: t.categoria as CategoryCode,
+          subcategoria: t.subcategoria || null,
+          pago: false,
+          agendado: true,
+          tipo: "saida",
+        });
+      });
+      toast({
+        title: `${scheduledUnpaidToReschedule.length} conta(s) reagendada(s)`,
+        description: "Contas agendadas não pagas foram transferidas para o dia seguinte.",
+      });
+    }
+
+    setBankEntries((prev) => [...prev, ...enriched]);
+    setShowImportModeDialog(false);
+    setPendingParsedEntries([]);
+    setPendingImportPeriod(null);
+    setImportFilter("all");
   };
 
   const applyImportEntries = (entries: ParsedBankEntry[], mode: "add" | "replace") => {
@@ -179,12 +243,8 @@ const TransactionForm = () => {
     // Save existing transactions before replacing, for smart matching
     let existingTxForPeriod: typeof transactions = [];
     if (mode === "replace" && pendingImportPeriod) {
-      const parseToISO = (d: string) => {
-        const [day, month, year] = d.split("/");
-        return `${year}-${month}-${day}`;
-      };
       existingTxForPeriod = transactions.filter((t) => {
-        const iso = parseToISO(t.data);
+        const iso = brToISO(t.data);
         return iso >= pendingImportPeriod.start && iso <= pendingImportPeriod.end;
       });
 
@@ -197,14 +257,14 @@ const TransactionForm = () => {
       toast({ title: "Período limpo", description: "As transações antigas foram removidas. Revise e aprove os novos lançamentos abaixo." });
     }
 
-    // Enrich entries: match by category keyword AND by existing transaction value
+    // Detect candidates needing approval (date change scenarios)
+    const candidates: DateChangeCandidate[] = [];
     const usedExistingIds = new Set<number>();
     const enriched = filtered.map((entry) => {
-      // Try to find an existing transaction with the same value (for saida entries)
       let matchedExisting: (typeof transactions)[0] | undefined;
       if (mode === "replace" && entry.tipo === "saida" && existingTxForPeriod.length > 0) {
         matchedExisting = existingTxForPeriod.find(
-          (t) => t.tipo === "saida" && Math.abs(t.valor - entry.valor) < 0.01 && !usedExistingIds.has(t.id)
+          (t) => t.tipo === "saida" && Math.abs(t.valor - entry.valor) < 0.01 && !usedExistingIds.has(t.id),
         );
         if (matchedExisting) {
           usedExistingIds.add(matchedExisting.id);
@@ -212,7 +272,22 @@ const TransactionForm = () => {
       }
 
       if (matchedExisting) {
-        // Pre-fill with existing transaction data (empresa, categoria, pago)
+        const oldISO = brToISO(matchedExisting.data);
+        // If dates differ, register an approval candidate
+        if (oldISO !== entry.data) {
+          candidates.push({
+            key: `move-${matchedExisting.id}-${entry.id}`,
+            kind: "move",
+            existingId: matchedExisting.id,
+            empresa: matchedExisting.empresa,
+            valor: matchedExisting.valor,
+            oldDate: matchedExisting.data,
+            newDate: isoToBR(entry.data),
+            categoria: matchedExisting.categoria as CategoryCode,
+            subcategoria: matchedExisting.subcategoria || null,
+            entryId: entry.id,
+          });
+        }
         return {
           ...entry,
           empresa: matchedExisting.empresa,
@@ -226,48 +301,50 @@ const TransactionForm = () => {
       return matchedCat ? { ...entry, categoria: matchedCat } : entry;
     });
 
-    // Auto-reschedule: find scheduled unpaid bills within the import period that are not in the extract
-    if (mode === "replace" && pendingImportPeriod) {
-      const parseToISO = (d: string) => {
-        const [day, month, year] = d.split("/");
-        return `${year}-${month}-${day}`;
-      };
-      const scheduledUnpaid = existingTxForPeriod.filter(
-        (t) => t.agendado && !t.pago && t.tipo === "saida" && !usedExistingIds.has(t.id)
-      );
-      
-      if (scheduledUnpaid.length > 0) {
-        // Move each unpaid scheduled bill to the next day after its original date
-        scheduledUnpaid.forEach((t) => {
-          const [day, month, year] = t.data.split("/").map(Number);
-          const nextDay = new Date(year, month - 1, day + 1);
-          const newDate = `${String(nextDay.getDate()).padStart(2, "0")}/${String(nextDay.getMonth() + 1).padStart(2, "0")}/${nextDay.getFullYear()}`;
-          // Re-add the transaction with the new date
-          addTransaction({
-            empresa: t.empresa,
-            valor: t.valor,
-            data: newDate,
-            categoria: t.categoria,
-            subcategoria: t.subcategoria || null,
-            pago: false,
-            agendado: true,
-            tipo: "saida",
-          });
-        });
-        
-        toast({
-          title: `${scheduledUnpaid.length} conta(s) reagendada(s)`,
-          description: "Contas agendadas não pagas foram transferidas para o dia seguinte.",
-        });
-      }
+    // Detect scheduled unpaid bills not in extract → reschedule candidates
+    const scheduledUnpaid =
+      mode === "replace" && pendingImportPeriod
+        ? existingTxForPeriod.filter(
+            (t) => t.agendado && !t.pago && t.tipo === "saida" && !usedExistingIds.has(t.id),
+          )
+        : [];
+
+    scheduledUnpaid.forEach((t) => {
+      const [day, month, year] = t.data.split("/").map(Number);
+      const nextDay = new Date(year, month - 1, day + 1);
+      const newDate = `${String(nextDay.getDate()).padStart(2, "0")}/${String(nextDay.getMonth() + 1).padStart(2, "0")}/${nextDay.getFullYear()}`;
+      candidates.push({
+        key: `resched-${t.id}`,
+        kind: "reschedule",
+        existingId: t.id,
+        empresa: t.empresa,
+        valor: t.valor,
+        oldDate: t.data,
+        newDate,
+        categoria: t.categoria as CategoryCode,
+        subcategoria: t.subcategoria || null,
+      });
+    });
+
+    const scheduledForCommit = scheduledUnpaid.map((t) => ({
+      id: t.id,
+      empresa: t.empresa,
+      valor: t.valor,
+      data: t.data,
+      categoria: t.categoria,
+      subcategoria: t.subcategoria || null,
+    }));
+
+    if (candidates.length > 0) {
+      // Pause: ask user for approval before applying date changes
+      setDateCandidates(candidates);
+      setApprovedKeys(new Set(candidates.map((c) => c.key))); // default: all approved
+      setPendingCommit({ enriched, scheduledUnpaid: scheduledForCommit });
+      setShowDateApprovalDialog(true);
+      return;
     }
 
-    setBankEntries((prev) => [...prev, ...enriched]);
-
-    setShowImportModeDialog(false);
-    setPendingParsedEntries([]);
-    setPendingImportPeriod(null);
-    setImportFilter("all");
+    finalizeImport(enriched, scheduledForCommit);
   };
 
   const handleBankFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -1929,6 +2006,103 @@ const TransactionForm = () => {
               className="text-xs sm:text-sm px-3"
             >
               Substituir período
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Date-change Approval Dialog */}
+      <AlertDialog open={showDateApprovalDialog} onOpenChange={(open) => {
+        if (!open) {
+          setShowDateApprovalDialog(false);
+          setDateCandidates([]);
+          setApprovedKeys(new Set());
+          setPendingCommit(null);
+          setShowImportModeDialog(false);
+          setPendingParsedEntries([]);
+          setPendingImportPeriod(null);
+          setImportFilter("all");
+        }
+      }}>
+        <AlertDialogContent className="max-w-[calc(100%-2rem)] sm:max-w-lg mx-auto">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Aprovar mudanças de data</AlertDialogTitle>
+            <AlertDialogDescription>
+              Algumas contas lançadas estão em datas diferentes do extrato. Selecione quais alterações deseja aplicar.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="max-h-[50vh] overflow-y-auto space-y-2 my-2">
+            {dateCandidates.map((c) => {
+              const checked = approvedKeys.has(c.key);
+              return (
+                <label
+                  key={c.key}
+                  className="flex items-start gap-3 p-3 rounded-lg border bg-secondary/30 cursor-pointer hover:bg-secondary/50"
+                >
+                  <input
+                    type="checkbox"
+                    checked={checked}
+                    onChange={(e) => {
+                      setApprovedKeys((prev) => {
+                        const next = new Set(prev);
+                        if (e.target.checked) next.add(c.key);
+                        else next.delete(c.key);
+                        return next;
+                      });
+                    }}
+                    className="mt-1"
+                  />
+                  <div className="flex-1 text-left text-sm">
+                    <div className="font-medium">{c.empresa}</div>
+                    <div className="text-xs text-muted-foreground">
+                      {formatCurrency(c.valor)} · {c.kind === "move" ? "Mover do extrato" : "Reagendar (não pago)"}
+                    </div>
+                    <div className="text-xs mt-1">
+                      <span className="line-through text-muted-foreground">{c.oldDate}</span>
+                      {" → "}
+                      <span className="font-semibold text-primary">{c.newDate}</span>
+                    </div>
+                  </div>
+                </label>
+              );
+            })}
+          </div>
+          <AlertDialogFooter className="flex-col sm:flex-row gap-2">
+            <AlertDialogCancel className="mt-0">Cancelar importação</AlertDialogCancel>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                if (!pendingCommit) return;
+                finalizeImport(pendingCommit.enriched, []);
+                setShowDateApprovalDialog(false);
+                setDateCandidates([]);
+                setApprovedKeys(new Set());
+                setPendingCommit(null);
+              }}
+            >
+              Manter datas originais
+            </Button>
+            <Button
+              size="sm"
+              onClick={() => {
+                if (!pendingCommit) return;
+                dateCandidates
+                  .filter((c) => c.kind === "move" && approvedKeys.has(c.key))
+                  .forEach((c) => {
+                    updateTransaction(c.existingId, { data: c.newDate });
+                  });
+                const approvedReschedules = pendingCommit.scheduledUnpaid.filter((t) =>
+                  approvedKeys.has(`resched-${t.id}`),
+                );
+                finalizeImport(pendingCommit.enriched, approvedReschedules);
+                setShowDateApprovalDialog(false);
+                setDateCandidates([]);
+                setApprovedKeys(new Set());
+                setPendingCommit(null);
+              }}
+            >
+              Aplicar selecionadas ({approvedKeys.size})
             </Button>
           </AlertDialogFooter>
         </AlertDialogContent>
