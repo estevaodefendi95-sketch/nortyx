@@ -188,6 +188,49 @@ const TransactionForm = () => {
     return { start: dates[0], end: dates[dates.length - 1] };
   };
 
+  const isoToBR = (iso: string) => {
+    const [y, m, d] = iso.split("-");
+    return `${d}/${m}/${y}`;
+  };
+  const brToISO = (br: string) => {
+    const [d, m, y] = br.split("/");
+    return `${y}-${m}-${d}`;
+  };
+
+  const finalizeImport = (
+    enriched: ParsedBankEntry[],
+    scheduledUnpaidToReschedule: Array<{ id: number; empresa: string; valor: number; data: string; categoria: string; subcategoria: string | null }>,
+  ) => {
+    // Reschedule approved unpaid scheduled bills (move to next day)
+    if (scheduledUnpaidToReschedule.length > 0) {
+      scheduledUnpaidToReschedule.forEach((t) => {
+        const [day, month, year] = t.data.split("/").map(Number);
+        const nextDay = new Date(year, month - 1, day + 1);
+        const newDate = `${String(nextDay.getDate()).padStart(2, "0")}/${String(nextDay.getMonth() + 1).padStart(2, "0")}/${nextDay.getFullYear()}`;
+        addTransaction({
+          empresa: t.empresa,
+          valor: t.valor,
+          data: newDate,
+          categoria: t.categoria as CategoryCode,
+          subcategoria: t.subcategoria || null,
+          pago: false,
+          agendado: true,
+          tipo: "saida",
+        });
+      });
+      toast({
+        title: `${scheduledUnpaidToReschedule.length} conta(s) reagendada(s)`,
+        description: "Contas agendadas não pagas foram transferidas para o dia seguinte.",
+      });
+    }
+
+    setBankEntries((prev) => [...prev, ...enriched]);
+    setShowImportModeDialog(false);
+    setPendingParsedEntries([]);
+    setPendingImportPeriod(null);
+    setImportFilter("all");
+  };
+
   const applyImportEntries = (entries: ParsedBankEntry[], mode: "add" | "replace") => {
     // Filter entries based on importFilter
     const filtered = importFilter === "all" ? entries : entries.filter((e) => e.tipo === importFilter);
@@ -200,12 +243,8 @@ const TransactionForm = () => {
     // Save existing transactions before replacing, for smart matching
     let existingTxForPeriod: typeof transactions = [];
     if (mode === "replace" && pendingImportPeriod) {
-      const parseToISO = (d: string) => {
-        const [day, month, year] = d.split("/");
-        return `${year}-${month}-${day}`;
-      };
       existingTxForPeriod = transactions.filter((t) => {
-        const iso = parseToISO(t.data);
+        const iso = brToISO(t.data);
         return iso >= pendingImportPeriod.start && iso <= pendingImportPeriod.end;
       });
 
@@ -218,14 +257,14 @@ const TransactionForm = () => {
       toast({ title: "Período limpo", description: "As transações antigas foram removidas. Revise e aprove os novos lançamentos abaixo." });
     }
 
-    // Enrich entries: match by category keyword AND by existing transaction value
+    // Detect candidates needing approval (date change scenarios)
+    const candidates: DateChangeCandidate[] = [];
     const usedExistingIds = new Set<number>();
     const enriched = filtered.map((entry) => {
-      // Try to find an existing transaction with the same value (for saida entries)
       let matchedExisting: (typeof transactions)[0] | undefined;
       if (mode === "replace" && entry.tipo === "saida" && existingTxForPeriod.length > 0) {
         matchedExisting = existingTxForPeriod.find(
-          (t) => t.tipo === "saida" && Math.abs(t.valor - entry.valor) < 0.01 && !usedExistingIds.has(t.id)
+          (t) => t.tipo === "saida" && Math.abs(t.valor - entry.valor) < 0.01 && !usedExistingIds.has(t.id),
         );
         if (matchedExisting) {
           usedExistingIds.add(matchedExisting.id);
@@ -233,7 +272,22 @@ const TransactionForm = () => {
       }
 
       if (matchedExisting) {
-        // Pre-fill with existing transaction data (empresa, categoria, pago)
+        const oldISO = brToISO(matchedExisting.data);
+        // If dates differ, register an approval candidate
+        if (oldISO !== entry.data) {
+          candidates.push({
+            key: `move-${matchedExisting.id}-${entry.id}`,
+            kind: "move",
+            existingId: matchedExisting.id,
+            empresa: matchedExisting.empresa,
+            valor: matchedExisting.valor,
+            oldDate: matchedExisting.data,
+            newDate: isoToBR(entry.data),
+            categoria: matchedExisting.categoria as CategoryCode,
+            subcategoria: matchedExisting.subcategoria || null,
+            entryId: entry.id,
+          });
+        }
         return {
           ...entry,
           empresa: matchedExisting.empresa,
@@ -247,48 +301,50 @@ const TransactionForm = () => {
       return matchedCat ? { ...entry, categoria: matchedCat } : entry;
     });
 
-    // Auto-reschedule: find scheduled unpaid bills within the import period that are not in the extract
-    if (mode === "replace" && pendingImportPeriod) {
-      const parseToISO = (d: string) => {
-        const [day, month, year] = d.split("/");
-        return `${year}-${month}-${day}`;
-      };
-      const scheduledUnpaid = existingTxForPeriod.filter(
-        (t) => t.agendado && !t.pago && t.tipo === "saida" && !usedExistingIds.has(t.id)
-      );
-      
-      if (scheduledUnpaid.length > 0) {
-        // Move each unpaid scheduled bill to the next day after its original date
-        scheduledUnpaid.forEach((t) => {
-          const [day, month, year] = t.data.split("/").map(Number);
-          const nextDay = new Date(year, month - 1, day + 1);
-          const newDate = `${String(nextDay.getDate()).padStart(2, "0")}/${String(nextDay.getMonth() + 1).padStart(2, "0")}/${nextDay.getFullYear()}`;
-          // Re-add the transaction with the new date
-          addTransaction({
-            empresa: t.empresa,
-            valor: t.valor,
-            data: newDate,
-            categoria: t.categoria,
-            subcategoria: t.subcategoria || null,
-            pago: false,
-            agendado: true,
-            tipo: "saida",
-          });
-        });
-        
-        toast({
-          title: `${scheduledUnpaid.length} conta(s) reagendada(s)`,
-          description: "Contas agendadas não pagas foram transferidas para o dia seguinte.",
-        });
-      }
+    // Detect scheduled unpaid bills not in extract → reschedule candidates
+    const scheduledUnpaid =
+      mode === "replace" && pendingImportPeriod
+        ? existingTxForPeriod.filter(
+            (t) => t.agendado && !t.pago && t.tipo === "saida" && !usedExistingIds.has(t.id),
+          )
+        : [];
+
+    scheduledUnpaid.forEach((t) => {
+      const [day, month, year] = t.data.split("/").map(Number);
+      const nextDay = new Date(year, month - 1, day + 1);
+      const newDate = `${String(nextDay.getDate()).padStart(2, "0")}/${String(nextDay.getMonth() + 1).padStart(2, "0")}/${nextDay.getFullYear()}`;
+      candidates.push({
+        key: `resched-${t.id}`,
+        kind: "reschedule",
+        existingId: t.id,
+        empresa: t.empresa,
+        valor: t.valor,
+        oldDate: t.data,
+        newDate,
+        categoria: t.categoria as CategoryCode,
+        subcategoria: t.subcategoria || null,
+      });
+    });
+
+    const scheduledForCommit = scheduledUnpaid.map((t) => ({
+      id: t.id,
+      empresa: t.empresa,
+      valor: t.valor,
+      data: t.data,
+      categoria: t.categoria,
+      subcategoria: t.subcategoria || null,
+    }));
+
+    if (candidates.length > 0) {
+      // Pause: ask user for approval before applying date changes
+      setDateCandidates(candidates);
+      setApprovedKeys(new Set(candidates.map((c) => c.key))); // default: all approved
+      setPendingCommit({ enriched, scheduledUnpaid: scheduledForCommit });
+      setShowDateApprovalDialog(true);
+      return;
     }
 
-    setBankEntries((prev) => [...prev, ...enriched]);
-
-    setShowImportModeDialog(false);
-    setPendingParsedEntries([]);
-    setPendingImportPeriod(null);
-    setImportFilter("all");
+    finalizeImport(enriched, scheduledForCommit);
   };
 
   const handleBankFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
