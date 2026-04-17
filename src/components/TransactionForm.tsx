@@ -162,6 +162,27 @@ const TransactionForm = () => {
   const [pendingImportPeriod, setPendingImportPeriod] = useState<{ start: string; end: string } | null>(null);
   const [importFilter, setImportFilter] = useState<"all" | "entrada" | "saida">("all");
 
+  // Date-change approval dialog state
+  type DateChangeCandidate = {
+    key: string;
+    kind: "move" | "reschedule";
+    existingId: number;
+    empresa: string;
+    valor: number;
+    oldDate: string; // BR dd/mm/yyyy
+    newDate: string; // BR dd/mm/yyyy
+    categoria: CategoryCode;
+    subcategoria: string | null;
+    entryId?: number;
+  };
+  const [showDateApprovalDialog, setShowDateApprovalDialog] = useState(false);
+  const [dateCandidates, setDateCandidates] = useState<DateChangeCandidate[]>([]);
+  const [approvedKeys, setApprovedKeys] = useState<Set<string>>(new Set());
+  const [pendingCommit, setPendingCommit] = useState<{
+    enriched: ParsedBankEntry[];
+    scheduledUnpaid: Array<{ id: number; empresa: string; valor: number; data: string; categoria: string; subcategoria: string | null }>;
+  } | null>(null);
+
   const getDateRange = (entries: ParsedBankEntry[]): { start: string; end: string } => {
     const dates = entries.map((e) => e.data).sort();
     return { start: dates[0], end: dates[dates.length - 1] };
