@@ -1,26 +1,50 @@
-## Diagnóstico
+## Por que os clientes não foram vinculados à cobrança
 
-As cobranças lançadas na aba **Lançamento** (quando o usuário marca "Cliente de cobrança") estão **sendo descartadas pela RLS** do banco, porque os `INSERT` em `billing_clients` e `billing_charges` no `TransactionForm.tsx` (linhas 608‑641) **não enviam `organization_id`** — e a policy `Org members can insert ...` exige `organization_id = get_user_org_id(auth.uid())`. Resultado: a entrada salva, mas a cobrança "some" silenciosamente.
+Pelo que verifiquei no banco, atualmente existem lançamentos normais (`daily_incomes` e `transactions`), mas **não existe nenhum registro salvo em `billing_clients` nem em `billing_charges`**. Ou seja: a cobrança não ficou “sem cliente”; ela não chegou a ser gravada como cobrança.
 
-A `CalendarView` já tem a infraestrutura completa de leitura, agrupamento por dia e renderização de cobranças (`selectedBillingCharges`, `billingChargesByDay`), mas como nada chega ao banco, nada aparece no calendário.
+As causas prováveis no código atual são:
 
-## Mudanças
+1. **A cobrança só é criada se o checkbox “Vincular cliente para cobrança” estiver marcado e nome + e-mail estiverem preenchidos.** Se qualquer um desses campos faltar, o sistema salva apenas como entrada comum.
+2. **O formulário grava a entrada antes e tenta gravar o cliente/cobrança depois.** Se a segunda etapa falhar, a entrada fica salva, mas o cliente e a cobrança não ficam vinculados.
+3. **Há consultas de cliente sem filtro explícito da empresa ativa no formulário de lançamento**, o que pode atrapalhar a seleção/reuso do cliente no contexto multiempresa.
+4. **A tabela de cobrança permite inconsistências**, porque `organization_id` ainda está nullable e não há validação garantindo que `billing_charges.organization_id` seja a mesma empresa do `billing_clients.organization_id`.
 
-### 1. `src/components/TransactionForm.tsx` — corrigir inserts
-- Importar `useOrganization` e pegar `organization?.id`.
-- Incluir `organization_id: organization.id` nos `insert` de:
-  - `billing_clients` (linha ~610)
-  - cada item de `chargesData` para `billing_charges` (linha ~631)
-- Bloquear o salvamento da cobrança caso `organization` ainda não esteja carregado, com toast claro.
+## Plano de correção
 
-### 2. `src/components/CalendarView.tsx` — robustez na exibição
-- Filtrar `billing_charges` por `organization_id` no fetch (já é feito por RLS, mas tornar explícito) e **recarregar quando uma transação de entrada é criada/editada**, escutando o canal Realtime de `billing_charges` (igual ao padrão usado em `TransactionsContext`). Sem isso, o usuário precisa recarregar a página para ver a cobrança recém‑lançada.
-- Garantir que cada chip do dia mostre um marcador visual quando há cobranças (já existe `getDayIncomeTotal` somando, mas conferir se há ícone/dot indicando cobrança vs entrada manual; se não, adicionar um pequeno `User` icon no canto da célula quando `billingChargesByDay.has(day)`).
+### 1. Tornar o salvamento da cobrança mais seguro
+No `TransactionForm.tsx`:
 
-### 3. Nenhuma migração necessária
-Schema e RLS já estão corretos.
+- Quando “Vincular cliente para cobrança” estiver marcado, exigir nome e e-mail antes de salvar.
+- Não salvar como entrada comum se o usuário marcou vínculo de cobrança mas esqueceu dados obrigatórios.
+- Usar uma sequência mais confiável: primeiro criar/atualizar o cliente, depois criar a cobrança.
+- Melhorar a mensagem de erro para mostrar a falha real quando cliente/cobrança não for salvo.
 
-## Arquivos afetados
+### 2. Filtrar clientes pela empresa ativa no lançamento
+No `TransactionForm.tsx`:
 
-- `src/components/TransactionForm.tsx`
-- `src/components/CalendarView.tsx`
+- Buscar clientes existentes com `.eq("organization_id", organization.id)`.
+- Ao procurar cliente por e-mail, procurar dentro da empresa ativa.
+- Se encontrar um cliente antigo sem empresa, atualizar/migrar para a empresa ativa quando permitido.
+
+### 3. Garantir vínculo correto entre cliente e cobrança no banco
+Criar uma nova migração para:
+
+- Preencher `organization_id` em registros antigos, se existirem.
+- Garantir que novos `billing_clients` e `billing_charges` tenham `organization_id` obrigatório quando possível.
+- Criar uma validação no banco para impedir cobrança com empresa diferente da empresa do cliente.
+- Ajustar RLS para permitir ao super usuário criar/editar cobranças na empresa selecionada, não apenas visualizar.
+
+### 4. Corrigir visualização em Clientes e Calendário
+No `ClientsView.tsx` e `CalendarView.tsx`:
+
+- Manter o filtro por empresa ativa.
+- Tratar erros de carregamento explicitamente, em vez de apenas mostrar lista vazia.
+- No calendário, carregar cobrança com dados do cliente e mostrar mesmo quando a cobrança estiver pendente/enviada/paga.
+
+### 5. Validação após implementar
+Depois da aprovação, vou:
+
+- Aplicar a migração.
+- Ajustar os componentes.
+- Verificar no banco se `billing_clients` e `billing_charges` passam a ser criados.
+- Confirmar que aparecem na aba **Clientes** e no **Calendário** para a empresa selecionada.
