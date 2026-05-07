@@ -2110,15 +2110,17 @@ const TransactionForm = () => {
               size="sm"
               onClick={() => {
                 if (!pendingCommit) return;
+                const skipEntryIds = new Set<number>();
                 dateCandidates
                   .filter((c) => c.kind === "move" && approvedKeys.has(c.key))
                   .forEach((c) => {
-                    updateTransaction(c.existingId, { data: c.newDate });
+                    updateTransaction(c.existingId, { data: c.newDate, pago: true });
+                    if (c.entryId !== undefined) skipEntryIds.add(c.entryId);
                   });
                 const approvedReschedules = pendingCommit.scheduledUnpaid.filter((t) =>
                   approvedKeys.has(`resched-${t.id}`),
                 );
-                finalizeImport(pendingCommit.enriched, approvedReschedules);
+                finalizeImport(pendingCommit.enriched, approvedReschedules, skipEntryIds);
                 setShowDateApprovalDialog(false);
                 setDateCandidates([]);
                 setApprovedKeys(new Set());
