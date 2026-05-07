@@ -35,6 +35,7 @@ interface CategoriesContextType {
   getCategoryInfo: (code: CategoryCode) => CategoryInfo;
   getCategoryColor: (codeOrColorVar: string) => string;
   updateCategoryColor: (code: CategoryCode, color: string) => void;
+  updateCategoryName: (code: CategoryCode, name: string) => Promise<void>;
   mappings: Record<string, CategoryCode>;
   addMapping: (keyword: string, categoryCode: CategoryCode) => void;
   findCategoryByKeyword: (empresa: string) => CategoryCode | null;
