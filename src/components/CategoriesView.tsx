@@ -7,7 +7,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowDown, CheckCircle2, Clock, AlertCircle, ChevronDown, Plus, X, Copy, StickyNote, Trash2, Repeat, Pencil, Check } from "lucide-react";
+import { ArrowDown, CheckCircle2, Clock, AlertCircle, ChevronDown, Plus, X, Copy, StickyNote, Trash2, Repeat, Pencil, Check, MessageSquare } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import ColorPicker from "@/components/ColorPicker";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
@@ -67,6 +67,28 @@ const CategoriesView = ({ selectedMonths, selectedYear, isViewer = false }: Cate
   const [editingTxId, setEditingTxId] = useState<number | null>(null);
   const [editTxEmpresa, setEditTxEmpresa] = useState("");
   const [editTxValor, setEditTxValor] = useState("");
+
+  // Observação (nota) inline state
+  const [expandedNoteId, setExpandedNoteId] = useState<number | null>(null);
+  const [noteDraft, setNoteDraft] = useState("");
+
+  const toggleNote = (t: any) => {
+    if (expandedNoteId === t.id) {
+      setExpandedNoteId(null);
+      setNoteDraft("");
+    } else {
+      setExpandedNoteId(t.id);
+      setNoteDraft(t.observacao || "");
+    }
+  };
+
+  const saveNote = (id: number) => {
+    const value = noteDraft.trim();
+    updateTransaction(id, { observacao: value || null });
+    toast({ title: value ? "Observação salva" : "Observação removida" });
+    setExpandedNoteId(null);
+    setNoteDraft("");
+  };
 
   const startEditTx = (t: any) => {
     setEditingTxId(t.id);
@@ -774,8 +796,8 @@ const CategoriesView = ({ selectedMonths, selectedYear, isViewer = false }: Cate
 
           <div className="space-y-2 max-h-[60vh] sm:max-h-[400px] overflow-y-auto">
             {selectedTransactionsList.map((t) => (
+              <div key={t.id} className="space-y-1">
               <div
-                key={t.id}
                 className={`flex flex-col sm:flex-row sm:items-center justify-between p-3 rounded-lg bg-secondary/30 border gap-2 sm:gap-0 ${selectMode && selectedForDup.has(t.id) ? "border-primary/50 bg-primary/5" : "border-border/30"}`}
               >
                 <div className="flex items-center gap-2 sm:gap-3 min-w-0">
@@ -922,7 +944,41 @@ const CategoriesView = ({ selectedMonths, selectedYear, isViewer = false }: Cate
                       </button>
                     </>
                   )}
+                  {editingTxId !== t.id && (
+                    <button
+                      onClick={(e) => { e.stopPropagation(); toggleNote(t); }}
+                      className="p-1 rounded hover:bg-primary/10 transition-colors"
+                      title={t.observacao ? "Editar observação" : "Adicionar observação"}
+                    >
+                      <MessageSquare className={`w-3.5 h-3.5 ${t.observacao ? "text-primary" : "text-muted-foreground hover:text-primary"}`} />
+                    </button>
+                  )}
                 </div>
+              </div>
+              {expandedNoteId !== t.id && t.observacao && (
+                <p
+                  className="text-[11px] text-muted-foreground italic px-3 truncate cursor-pointer"
+                  onClick={() => !isViewer && toggleNote(t)}
+                  title={t.observacao}
+                >
+                  {t.observacao}
+                </p>
+              )}
+              {expandedNoteId === t.id && !isViewer && (
+                <div className="px-3 pb-2 pt-1 space-y-2">
+                  <Textarea
+                    value={noteDraft}
+                    onChange={(e) => setNoteDraft(e.target.value)}
+                    placeholder="Observação / descrição (opcional)"
+                    className="text-xs min-h-[60px]"
+                    autoFocus
+                  />
+                  <div className="flex justify-end gap-2">
+                    <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => { setExpandedNoteId(null); setNoteDraft(""); }}>Cancelar</Button>
+                    <Button size="sm" className="h-7 text-xs" onClick={() => saveNote(t.id)}>Salvar</Button>
+                  </div>
+                </div>
+              )}
               </div>
             ))}
           </div>
