@@ -299,8 +299,27 @@ const AdminApproval = () => {
     }
   };
 
-  const pending = users.filter((u) => !u.approved);
-  const approved = users.filter((u) => u.approved);
+  const filterByOrg = (u: PendingUser) => orgFilter === "all" || u.organizationIds?.includes(orgFilter);
+  const pending = users.filter((u) => !u.approved).filter(filterByOrg);
+  const approved = users.filter((u) => u.approved).filter(filterByOrg);
+
+  // Group approved by primary org when filter = all
+  const approvedGroups: { orgId: string | "none"; org: OrgInfo | null; users: PendingUser[] }[] = (() => {
+    if (orgFilter !== "all") return [{ orgId: orgFilter, org: allOrgs.find((o) => o.id === orgFilter) || null, users: approved }];
+    const groups = new Map<string, PendingUser[]>();
+    approved.forEach((u) => {
+      const key = u.primaryOrgId || "none";
+      const arr = groups.get(key) || [];
+      arr.push(u);
+      groups.set(key, arr);
+    });
+    const result: { orgId: string | "none"; org: OrgInfo | null; users: PendingUser[] }[] = [];
+    allOrgs.forEach((o) => {
+      if (groups.has(o.id)) result.push({ orgId: o.id, org: o, users: groups.get(o.id)! });
+    });
+    if (groups.has("none")) result.push({ orgId: "none", org: null, users: groups.get("none")! });
+    return result;
+  })();
 
   return (
     <div className="min-h-screen bg-background p-4 max-w-2xl mx-auto space-y-6">
