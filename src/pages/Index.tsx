@@ -137,21 +137,34 @@ const Index = () => {
               </div>
 
               {isSuperUser && availableOrganizations.length > 1 && (
-                <Select
-                  value={organization?.id || ""}
-                  onValueChange={(val) => switchOrganization(val)}
-                >
-                  <SelectTrigger className="w-[180px] h-8 text-xs">
-                    <SelectValue placeholder="Trocar org" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {availableOrganizations.map((org) => (
-                      <SelectItem key={org.id} value={org.id}>
-                        {org.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <button
+                      className="p-2 rounded-lg hover:bg-secondary transition-colors flex-shrink-0"
+                      title={organization?.name || "Trocar empresa"}
+                    >
+                      <Building2 className="w-5 h-5 text-muted-foreground" />
+                    </button>
+                  </PopoverTrigger>
+                  <PopoverContent align="start" className="w-64 p-1">
+                    <div className="px-2 py-1.5 text-xs font-medium text-muted-foreground">Selecionar empresa</div>
+                    <div className="max-h-72 overflow-y-auto">
+                      {availableOrganizations.map((org) => {
+                        const active = org.id === organization?.id;
+                        return (
+                          <button
+                            key={org.id}
+                            onClick={() => switchOrganization(org.id)}
+                            className={`w-full flex items-center justify-between gap-2 px-2 py-2 rounded-md text-sm text-left transition-colors ${active ? "bg-primary/10 text-primary" : "hover:bg-secondary"}`}
+                          >
+                            <span className="truncate">{org.name}</span>
+                            {active && <Check className="w-4 h-4 flex-shrink-0" />}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </PopoverContent>
+                </Popover>
               )}
             </div>
 
