@@ -241,6 +241,17 @@ export const CategoriesProvider = ({ children }: { children: ReactNode }) => {
     }
   }, []);
 
+  const updateCategoryName = useCallback(async (code: CategoryCode, name: string) => {
+    const trimmed = name.trim();
+    if (!trimmed) return;
+    setCats((prev) => prev.map((c) => (c.code === code ? { ...c, name: trimmed } : c)));
+    const { error } = await supabase
+      .from("categories")
+      .update({ name: trimmed })
+      .eq("code", code);
+    if (error) console.error("Error renaming category:", error);
+  }, []);
+
   const deleteCategory = useCallback(async (code: CategoryCode) => {
     if (code === "O") return;
 
@@ -325,6 +336,7 @@ export const CategoriesProvider = ({ children }: { children: ReactNode }) => {
         getCategoryInfo: getCategoryInfoFn,
         getCategoryColor,
         updateCategoryColor,
+        updateCategoryName,
         mappings,
         addMapping,
         findCategoryByKeyword,
