@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { formatCurrency, getIncomeByMonth, type Transaction, type DailyIncome } from "@/data/cashflow";
 import { useCategories } from "@/context/CategoriesContext";
 import { useTransactions } from "@/context/TransactionsContext";
+import { useOrganization } from "@/context/OrganizationContext";
 import { Badge } from "@/components/ui/badge";
 import { ChevronLeft, ChevronRight, CheckCircle2, Clock, AlertCircle, ArrowUp, ArrowDown, Pencil, Check, X, Scale, CalendarDays, Trash2, ChevronDown, ChevronUp as ChevronUpIcon, User } from "lucide-react";
 import { Input } from "@/components/ui/input";
@@ -25,6 +26,7 @@ interface CalendarViewProps {
 const CalendarView = ({ initialMonth, selectedYear: propYear, isViewer = false }: CalendarViewProps) => {
   const { transactions, dailyIncomes, deleteTransaction, updateTransaction, updateDailyIncome, deleteDailyIncome } = useTransactions();
   const { categories, getCategoryInfo, getCategoryColor } = useCategories();
+  const { organization } = useOrganization();
   const { toast } = useToast();
   const isMobile = useIsMobile();
   const dayScrollerRef = useRef<HTMLDivElement>(null);
@@ -58,11 +60,17 @@ const CalendarView = ({ initialMonth, selectedYear: propYear, isViewer = false }
   const [billingCharges, setBillingCharges] = useState<BillingChargeWithClient[]>([]);
 
   useEffect(() => {
+    if (!organization?.id) {
+      setBillingCharges([]);
+      return;
+    }
     let cancelled = false;
+    const orgId = organization.id;
     const fetchBillingCharges = async () => {
       const { data } = await supabase
         .from("billing_charges")
         .select("id, valor, data_cobranca, status, billing_clients(nome)")
+        .eq("organization_id", orgId)
         .order("data_cobranca");
       if (!cancelled && data) {
         setBillingCharges(
@@ -78,7 +86,7 @@ const CalendarView = ({ initialMonth, selectedYear: propYear, isViewer = false }
     };
     fetchBillingCharges();
     const channel = supabase
-      .channel("billing_charges_calendar")
+      .channel(`billing_charges_calendar_${orgId}`)
       .on("postgres_changes", { event: "*", schema: "public", table: "billing_charges" }, () => fetchBillingCharges())
       .on("postgres_changes", { event: "*", schema: "public", table: "billing_clients" }, () => fetchBillingCharges())
       .subscribe();
@@ -86,7 +94,7 @@ const CalendarView = ({ initialMonth, selectedYear: propYear, isViewer = false }
       cancelled = true;
       supabase.removeChannel(channel);
     };
-  }, [currentMonth, currentYear]);
+  }, [currentMonth, currentYear, organization?.id]);
 
   // Editable transaction overrides
   const [txOverrides, setTxOverrides] = useState<Map<number, { empresa?: string; valor?: number; pago?: boolean; data?: string }>>(new Map());

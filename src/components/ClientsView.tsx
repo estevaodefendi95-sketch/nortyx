@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { useOrganization } from "@/context/OrganizationContext";
 import { formatCurrency } from "@/data/cashflow";
 import { useToast } from "@/hooks/use-toast";
 import { Badge } from "@/components/ui/badge";
@@ -41,6 +42,7 @@ interface ClientsViewProps {
 
 const ClientsView = ({ selectedMonths, selectedYear, isViewer = false }: ClientsViewProps) => {
   const { toast } = useToast();
+  const { organization } = useOrganization();
   const [clients, setClients] = useState<BillingClient[]>([]);
   const [charges, setCharges] = useState<BillingCharge[]>([]);
   const [expandedClient, setExpandedClient] = useState<string | null>(null);
@@ -52,16 +54,33 @@ const ClientsView = ({ selectedMonths, selectedYear, isViewer = false }: Clients
   const isAllSelected = selectedMonths.length === 0;
 
   useEffect(() => {
+    if (!organization?.id) {
+      setClients([]);
+      setCharges([]);
+      return;
+    }
+    const orgId = organization.id;
+    let cancelled = false;
     const load = async () => {
       const [{ data: c }, { data: ch }] = await Promise.all([
-        supabase.from("billing_clients").select("*"),
-        supabase.from("billing_charges").select("*"),
+        supabase.from("billing_clients").select("*").eq("organization_id", orgId),
+        supabase.from("billing_charges").select("*").eq("organization_id", orgId),
       ]);
+      if (cancelled) return;
       if (c) setClients(c);
       if (ch) setCharges(ch);
     };
     load();
-  }, []);
+    const channel = supabase
+      .channel(`clients_view_${orgId}`)
+      .on("postgres_changes", { event: "*", schema: "public", table: "billing_charges" }, load)
+      .on("postgres_changes", { event: "*", schema: "public", table: "billing_clients" }, load)
+      .subscribe();
+    return () => {
+      cancelled = true;
+      supabase.removeChannel(channel);
+    };
+  }, [organization?.id]);
 
   const filteredCharges = useMemo(() => {
     return charges.filter((ch) => {

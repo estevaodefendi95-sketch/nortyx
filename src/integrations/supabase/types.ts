@@ -878,6 +878,10 @@ export type Database = {
         }
         Returns: boolean
       }
+      is_org_member: {
+        Args: { _org_id: string; _user_id: string }
+        Returns: boolean
+      }
       is_super_user: { Args: { _user_id: string }; Returns: boolean }
       move_to_dlq: {
         Args: {
