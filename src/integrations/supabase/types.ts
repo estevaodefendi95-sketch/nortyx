@@ -769,6 +769,7 @@ export type Database = {
           empresa: string
           forma_pagamento: string | null
           id: number
+          observacao: string | null
           organization_id: string | null
           pago: boolean
           pix_code: string | null
@@ -786,6 +787,7 @@ export type Database = {
           empresa: string
           forma_pagamento?: string | null
           id?: never
+          observacao?: string | null
           organization_id?: string | null
           pago?: boolean
           pix_code?: string | null
@@ -803,6 +805,7 @@ export type Database = {
           empresa?: string
           forma_pagamento?: string | null
           id?: never
+          observacao?: string | null
           organization_id?: string | null
           pago?: boolean
           pix_code?: string | null
