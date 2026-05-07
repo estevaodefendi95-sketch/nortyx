@@ -19,6 +19,7 @@ export interface Transaction {
   pix_code?: string | null;
   recurrence_type?: RecurrenceType;
   recurrence_group_id?: string | null;
+  observacao?: string | null;
 }
 
 export interface CategoryInfo {

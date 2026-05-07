@@ -91,6 +91,7 @@ const mapTransactionRow = (r: any): Transaction => ({
   pix_code: r.pix_code || null,
   recurrence_type: (r.recurrence_type as RecurrenceType) || null,
   recurrence_group_id: r.recurrence_group_id || null,
+  observacao: r.observacao || null,
 });
 
 const mapDailyIncomeRow = (r: any): DailyIncome => ({
@@ -248,6 +249,7 @@ export const TransactionsProvider = ({ children }: { children: ReactNode }) => {
         pix_code: normalizedTransaction.pix_code || null,
         recurrence_type: normalizedTransaction.recurrence_type || null,
         recurrence_group_id: normalizedTransaction.recurrence_group_id || null,
+        observacao: normalizedTransaction.observacao || null,
         organization_id: orgId,
       } as any)
       .select()
