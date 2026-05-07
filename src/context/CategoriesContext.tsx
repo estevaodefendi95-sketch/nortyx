@@ -56,7 +56,7 @@ export const CategoriesProvider = ({ children }: { children: ReactNode }) => {
   const { user, loading: authLoading } = useAuth();
   const { organization } = useOrganization();
   const orgId = organization?.id;
-  const [cats, setCats] = useState<CategoryInfo[]>(DEFAULT_CATEGORIES);
+  const [cats, setCats] = useState<CategoryInfo[]>([]);
   const [dbLoaded, setDbLoaded] = useState(false);
 
   const [mappings, setMappings] = useState<Record<string, CategoryCode>>(() => {
@@ -88,82 +88,39 @@ export const CategoriesProvider = ({ children }: { children: ReactNode }) => {
         return;
       }
 
-      if (!data || data.length === 0) {
-        // Seed default categories into DB
+      let rows = data || [];
+
+      if (rows.length === 0) {
+        // Seed default categories into DB for this org
         const toInsert = DEFAULT_CATEGORIES.map((cat) => ({
           code: cat.code,
           name: cat.name,
           color: DEFAULT_COLORS[cat.colorVar] || "hsl(215, 12%, 50%)",
           organization_id: orgId,
         }));
-        await supabase.from("categories").insert(toInsert as any);
-        DEFAULT_CATEGORIES.forEach((cat) => {
-          colorOverrides[cat.code] = DEFAULT_COLORS[cat.colorVar] || "hsl(215, 12%, 50%)";
-        });
-      } else {
-        const dbCats: CategoryInfo[] = data.map((row) => ({
-          code: row.code,
-          name: row.name,
-          colorVar: `db-${row.code}`,
-        }));
-        setCats(dbCats);
-        data.forEach((row) => {
-          colorOverrides[row.code] = row.color;
-        });
-      }
-
-      // Migrate orphaned categories: check if transactions reference category codes not in DB
-      const existingCodes = new Set((data || []).map((r) => r.code));
-      const { data: txCats } = await supabase
-        .from("transactions")
-        .select("categoria")
-        .eq("organization_id", orgId);
-      
-      if (txCats) {
-        const orphanedCodes = new Set<string>();
-        txCats.forEach((t) => {
-          if (!existingCodes.has(t.categoria)) {
-            orphanedCodes.add(t.categoria);
-          }
-        });
-
-        if (orphanedCodes.size > 0) {
-          // Try to recover names from localStorage
-          let localCats: CategoryInfo[] = [];
-          try {
-            const raw = localStorage.getItem("paggio_categories");
-            if (raw) localCats = JSON.parse(raw);
-          } catch {}
-
-          const toInsert = Array.from(orphanedCodes).map((code, idx) => {
-            const localMatch = localCats.find((c) => c.code === code);
-            const color = EXTRA_COLORS[(existingCodes.size + idx) % EXTRA_COLORS.length];
-            return {
-              code,
-              name: localMatch?.name || `Categoria ${code}`,
-              color,
-            };
-          });
-
-          await supabase.from("categories").insert(toInsert.map(t => ({ ...t, organization_id: orgId })) as any);
-
-          // Update local state with new categories
-          const newCats = toInsert.map((row) => ({
-            code: row.code,
-            name: row.name,
-            colorVar: `db-${row.code}`,
-          }));
-          newCats.forEach((c) => {
-            const match = toInsert.find((t) => t.code === c.code);
-            if (match) colorOverrides[c.code] = match.color;
-          });
-          setCats((prev) => [...prev, ...newCats]);
+        const { data: inserted, error: insErr } = await supabase
+          .from("categories")
+          .insert(toInsert as any)
+          .select("*");
+        if (insErr) {
+          console.error("Error seeding default categories:", insErr);
         }
+        rows = inserted || [];
       }
 
-      // Legacy localStorage category migration removed to avoid resurrecting deleted categories
-      // Source of truth is now only the database
+      const dbCats: CategoryInfo[] = rows.map((row: any) => ({
+        code: row.code,
+        name: row.name,
+        colorVar: `db-${row.code}`,
+      }));
+      rows.forEach((row: any) => {
+        colorOverrides[row.code] = row.color;
+      });
+      setCats(dbCats);
 
+      // Source of truth is the DB only — orphan codes in transactions
+      // fall back to "Outros" via getCategoryInfoFn. We never invent
+      // categories from transaction data anymore.
 
       setDbLoaded(true);
     };
