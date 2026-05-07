@@ -708,7 +708,10 @@ const CalendarView = ({ initialMonth, selectedYear: propYear, isViewer = false }
                       ${hasData ? "cursor-pointer" : "cursor-default opacity-50"}
                     `}
                   >
-                    <span className={`text-xs font-medium ${isTodayDay ? "bg-primary text-primary-foreground rounded-full w-5 h-5 flex items-center justify-center" : isSelected ? "text-primary" : "text-foreground"}`}>{day}</span>
+                    <div className="flex items-center justify-between">
+                      <span className={`text-xs font-medium ${isTodayDay ? "bg-primary text-primary-foreground rounded-full w-5 h-5 flex items-center justify-center" : isSelected ? "text-primary" : "text-foreground"}`}>{day}</span>
+                      {billingChargesByDay.has(day) && <User className="w-3 h-3 text-income" />}
+                    </div>
                     {hasData && (
                       <div className="mt-0.5 space-y-0">
                         <p className={`text-[9px] font-medium truncate ${saldoInicial >= 0 ? "text-muted-foreground" : "text-expense/70"}`}>
