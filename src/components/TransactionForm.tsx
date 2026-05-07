@@ -2051,7 +2051,7 @@ const TransactionForm = () => {
           <AlertDialogHeader>
             <AlertDialogTitle>Aprovar mudanças de data</AlertDialogTitle>
             <AlertDialogDescription>
-              Algumas contas lançadas estão em datas diferentes do extrato. Selecione quais alterações deseja aplicar.
+              Estas contas já estão lançadas em outra data. Marque para mover (atualizar a data do lançamento existente) ou desmarque para manter como está e criar uma entrada nova a partir do extrato.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <div className="max-h-[50vh] overflow-y-auto space-y-2 my-2">
