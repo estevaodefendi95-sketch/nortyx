@@ -101,6 +101,93 @@ const OrgSettings = () => {
     load();
   }, [organization]);
 
+  // Load members and pending invites
+  const loadMembers = async () => {
+    if (!organization) return;
+    const { data: mems } = await supabase
+      .from("organization_members")
+      .select("id, user_id, role")
+      .eq("organization_id", organization.id);
+    if (mems && mems.length) {
+      const ids = mems.map((m) => m.user_id);
+      const { data: profs } = await supabase
+        .from("profiles")
+        .select("user_id, display_name")
+        .in("user_id", ids);
+      const nameMap = new Map(profs?.map((p) => [p.user_id, p.display_name]) || []);
+      setMembers(mems.map((m) => ({ ...m, display_name: nameMap.get(m.user_id) ?? null })));
+    } else {
+      setMembers([]);
+    }
+    const { data: invs } = await supabase
+      .from("organization_invites" as any)
+      .select("id, email, role, created_at")
+      .eq("organization_id", organization.id)
+      .is("accepted_at", null)
+      .order("created_at", { ascending: false });
+    setInvites((invs as any) || []);
+  };
+
+  useEffect(() => {
+    loadMembers();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [organization]);
+
+  const handleInvite = async () => {
+    if (!organization || !inviteEmail.trim()) return;
+    setInviting(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("add-org-member", {
+        body: {
+          email: inviteEmail.trim(),
+          organization_id: organization.id,
+          role: inviteRole,
+        },
+      });
+      if (error) throw error;
+      if ((data as any)?.error) throw new Error((data as any).error);
+      toast({
+        title: (data as any)?.invited ? "Convite criado" : "Membro adicionado",
+        description: (data as any)?.invited
+          ? "Peça para a pessoa se cadastrar com este e-mail para entrar automaticamente."
+          : "O usuário agora faz parte da organização.",
+      });
+      setInviteEmail("");
+      setInviteRole("member");
+      await loadMembers();
+    } catch (e: any) {
+      toast({ title: "Erro", description: e.message || "Falha ao adicionar", variant: "destructive" });
+    } finally {
+      setInviting(false);
+    }
+  };
+
+  const handleRemoveMember = async (memberId: string, memberUserId: string) => {
+    if (!organization) return;
+    if (memberUserId === user?.id) {
+      toast({ title: "Ação não permitida", description: "Você não pode remover a si mesmo.", variant: "destructive" });
+      return;
+    }
+    const { error } = await supabase.from("organization_members").delete().eq("id", memberId);
+    if (error) {
+      toast({ title: "Erro", description: error.message, variant: "destructive" });
+      return;
+    }
+    setMembers((prev) => prev.filter((m) => m.id !== memberId));
+    toast({ title: "Membro removido" });
+  };
+
+  const handleCancelInvite = async (inviteId: string) => {
+    const { error } = await (supabase.from("organization_invites" as any) as any).delete().eq("id", inviteId);
+    if (error) {
+      toast({ title: "Erro", description: error.message, variant: "destructive" });
+      return;
+    }
+    setInvites((prev) => prev.filter((i) => i.id !== inviteId));
+    toast({ title: "Convite cancelado" });
+  };
+
+
   useEffect(() => {
     if (organization) {
       setName(organization.name);
