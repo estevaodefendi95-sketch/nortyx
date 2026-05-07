@@ -16,6 +16,13 @@ const ALL_TABS = [
   { id: "lancamento", label: "Lançamento" },
 ];
 
+interface OrgInfo {
+  id: string;
+  name: string;
+  primary_color: string | null;
+  logo_url: string | null;
+}
+
 interface PendingUser {
   id: string;
   user_id: string;
@@ -24,6 +31,8 @@ interface PendingUser {
   approved: boolean;
   role?: string;
   tabVisibility?: Record<string, boolean>;
+  organizationIds?: string[];
+  primaryOrgId?: string | null;
 }
 
 const AdminApproval = () => {
