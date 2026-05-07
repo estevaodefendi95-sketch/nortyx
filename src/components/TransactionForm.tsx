@@ -66,6 +66,7 @@ interface ImportedEntry {
 
 const TransactionForm = () => {
   const { transactions, addTransaction, addDailyIncome, deleteTransactionsByDateRange, deleteDailyIncomesByDateRange, reassignCategory, updateTransaction } = useTransactions();
+  const { organization } = useOrganization();
   const { categories, addCategory, deleteCategory, findCategoryByKeyword, addMapping } = useCategories();
   const { subcategories, addSubcategory, getSubcategoriesByCategory } = useSubcategories();
   const { toast } = useToast();
