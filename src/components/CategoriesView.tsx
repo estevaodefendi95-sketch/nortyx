@@ -888,9 +888,23 @@ const CategoriesView = ({ selectedMonths, selectedYear, isViewer = false }: Cate
                           startEditTx(t);
                         }}
                         className="p-1 rounded hover:bg-primary/10 transition-colors"
+                        title="Editar"
                       >
                         <Pencil className="w-3.5 h-3.5 text-muted-foreground hover:text-primary" />
                       </button>
+                      {!t.recurrence_group_id && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setMakeRecurringTx(t);
+                            setRecurringMonths(12);
+                          }}
+                          className="p-1 rounded hover:bg-primary/10 transition-colors"
+                          title="Tornar recorrente (repetir nos próximos meses)"
+                        >
+                          <Repeat className="w-3.5 h-3.5 text-muted-foreground hover:text-primary" />
+                        </button>
+                      )}
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
