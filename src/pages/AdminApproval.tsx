@@ -43,6 +43,8 @@ const AdminApproval = () => {
   const [pushMinute, setPushMinute] = useState<number>(0);
   const [pushLoading, setPushLoading] = useState(false);
   const [testPushLoading, setTestPushLoading] = useState(false);
+  const [allOrgs, setAllOrgs] = useState<OrgInfo[]>([]);
+  const [orgFilter, setOrgFilter] = useState<string>("all");
   const { toast } = useToast();
   const navigate = useNavigate();
 
