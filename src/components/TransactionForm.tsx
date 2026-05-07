@@ -257,6 +257,9 @@ const TransactionForm = () => {
         deleteDailyIncomesByDateRange(pendingImportPeriod.start, pendingImportPeriod.end);
       }
       toast({ title: "Período limpo", description: "As transações antigas foram removidas. Revise e aprove os novos lançamentos abaixo." });
+    } else if (mode === "add") {
+      // For "add" mode, look at all existing saidas to detect possible date moves
+      existingTxForPeriod = transactions.filter((t) => t.tipo === "saida");
     }
 
     // Detect candidates needing approval (date change scenarios)
@@ -264,10 +267,28 @@ const TransactionForm = () => {
     const usedExistingIds = new Set<number>();
     const enriched = filtered.map((entry) => {
       let matchedExisting: (typeof transactions)[0] | undefined;
-      if (mode === "replace" && entry.tipo === "saida" && existingTxForPeriod.length > 0) {
-        matchedExisting = existingTxForPeriod.find(
-          (t) => t.tipo === "saida" && Math.abs(t.valor - entry.valor) < 0.01 && !usedExistingIds.has(t.id),
-        );
+      if (entry.tipo === "saida" && existingTxForPeriod.length > 0) {
+        if (mode === "replace") {
+          matchedExisting = existingTxForPeriod.find(
+            (t) => t.tipo === "saida" && Math.abs(t.valor - entry.valor) < 0.01 && !usedExistingIds.has(t.id),
+          );
+        } else {
+          // add mode: require matching value AND similar empresa AND date within ±15 days
+          const entryISO = entry.data;
+          const entryDate = new Date(entryISO);
+          const entryDescLower = entry.empresa.toLowerCase().trim();
+          matchedExisting = existingTxForPeriod.find((t) => {
+            if (Math.abs(t.valor - entry.valor) > 0.01) return false;
+            if (usedExistingIds.has(t.id)) return false;
+            const tISO = brToISO(t.data);
+            if (tISO === entryISO) return false; // same date = treat as duplicate, not a move
+            const tDate = new Date(tISO);
+            const diffDays = Math.abs((tDate.getTime() - entryDate.getTime()) / 86400000);
+            if (diffDays > 15) return false;
+            const tDescLower = t.empresa.toLowerCase().trim();
+            return tDescLower.includes(entryDescLower) || entryDescLower.includes(tDescLower) || tDescLower === entryDescLower;
+          });
+        }
         if (matchedExisting) {
           usedExistingIds.add(matchedExisting.id);
         }
