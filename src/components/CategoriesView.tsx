@@ -383,43 +383,178 @@ const CategoriesView = ({ selectedMonths, selectedYear, isViewer = false }: Cate
 
         {/* Category List */}
         <div className="rounded-xl bg-card border border-border p-6">
-          <h2 className="font-display font-semibold text-lg mb-4">Categorias de Saída</h2>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="font-display font-semibold text-lg">Categorias de Saída</h2>
+            {!isViewer && (
+              <Button size="sm" variant="ghost" className="h-7 text-xs gap-1" onClick={() => { setShowNewCat(!showNewCat); setNewCatName(""); }}>
+                <Plus className="w-3 h-3" /> Nova
+              </Button>
+            )}
+          </div>
+          {!isViewer && showNewCat && (
+            <div className="flex gap-2 mb-3">
+              <Input
+                value={newCatName}
+                onChange={(e) => setNewCatName(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && newCatName.trim()) {
+                    addCategory(newCatName.trim());
+                    setNewCatName("");
+                    setShowNewCat(false);
+                    toast({ title: "Categoria criada" });
+                  }
+                  if (e.key === "Escape") setShowNewCat(false);
+                }}
+                placeholder="Nome da categoria"
+                className="h-8 text-xs"
+                autoFocus
+              />
+              <Button size="sm" className="h-8 text-xs" onClick={() => {
+                if (newCatName.trim()) {
+                  addCategory(newCatName.trim());
+                  setNewCatName("");
+                  setShowNewCat(false);
+                  toast({ title: "Categoria criada" });
+                }
+              }}>OK</Button>
+            </div>
+          )}
           <div className="space-y-2 max-h-[400px] overflow-y-auto">
             {categoryData.length === 0 ? (
               <p className="text-sm text-muted-foreground text-center py-8">Nenhuma saída neste período</p>
             ) : (
               categoryData.map((cat) => {
                 const isSelected = selectedCategory === cat.code;
+                const isEditing = editingCatCode === cat.code;
                 return (
-                  <button
+                  <div
                     key={cat.code}
-                    onClick={() => {
-                      const newCat = isSelected ? null : cat.code;
-                      setSelectedCategory(newCat);
-                      setDetailOpen(false);
-                    }}
                     className={`
                       w-full flex items-center justify-between p-3 rounded-lg transition-all text-left
                       ${isSelected ? "bg-primary/10 border border-primary/30" : "bg-secondary/40 border border-transparent hover:bg-secondary/70"}
                     `}
                   >
-                    <div className="flex items-center gap-3 min-w-0">
+                    <button
+                      onClick={() => {
+                        if (isEditing) return;
+                        const newCat = isSelected ? null : cat.code;
+                        setSelectedCategory(newCat);
+                        setDetailOpen(false);
+                      }}
+                      className="flex items-center gap-3 min-w-0 flex-1 text-left"
+                    >
                       <ColorPicker
                         currentColor={getCategoryColor(cat.code)}
                         onColorChange={(color) => updateCategoryColor(cat.code, color)}
                       />
-                      <div className="min-w-0">
-                        <p className="text-sm font-medium truncate">{cat.name}</p>
+                      <div className="min-w-0 flex-1">
+                        {isEditing ? (
+                          <Input
+                            value={editingCatName}
+                            onChange={(e) => setEditingCatName(e.target.value)}
+                            onClick={(e) => e.stopPropagation()}
+                            onKeyDown={(e) => {
+                              e.stopPropagation();
+                              if (e.key === "Enter" && editingCatName.trim()) {
+                                updateCategoryName(cat.code, editingCatName.trim());
+                                setEditingCatCode(null);
+                                toast({ title: "Categoria renomeada" });
+                              }
+                              if (e.key === "Escape") setEditingCatCode(null);
+                            }}
+                            className="h-7 text-xs"
+                            autoFocus
+                          />
+                        ) : (
+                          <p className="text-sm font-medium truncate">{cat.name}</p>
+                        )}
                         <p className="text-xs text-muted-foreground">{cat.percentage.toFixed(1)}%</p>
                       </div>
-                    </div>
-                    <div className="text-right flex-shrink-0 ml-2">
+                    </button>
+                    <div className="text-right flex-shrink-0 ml-2 flex items-center gap-1">
                       <p className="text-sm font-semibold text-expense">{formatCurrency(cat.total)}</p>
+                      {!isViewer && cat.code !== "O" && (
+                        <>
+                          {isEditing ? (
+                            <>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  if (editingCatName.trim()) {
+                                    updateCategoryName(cat.code, editingCatName.trim());
+                                    setEditingCatCode(null);
+                                    toast({ title: "Categoria renomeada" });
+                                  }
+                                }}
+                                className="p-1 rounded hover:bg-primary/10"
+                              >
+                                <Check className="w-3.5 h-3.5 text-primary" />
+                              </button>
+                              <button onClick={(e) => { e.stopPropagation(); setEditingCatCode(null); }} className="p-1 rounded hover:bg-destructive/10">
+                                <X className="w-3.5 h-3.5 text-muted-foreground" />
+                              </button>
+                            </>
+                          ) : (
+                            <>
+                              <button
+                                onClick={(e) => { e.stopPropagation(); setEditingCatCode(cat.code); setEditingCatName(cat.name); }}
+                                className="p-1 rounded hover:bg-primary/10"
+                                title="Renomear"
+                              >
+                                <Pencil className="w-3.5 h-3.5 text-muted-foreground hover:text-primary" />
+                              </button>
+                              <button
+                                onClick={(e) => { e.stopPropagation(); setCatToDelete({ code: cat.code, name: cat.name }); }}
+                                className="p-1 rounded hover:bg-destructive/10"
+                                title="Excluir"
+                              >
+                                <Trash2 className="w-3.5 h-3.5 text-muted-foreground hover:text-destructive" />
+                              </button>
+                            </>
+                          )}
+                        </>
+                      )}
                     </div>
-                  </button>
+                  </div>
                 );
               })
             )}
+            {/* Show categories without spending too, so they can still be managed */}
+            {!isViewer && categories.filter(c => !categoryData.some(cd => cd.code === c.code)).map((cat) => (
+              <div key={cat.code} className="w-full flex items-center justify-between p-2 rounded-lg bg-secondary/20 border border-transparent text-left opacity-60 hover:opacity-100">
+                <div className="flex items-center gap-3 min-w-0 flex-1">
+                  <ColorPicker currentColor={getCategoryColor(cat.code)} onColorChange={(color) => updateCategoryColor(cat.code, color)} />
+                  {editingCatCode === cat.code ? (
+                    <Input
+                      value={editingCatName}
+                      onChange={(e) => setEditingCatName(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" && editingCatName.trim()) {
+                          updateCategoryName(cat.code, editingCatName.trim());
+                          setEditingCatCode(null);
+                          toast({ title: "Categoria renomeada" });
+                        }
+                        if (e.key === "Escape") setEditingCatCode(null);
+                      }}
+                      className="h-7 text-xs"
+                      autoFocus
+                    />
+                  ) : (
+                    <p className="text-xs text-muted-foreground truncate">{cat.name} <span className="text-[10px]">(sem lançamentos)</span></p>
+                  )}
+                </div>
+                {cat.code !== "O" && (
+                  <div className="flex items-center gap-1">
+                    <button onClick={() => { setEditingCatCode(cat.code); setEditingCatName(cat.name); }} className="p-1 rounded hover:bg-primary/10">
+                      <Pencil className="w-3.5 h-3.5 text-muted-foreground hover:text-primary" />
+                    </button>
+                    <button onClick={() => setCatToDelete({ code: cat.code, name: cat.name })} className="p-1 rounded hover:bg-destructive/10">
+                      <Trash2 className="w-3.5 h-3.5 text-muted-foreground hover:text-destructive" />
+                    </button>
+                  </div>
+                )}
+              </div>
+            ))}
           </div>
         </div>
       </div>
