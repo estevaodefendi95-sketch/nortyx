@@ -37,8 +37,8 @@ interface CategoriesViewProps {
 }
 
 const CategoriesView = ({ selectedMonths, selectedYear, isViewer = false }: CategoriesViewProps) => {
-  const { transactions, addTransaction, updateTransaction, deleteTransaction, deleteRecurringFromDate } = useTransactions();
-  const { categories, getCategoryInfo, getCategoryColor, updateCategoryColor } = useCategories();
+  const { transactions, addTransaction, updateTransaction, deleteTransaction, deleteRecurringFromDate, reassignCategory } = useTransactions();
+  const { categories, addCategory, deleteCategory, getCategoryInfo, getCategoryColor, updateCategoryColor, updateCategoryName } = useCategories();
   const { subcategories, addSubcategory, deleteSubcategory, getSubcategoriesByCategory, getSubcategoryName } = useSubcategories();
   const { toast } = useToast();
   const [selectedCategory, setSelectedCategory] = useState<CategoryCode | null>(null);
