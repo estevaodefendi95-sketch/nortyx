@@ -26,6 +26,7 @@ interface CalendarViewProps {
 const CalendarView = ({ initialMonth, selectedYear: propYear, isViewer = false }: CalendarViewProps) => {
   const { transactions, dailyIncomes, deleteTransaction, updateTransaction, updateDailyIncome, deleteDailyIncome } = useTransactions();
   const { categories, getCategoryInfo, getCategoryColor } = useCategories();
+  const { organization } = useOrganization();
   const { toast } = useToast();
   const isMobile = useIsMobile();
   const dayScrollerRef = useRef<HTMLDivElement>(null);
