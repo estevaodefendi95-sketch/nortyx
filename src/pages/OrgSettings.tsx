@@ -47,6 +47,15 @@ const OrgSettings = () => {
   const [rankingTitle, setRankingTitle] = useState("Top 10");
   const [rankingTitle2, setRankingTitle2] = useState("Top 10");
 
+  // Members management
+  type Member = { id: string; user_id: string; role: string; display_name: string | null };
+  type Invite = { id: string; email: string; role: string; created_at: string };
+  const [members, setMembers] = useState<Member[]>([]);
+  const [invites, setInvites] = useState<Invite[]>([]);
+  const [inviteEmail, setInviteEmail] = useState("");
+  const [inviteRole, setInviteRole] = useState<"member" | "admin">("member");
+  const [inviting, setInviting] = useState(false);
+
   const isOwner = membership?.role === "owner" || membership?.role === "admin";
   const isSuperUser = user?.email === SUPER_EMAIL;
 
