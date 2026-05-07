@@ -227,6 +227,62 @@ const AdminApproval = () => {
     );
   };
 
+  const handleToggleOrg = async (user: PendingUser, orgId: string) => {
+    const isMember = user.organizationIds?.includes(orgId);
+    setActionLoading(user.id);
+    try {
+      if (isMember) {
+        if ((user.organizationIds?.length || 0) <= 1) {
+          toast({ title: "Ação bloqueada", description: "O usuário precisa pertencer a pelo menos uma empresa.", variant: "destructive" });
+          setActionLoading(null);
+          return;
+        }
+        const { error } = await supabase
+          .from("organization_members")
+          .delete()
+          .eq("user_id", user.user_id)
+          .eq("organization_id", orgId);
+        if (error) throw error;
+        const newIds = (user.organizationIds || []).filter((id) => id !== orgId);
+        let newPrimary = user.primaryOrgId;
+        if (user.primaryOrgId === orgId) {
+          newPrimary = newIds[0] || null;
+          await supabase.from("profiles").update({ organization_id: newPrimary }).eq("id", user.id);
+        }
+        setUsers((prev) => prev.map((u) => (u.id === user.id ? { ...u, organizationIds: newIds, primaryOrgId: newPrimary } : u)));
+      } else {
+        const { error } = await supabase
+          .from("organization_members")
+          .insert({ user_id: user.user_id, organization_id: orgId, role: "member" as any });
+        if (error) throw error;
+        const newIds = [...(user.organizationIds || []), orgId];
+        let newPrimary = user.primaryOrgId;
+        if (!newPrimary) {
+          newPrimary = orgId;
+          await supabase.from("profiles").update({ organization_id: orgId, approved: true }).eq("id", user.id);
+        }
+        setUsers((prev) => prev.map((u) => (u.id === user.id ? { ...u, organizationIds: newIds, primaryOrgId: newPrimary } : u)));
+      }
+    } catch (e: any) {
+      toast({ title: "Erro", description: e.message || "Falha ao atualizar empresa", variant: "destructive" });
+    }
+    setActionLoading(null);
+  };
+
+  const handleSetPrimaryOrg = async (user: PendingUser, orgId: string) => {
+    if (!user.organizationIds?.includes(orgId)) return;
+    setActionLoading(user.id);
+    const { error } = await supabase.from("profiles").update({ organization_id: orgId }).eq("id", user.id);
+    if (error) {
+      toast({ title: "Erro", description: error.message, variant: "destructive" });
+    } else {
+      setUsers((prev) => prev.map((u) => (u.id === user.id ? { ...u, primaryOrgId: orgId } : u)));
+      toast({ title: "Empresa principal atualizada" });
+    }
+    setActionLoading(null);
+  };
+
+
   const getRoleLabel = (role: string) => {
     switch (role) {
       case "admin": return "Administrador";
