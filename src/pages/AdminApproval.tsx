@@ -88,7 +88,7 @@ const AdminApproval = () => {
     setLoading(true);
     const { data: profiles, error } = await supabase
       .from("profiles")
-      .select("id, user_id, display_name, created_at, approved")
+      .select("id, user_id, display_name, created_at, approved, organization_id")
       .order("created_at", { ascending: false });
 
     if (error) {
@@ -116,10 +116,34 @@ const AdminApproval = () => {
       tabVisMap.set(tv.user_id, existing);
     });
 
-    setUsers((profiles || []).map((u) => ({
-      ...u,
+    // Fetch all organizations
+    const { data: orgs } = await supabase
+      .from("organizations")
+      .select("id, name, primary_color, logo_url")
+      .order("name");
+    setAllOrgs((orgs || []) as OrgInfo[]);
+
+    // Fetch all org memberships
+    const { data: memberships } = await supabase
+      .from("organization_members")
+      .select("user_id, organization_id");
+    const memberMap = new Map<string, string[]>();
+    memberships?.forEach((m: any) => {
+      const arr = memberMap.get(m.user_id) || [];
+      arr.push(m.organization_id);
+      memberMap.set(m.user_id, arr);
+    });
+
+    setUsers((profiles || []).map((u: any) => ({
+      id: u.id,
+      user_id: u.user_id,
+      display_name: u.display_name,
+      created_at: u.created_at,
+      approved: u.approved,
       role: roleMap.get(u.user_id) || "user",
       tabVisibility: tabVisMap.get(u.user_id) || {},
+      organizationIds: memberMap.get(u.user_id) || [],
+      primaryOrgId: u.organization_id || null,
     })));
     setLoading(false);
   };
