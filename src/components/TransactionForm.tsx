@@ -142,15 +142,19 @@ const TransactionForm = () => {
   const [existingClients, setExistingClients] = useState<{ id: string; nome: string; email: string; telefone: string | null; forma_cobranca: string | null }[]>([]);
   const [clientPopoverOpen, setClientPopoverOpen] = useState(false);
 
-  // Fetch existing billing clients when billing section opens
+  // Fetch existing billing clients (scoped to active organization) when billing section opens
   useEffect(() => {
-    if (!showBilling) return;
+    if (!showBilling || !organization?.id) return;
+    const orgId = organization.id;
     const fetchClients = async () => {
-      const { data } = await supabase.from("billing_clients").select("id, nome, email, telefone, forma_cobranca");
+      const { data } = await supabase
+        .from("billing_clients")
+        .select("id, nome, email, telefone, forma_cobranca")
+        .eq("organization_id", orgId);
       if (data) setExistingClients(data);
     };
     fetchClients();
-  }, [showBilling]);
+  }, [showBilling, organization?.id]);
   const [recentEntries, setRecentEntries] = useState<NewTransaction[]>([]);
   const [bankEntries, setBankEntries] = useState<ParsedBankEntry[]>([]);
   const bankInputRef = useRef<HTMLInputElement>(null);
