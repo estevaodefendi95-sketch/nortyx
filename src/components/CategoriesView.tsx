@@ -796,8 +796,8 @@ const CategoriesView = ({ selectedMonths, selectedYear, isViewer = false }: Cate
 
           <div className="space-y-2 max-h-[60vh] sm:max-h-[400px] overflow-y-auto">
             {selectedTransactionsList.map((t) => (
+              <div key={t.id} className="space-y-1">
               <div
-                key={t.id}
                 className={`flex flex-col sm:flex-row sm:items-center justify-between p-3 rounded-lg bg-secondary/30 border gap-2 sm:gap-0 ${selectMode && selectedForDup.has(t.id) ? "border-primary/50 bg-primary/5" : "border-border/30"}`}
               >
                 <div className="flex items-center gap-2 sm:gap-3 min-w-0">
