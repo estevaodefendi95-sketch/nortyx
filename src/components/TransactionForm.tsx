@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { formatCurrency, type CategoryCode, type TransactionType, type FormaPagamento, type RecurrenceType } from "@/data/cashflow";
 import { useTransactions } from "@/context/TransactionsContext";
+import { useOrganization } from "@/context/OrganizationContext";
 import { useCategories } from "@/context/CategoriesContext";
 import { useSubcategories } from "@/context/SubcategoriesContext";
 import { supabase } from "@/integrations/supabase/client";
