@@ -52,6 +52,17 @@ const CategoriesView = ({ selectedMonths, selectedYear, isViewer = false }: Cate
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [pendingDeleteTx, setPendingDeleteTx] = useState<{ id: number; groupId: string | null; data: string } | null>(null);
 
+  // Category management state
+  const [newCatName, setNewCatName] = useState("");
+  const [showNewCat, setShowNewCat] = useState(false);
+  const [editingCatCode, setEditingCatCode] = useState<string | null>(null);
+  const [editingCatName, setEditingCatName] = useState("");
+  const [catToDelete, setCatToDelete] = useState<{ code: string; name: string } | null>(null);
+
+  // Make recurring dialog state
+  const [makeRecurringTx, setMakeRecurringTx] = useState<any | null>(null);
+  const [recurringMonths, setRecurringMonths] = useState(12);
+
   // Inline edit state
   const [editingTxId, setEditingTxId] = useState<number | null>(null);
   const [editTxEmpresa, setEditTxEmpresa] = useState("");
