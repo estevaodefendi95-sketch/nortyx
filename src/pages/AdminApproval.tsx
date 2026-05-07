@@ -447,11 +447,41 @@ const AdminApproval = () => {
             )}
           </section>
 
+          {/* Filtro de empresa */}
+          {allOrgs.length > 1 && (
+            <div className="flex items-center gap-2">
+              <Building2 className="w-4 h-4 text-muted-foreground" />
+              <span className="text-sm text-muted-foreground">Filtrar por empresa:</span>
+              <Select value={orgFilter} onValueChange={setOrgFilter}>
+                <SelectTrigger className="h-8 w-[180px] text-sm">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all" className="text-sm">Todas</SelectItem>
+                  {allOrgs.map((o) => (
+                    <SelectItem key={o.id} value={o.id} className="text-sm">{o.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
           <section className="space-y-3">
             <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
               Aprovados ({approved.length})
             </h2>
-            {approved.map((user) => (
+            {approvedGroups.map((group) => (
+              <div key={group.orgId} className="space-y-2">
+                <div className="flex items-center gap-2 pt-2">
+                  <span
+                    className="inline-block w-2 h-2 rounded-full"
+                    style={{ backgroundColor: group.org?.primary_color || "hsl(var(--muted-foreground))" }}
+                  />
+                  <h3 className="text-xs font-semibold text-foreground uppercase tracking-wider">
+                    {group.org?.name || "Sem empresa"} ({group.users.length})
+                  </h3>
+                </div>
+                {group.users.map((user) => (
               <div key={user.id} className="p-3 rounded-lg border border-border bg-card space-y-2">
                 <div className="flex items-center justify-between gap-2">
                   <div className="min-w-0 flex-1">
@@ -516,6 +546,56 @@ const AdminApproval = () => {
                     );
                   })}
                 </div>
+                {/* Empresas controls */}
+                {allOrgs.length > 0 && (
+                  <div className="flex items-center gap-1.5 flex-wrap pt-1 border-t border-border/50">
+                    <Building2 className="w-3 h-3 text-muted-foreground" />
+                    <span className="text-[10px] text-muted-foreground mr-1">Empresas:</span>
+                    {allOrgs.map((org) => {
+                      const isMember = user.organizationIds?.includes(org.id);
+                      const isPrimary = user.primaryOrgId === org.id;
+                      return (
+                        <div
+                          key={org.id}
+                          className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full border text-[10px] transition-colors ${
+                            isMember
+                              ? "bg-primary/10 border-primary/40 text-foreground"
+                              : "bg-transparent border-border text-muted-foreground hover:bg-muted/30"
+                          }`}
+                        >
+                          {isMember && (
+                            <button
+                              type="button"
+                              onClick={() => !isPrimary && handleSetPrimaryOrg(user, org.id)}
+                              disabled={isPrimary || actionLoading === user.id}
+                              title={isPrimary ? "Empresa principal" : "Definir como principal"}
+                              className="flex items-center"
+                            >
+                              <Star
+                                className={`w-3 h-3 ${isPrimary ? "fill-primary text-primary" : "text-muted-foreground hover:text-primary"}`}
+                              />
+                            </button>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => handleToggleOrg(user, org.id)}
+                            disabled={actionLoading === user.id}
+                            className="flex items-center gap-1"
+                          >
+                            <span
+                              className="inline-block w-1.5 h-1.5 rounded-full"
+                              style={{ backgroundColor: org.primary_color || "hsl(var(--muted-foreground))" }}
+                            />
+                            {org.name}
+                            {isMember && <Check className="w-2.5 h-2.5 text-primary" />}
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+                ))}
               </div>
             ))}
           </section>
