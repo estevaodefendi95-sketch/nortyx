@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { formatCurrency, type CategoryCode, type TransactionType, type FormaPagamento, type RecurrenceType } from "@/data/cashflow";
 import { useTransactions } from "@/context/TransactionsContext";
+import { useOrganization } from "@/context/OrganizationContext";
 import { useCategories } from "@/context/CategoriesContext";
 import { useSubcategories } from "@/context/SubcategoriesContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -65,6 +66,7 @@ interface ImportedEntry {
 
 const TransactionForm = () => {
   const { transactions, addTransaction, addDailyIncome, deleteTransactionsByDateRange, deleteDailyIncomesByDateRange, reassignCategory, updateTransaction } = useTransactions();
+  const { organization } = useOrganization();
   const { categories, addCategory, deleteCategory, findCategoryByKeyword, addMapping } = useCategories();
   const { subcategories, addSubcategory, getSubcategoriesByCategory } = useSubcategories();
   const { toast } = useToast();
@@ -588,6 +590,11 @@ const TransactionForm = () => {
       // Save billing client and charge if enabled
       if (showBilling && billingClient.nome && billingClient.email) {
         try {
+          if (!organization?.id) {
+            toast({ title: "Empresa não carregada", description: "Aguarde a organização ser carregada e tente novamente.", variant: "destructive" });
+            throw new Error("organization not loaded");
+          }
+          const orgId = organization.id;
           // Upsert client by email
           const { data: existingClients } = await supabase
             .from("billing_clients")
@@ -612,6 +619,7 @@ const TransactionForm = () => {
                 email: billingClient.email.trim(),
                 telefone: billingClient.telefone.trim() || null,
                 forma_cobranca: billingClient.forma_cobranca || null,
+                organization_id: orgId,
               })
               .select()
               .single();
@@ -636,9 +644,11 @@ const TransactionForm = () => {
               status: "pendente",
               email_enviado: false,
               meses_restantes: billingClient.recorrente ? chargeCount - i : null,
+              organization_id: orgId,
             });
           }
-          await supabase.from("billing_charges").insert(chargesData);
+          const { error: chargesError } = await supabase.from("billing_charges").insert(chargesData);
+          if (chargesError) throw chargesError;
 
           toast({ title: "Cliente de cobrança cadastrado", description: `${billingClient.nome} receberá lembretes por e-mail.` });
         } catch (err) {

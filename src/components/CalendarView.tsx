@@ -58,12 +58,13 @@ const CalendarView = ({ initialMonth, selectedYear: propYear, isViewer = false }
   const [billingCharges, setBillingCharges] = useState<BillingChargeWithClient[]>([]);
 
   useEffect(() => {
+    let cancelled = false;
     const fetchBillingCharges = async () => {
       const { data } = await supabase
         .from("billing_charges")
         .select("id, valor, data_cobranca, status, billing_clients(nome)")
         .order("data_cobranca");
-      if (data) {
+      if (!cancelled && data) {
         setBillingCharges(
           data.map((c: any) => ({
             id: c.id,
@@ -76,6 +77,15 @@ const CalendarView = ({ initialMonth, selectedYear: propYear, isViewer = false }
       }
     };
     fetchBillingCharges();
+    const channel = supabase
+      .channel("billing_charges_calendar")
+      .on("postgres_changes", { event: "*", schema: "public", table: "billing_charges" }, () => fetchBillingCharges())
+      .on("postgres_changes", { event: "*", schema: "public", table: "billing_clients" }, () => fetchBillingCharges())
+      .subscribe();
+    return () => {
+      cancelled = true;
+      supabase.removeChannel(channel);
+    };
   }, [currentMonth, currentYear]);
 
   // Editable transaction overrides
@@ -456,9 +466,10 @@ const CalendarView = ({ initialMonth, selectedYear: propYear, isViewer = false }
                     <span className="text-[10px] text-muted-foreground">{dayOfWeek}</span>
                     <span className={`text-sm font-bold ${isTodayDay && !isSelected ? "text-primary" : isSelected ? "text-primary" : ""}`}>{day}</span>
                     {hasData && (
-                      <div className="flex gap-0.5 mt-0.5">
+                      <div className="flex gap-0.5 mt-0.5 items-center">
                         {dayIncome > 0 && <div className="w-1.5 h-1.5 rounded-full bg-income" />}
                         {dayExpense > 0 && <div className="w-1.5 h-1.5 rounded-full bg-expense" />}
+                        {billingChargesByDay.has(day) && <User className="w-2 h-2 text-income" />}
                       </div>
                     )}
                   </button>
@@ -697,7 +708,10 @@ const CalendarView = ({ initialMonth, selectedYear: propYear, isViewer = false }
                       ${hasData ? "cursor-pointer" : "cursor-default opacity-50"}
                     `}
                   >
-                    <span className={`text-xs font-medium ${isTodayDay ? "bg-primary text-primary-foreground rounded-full w-5 h-5 flex items-center justify-center" : isSelected ? "text-primary" : "text-foreground"}`}>{day}</span>
+                    <div className="flex items-center justify-between">
+                      <span className={`text-xs font-medium ${isTodayDay ? "bg-primary text-primary-foreground rounded-full w-5 h-5 flex items-center justify-center" : isSelected ? "text-primary" : "text-foreground"}`}>{day}</span>
+                      {billingChargesByDay.has(day) && <User className="w-3 h-3 text-income" />}
+                    </div>
                     {hasData && (
                       <div className="mt-0.5 space-y-0">
                         <p className={`text-[9px] font-medium truncate ${saldoInicial >= 0 ? "text-muted-foreground" : "text-expense/70"}`}>
