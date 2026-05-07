@@ -200,6 +200,7 @@ const TransactionForm = () => {
   const finalizeImport = (
     enriched: ParsedBankEntry[],
     scheduledUnpaidToReschedule: Array<{ id: number; empresa: string; valor: number; data: string; categoria: string; subcategoria: string | null }>,
+    skipEntryIds: Set<number> = new Set(),
   ) => {
     // Reschedule approved unpaid scheduled bills (move to next day)
     if (scheduledUnpaidToReschedule.length > 0) {
@@ -224,7 +225,8 @@ const TransactionForm = () => {
       });
     }
 
-    setBankEntries((prev) => [...prev, ...enriched]);
+    const finalEntries = skipEntryIds.size > 0 ? enriched.filter((e) => !skipEntryIds.has(e.id)) : enriched;
+    setBankEntries((prev) => [...prev, ...finalEntries]);
     setShowImportModeDialog(false);
     setPendingParsedEntries([]);
     setPendingImportPeriod(null);
