@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
-import { Check, X, ArrowLeft, Loader2, Shield, Eye, Pencil, Bell, Clock, Send, LayoutGrid } from "lucide-react";
+import { Check, X, ArrowLeft, Loader2, Shield, Eye, Pencil, Bell, Clock, Send, LayoutGrid, Building2, Star } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -16,6 +16,13 @@ const ALL_TABS = [
   { id: "lancamento", label: "Lançamento" },
 ];
 
+interface OrgInfo {
+  id: string;
+  name: string;
+  primary_color: string | null;
+  logo_url: string | null;
+}
+
 interface PendingUser {
   id: string;
   user_id: string;
@@ -24,6 +31,8 @@ interface PendingUser {
   approved: boolean;
   role?: string;
   tabVisibility?: Record<string, boolean>;
+  organizationIds?: string[];
+  primaryOrgId?: string | null;
 }
 
 const AdminApproval = () => {
@@ -34,6 +43,8 @@ const AdminApproval = () => {
   const [pushMinute, setPushMinute] = useState<number>(0);
   const [pushLoading, setPushLoading] = useState(false);
   const [testPushLoading, setTestPushLoading] = useState(false);
+  const [allOrgs, setAllOrgs] = useState<OrgInfo[]>([]);
+  const [orgFilter, setOrgFilter] = useState<string>("all");
   const { toast } = useToast();
   const navigate = useNavigate();
 
@@ -77,7 +88,7 @@ const AdminApproval = () => {
     setLoading(true);
     const { data: profiles, error } = await supabase
       .from("profiles")
-      .select("id, user_id, display_name, created_at, approved")
+      .select("id, user_id, display_name, created_at, approved, organization_id")
       .order("created_at", { ascending: false });
 
     if (error) {
@@ -105,10 +116,34 @@ const AdminApproval = () => {
       tabVisMap.set(tv.user_id, existing);
     });
 
-    setUsers((profiles || []).map((u) => ({
-      ...u,
+    // Fetch all organizations
+    const { data: orgs } = await supabase
+      .from("organizations")
+      .select("id, name, primary_color, logo_url")
+      .order("name");
+    setAllOrgs((orgs || []) as OrgInfo[]);
+
+    // Fetch all org memberships
+    const { data: memberships } = await supabase
+      .from("organization_members")
+      .select("user_id, organization_id");
+    const memberMap = new Map<string, string[]>();
+    memberships?.forEach((m: any) => {
+      const arr = memberMap.get(m.user_id) || [];
+      arr.push(m.organization_id);
+      memberMap.set(m.user_id, arr);
+    });
+
+    setUsers((profiles || []).map((u: any) => ({
+      id: u.id,
+      user_id: u.user_id,
+      display_name: u.display_name,
+      created_at: u.created_at,
+      approved: u.approved,
       role: roleMap.get(u.user_id) || "user",
       tabVisibility: tabVisMap.get(u.user_id) || {},
+      organizationIds: memberMap.get(u.user_id) || [],
+      primaryOrgId: u.organization_id || null,
     })));
     setLoading(false);
   };
@@ -192,6 +227,62 @@ const AdminApproval = () => {
     );
   };
 
+  const handleToggleOrg = async (user: PendingUser, orgId: string) => {
+    const isMember = user.organizationIds?.includes(orgId);
+    setActionLoading(user.id);
+    try {
+      if (isMember) {
+        if ((user.organizationIds?.length || 0) <= 1) {
+          toast({ title: "Ação bloqueada", description: "O usuário precisa pertencer a pelo menos uma empresa.", variant: "destructive" });
+          setActionLoading(null);
+          return;
+        }
+        const { error } = await supabase
+          .from("organization_members")
+          .delete()
+          .eq("user_id", user.user_id)
+          .eq("organization_id", orgId);
+        if (error) throw error;
+        const newIds = (user.organizationIds || []).filter((id) => id !== orgId);
+        let newPrimary = user.primaryOrgId;
+        if (user.primaryOrgId === orgId) {
+          newPrimary = newIds[0] || null;
+          await supabase.from("profiles").update({ organization_id: newPrimary }).eq("id", user.id);
+        }
+        setUsers((prev) => prev.map((u) => (u.id === user.id ? { ...u, organizationIds: newIds, primaryOrgId: newPrimary } : u)));
+      } else {
+        const { error } = await supabase
+          .from("organization_members")
+          .insert({ user_id: user.user_id, organization_id: orgId, role: "member" as any });
+        if (error) throw error;
+        const newIds = [...(user.organizationIds || []), orgId];
+        let newPrimary = user.primaryOrgId;
+        if (!newPrimary) {
+          newPrimary = orgId;
+          await supabase.from("profiles").update({ organization_id: orgId, approved: true }).eq("id", user.id);
+        }
+        setUsers((prev) => prev.map((u) => (u.id === user.id ? { ...u, organizationIds: newIds, primaryOrgId: newPrimary } : u)));
+      }
+    } catch (e: any) {
+      toast({ title: "Erro", description: e.message || "Falha ao atualizar empresa", variant: "destructive" });
+    }
+    setActionLoading(null);
+  };
+
+  const handleSetPrimaryOrg = async (user: PendingUser, orgId: string) => {
+    if (!user.organizationIds?.includes(orgId)) return;
+    setActionLoading(user.id);
+    const { error } = await supabase.from("profiles").update({ organization_id: orgId }).eq("id", user.id);
+    if (error) {
+      toast({ title: "Erro", description: error.message, variant: "destructive" });
+    } else {
+      setUsers((prev) => prev.map((u) => (u.id === user.id ? { ...u, primaryOrgId: orgId } : u)));
+      toast({ title: "Empresa principal atualizada" });
+    }
+    setActionLoading(null);
+  };
+
+
   const getRoleLabel = (role: string) => {
     switch (role) {
       case "admin": return "Administrador";
@@ -208,8 +299,27 @@ const AdminApproval = () => {
     }
   };
 
-  const pending = users.filter((u) => !u.approved);
-  const approved = users.filter((u) => u.approved);
+  const filterByOrg = (u: PendingUser) => orgFilter === "all" || u.organizationIds?.includes(orgFilter);
+  const pending = users.filter((u) => !u.approved).filter(filterByOrg);
+  const approved = users.filter((u) => u.approved).filter(filterByOrg);
+
+  // Group approved by primary org when filter = all
+  const approvedGroups: { orgId: string | "none"; org: OrgInfo | null; users: PendingUser[] }[] = (() => {
+    if (orgFilter !== "all") return [{ orgId: orgFilter, org: allOrgs.find((o) => o.id === orgFilter) || null, users: approved }];
+    const groups = new Map<string, PendingUser[]>();
+    approved.forEach((u) => {
+      const key = u.primaryOrgId || "none";
+      const arr = groups.get(key) || [];
+      arr.push(u);
+      groups.set(key, arr);
+    });
+    const result: { orgId: string | "none"; org: OrgInfo | null; users: PendingUser[] }[] = [];
+    allOrgs.forEach((o) => {
+      if (groups.has(o.id)) result.push({ orgId: o.id, org: o, users: groups.get(o.id)! });
+    });
+    if (groups.has("none")) result.push({ orgId: "none", org: null, users: groups.get("none")! });
+    return result;
+  })();
 
   return (
     <div className="min-h-screen bg-background p-4 max-w-2xl mx-auto space-y-6">
@@ -337,11 +447,41 @@ const AdminApproval = () => {
             )}
           </section>
 
+          {/* Filtro de empresa */}
+          {allOrgs.length > 1 && (
+            <div className="flex items-center gap-2">
+              <Building2 className="w-4 h-4 text-muted-foreground" />
+              <span className="text-sm text-muted-foreground">Filtrar por empresa:</span>
+              <Select value={orgFilter} onValueChange={setOrgFilter}>
+                <SelectTrigger className="h-8 w-[180px] text-sm">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all" className="text-sm">Todas</SelectItem>
+                  {allOrgs.map((o) => (
+                    <SelectItem key={o.id} value={o.id} className="text-sm">{o.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
           <section className="space-y-3">
             <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
               Aprovados ({approved.length})
             </h2>
-            {approved.map((user) => (
+            {approvedGroups.map((group) => (
+              <div key={group.orgId} className="space-y-2">
+                <div className="flex items-center gap-2 pt-2">
+                  <span
+                    className="inline-block w-2 h-2 rounded-full"
+                    style={{ backgroundColor: group.org?.primary_color || "hsl(var(--muted-foreground))" }}
+                  />
+                  <h3 className="text-xs font-semibold text-foreground uppercase tracking-wider">
+                    {group.org?.name || "Sem empresa"} ({group.users.length})
+                  </h3>
+                </div>
+                {group.users.map((user) => (
               <div key={user.id} className="p-3 rounded-lg border border-border bg-card space-y-2">
                 <div className="flex items-center justify-between gap-2">
                   <div className="min-w-0 flex-1">
@@ -406,6 +546,56 @@ const AdminApproval = () => {
                     );
                   })}
                 </div>
+                {/* Empresas controls */}
+                {allOrgs.length > 0 && (
+                  <div className="flex items-center gap-1.5 flex-wrap pt-1 border-t border-border/50">
+                    <Building2 className="w-3 h-3 text-muted-foreground" />
+                    <span className="text-[10px] text-muted-foreground mr-1">Empresas:</span>
+                    {allOrgs.map((org) => {
+                      const isMember = user.organizationIds?.includes(org.id);
+                      const isPrimary = user.primaryOrgId === org.id;
+                      return (
+                        <div
+                          key={org.id}
+                          className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full border text-[10px] transition-colors ${
+                            isMember
+                              ? "bg-primary/10 border-primary/40 text-foreground"
+                              : "bg-transparent border-border text-muted-foreground hover:bg-muted/30"
+                          }`}
+                        >
+                          {isMember && (
+                            <button
+                              type="button"
+                              onClick={() => !isPrimary && handleSetPrimaryOrg(user, org.id)}
+                              disabled={isPrimary || actionLoading === user.id}
+                              title={isPrimary ? "Empresa principal" : "Definir como principal"}
+                              className="flex items-center"
+                            >
+                              <Star
+                                className={`w-3 h-3 ${isPrimary ? "fill-primary text-primary" : "text-muted-foreground hover:text-primary"}`}
+                              />
+                            </button>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => handleToggleOrg(user, org.id)}
+                            disabled={actionLoading === user.id}
+                            className="flex items-center gap-1"
+                          >
+                            <span
+                              className="inline-block w-1.5 h-1.5 rounded-full"
+                              style={{ backgroundColor: org.primary_color || "hsl(var(--muted-foreground))" }}
+                            />
+                            {org.name}
+                            {isMember && <Check className="w-2.5 h-2.5 text-primary" />}
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+                ))}
               </div>
             ))}
           </section>
