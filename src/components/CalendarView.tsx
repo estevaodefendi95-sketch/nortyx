@@ -58,12 +58,13 @@ const CalendarView = ({ initialMonth, selectedYear: propYear, isViewer = false }
   const [billingCharges, setBillingCharges] = useState<BillingChargeWithClient[]>([]);
 
   useEffect(() => {
+    let cancelled = false;
     const fetchBillingCharges = async () => {
       const { data } = await supabase
         .from("billing_charges")
         .select("id, valor, data_cobranca, status, billing_clients(nome)")
         .order("data_cobranca");
-      if (data) {
+      if (!cancelled && data) {
         setBillingCharges(
           data.map((c: any) => ({
             id: c.id,
@@ -76,6 +77,15 @@ const CalendarView = ({ initialMonth, selectedYear: propYear, isViewer = false }
       }
     };
     fetchBillingCharges();
+    const channel = supabase
+      .channel("billing_charges_calendar")
+      .on("postgres_changes", { event: "*", schema: "public", table: "billing_charges" }, () => fetchBillingCharges())
+      .on("postgres_changes", { event: "*", schema: "public", table: "billing_clients" }, () => fetchBillingCharges())
+      .subscribe();
+    return () => {
+      cancelled = true;
+      supabase.removeChannel(channel);
+    };
   }, [currentMonth, currentYear]);
 
   // Editable transaction overrides
