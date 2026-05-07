@@ -581,35 +581,37 @@ const TransactionForm = () => {
     };
 
     if (form.tipo === "entrada") {
-      // Only create daily_income if NOT linked to a billing client
-      // When linked, billing_charges is the single source of truth
-      if (!showBilling || !billingClient.nome || !billingClient.email) {
-        const saved = await addDailyIncome({ data: dataBR, valor });
-        if (!saved) {
-          toast({ title: "Erro ao salvar entrada", description: "Tente novamente.", variant: "destructive" });
-          return;
-        }
+      // If user enabled billing link but didn't fill required fields, block save
+      if (showBilling && (!billingClient.nome.trim() || !billingClient.email.trim())) {
+        toast({
+          title: "Dados do cliente incompletos",
+          description: "Preencha nome e e-mail do cliente, ou desmarque 'Vincular cliente para cobrança'.",
+          variant: "destructive",
+        });
+        return;
       }
 
-      // Save billing client and charge if enabled
+      // If billing is enabled, create client + charges FIRST so failures don't leave orphan income
       if (showBilling && billingClient.nome && billingClient.email) {
+        if (!organization?.id) {
+          toast({ title: "Empresa não carregada", description: "Aguarde a organização ser carregada e tente novamente.", variant: "destructive" });
+          return;
+        }
+        const orgId = organization.id;
+
         try {
-          if (!organization?.id) {
-            toast({ title: "Empresa não carregada", description: "Aguarde a organização ser carregada e tente novamente.", variant: "destructive" });
-            throw new Error("organization not loaded");
-          }
-          const orgId = organization.id;
-          // Upsert client by email
-          const { data: existingClients } = await supabase
+          // Look up existing client BY EMAIL within this organization
+          const { data: existingInOrg } = await supabase
             .from("billing_clients")
             .select("id")
             .eq("email", billingClient.email.trim())
+            .eq("organization_id", orgId)
             .limit(1);
 
           let clientId: string;
 
-          if (existingClients && existingClients.length > 0) {
-            clientId = existingClients[0].id;
+          if (existingInOrg && existingInOrg.length > 0) {
+            clientId = existingInOrg[0].id;
             await supabase.from("billing_clients").update({
               nome: billingClient.nome.trim(),
               telefone: billingClient.telefone.trim() || null,
@@ -654,10 +656,22 @@ const TransactionForm = () => {
           const { error: chargesError } = await supabase.from("billing_charges").insert(chargesData);
           if (chargesError) throw chargesError;
 
-          toast({ title: "Cliente de cobrança cadastrado", description: `${billingClient.nome} receberá lembretes por e-mail.` });
-        } catch (err) {
+          toast({ title: "Cliente vinculado à cobrança", description: `${billingClient.nome} — ${chargeCount} cobrança(s) criada(s).` });
+        } catch (err: any) {
           console.error("Erro ao salvar cliente de cobrança:", err);
-          toast({ title: "Erro ao cadastrar cliente", description: "A entrada foi salva, mas o cliente de cobrança não.", variant: "destructive" });
+          toast({
+            title: "Erro ao cadastrar cobrança",
+            description: err?.message || "Não foi possível vincular a cobrança. A entrada não foi salva.",
+            variant: "destructive",
+          });
+          return;
+        }
+      } else {
+        // Plain income (no billing link) — save as daily_income
+        const saved = await addDailyIncome({ data: dataBR, valor });
+        if (!saved) {
+          toast({ title: "Erro ao salvar entrada", description: "Tente novamente.", variant: "destructive" });
+          return;
         }
       }
     } else {
