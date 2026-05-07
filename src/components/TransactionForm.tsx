@@ -590,6 +590,11 @@ const TransactionForm = () => {
       // Save billing client and charge if enabled
       if (showBilling && billingClient.nome && billingClient.email) {
         try {
+          if (!organization?.id) {
+            toast({ title: "Empresa não carregada", description: "Aguarde a organização ser carregada e tente novamente.", variant: "destructive" });
+            throw new Error("organization not loaded");
+          }
+          const orgId = organization.id;
           // Upsert client by email
           const { data: existingClients } = await supabase
             .from("billing_clients")
@@ -614,6 +619,7 @@ const TransactionForm = () => {
                 email: billingClient.email.trim(),
                 telefone: billingClient.telefone.trim() || null,
                 forma_cobranca: billingClient.forma_cobranca || null,
+                organization_id: orgId,
               })
               .select()
               .single();
@@ -638,9 +644,11 @@ const TransactionForm = () => {
               status: "pendente",
               email_enviado: false,
               meses_restantes: billingClient.recorrente ? chargeCount - i : null,
+              organization_id: orgId,
             });
           }
-          await supabase.from("billing_charges").insert(chargesData);
+          const { error: chargesError } = await supabase.from("billing_charges").insert(chargesData);
+          if (chargesError) throw chargesError;
 
           toast({ title: "Cliente de cobrança cadastrado", description: `${billingClient.nome} receberá lembretes por e-mail.` });
         } catch (err) {
