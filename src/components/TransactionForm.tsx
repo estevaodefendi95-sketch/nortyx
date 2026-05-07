@@ -200,6 +200,7 @@ const TransactionForm = () => {
   const finalizeImport = (
     enriched: ParsedBankEntry[],
     scheduledUnpaidToReschedule: Array<{ id: number; empresa: string; valor: number; data: string; categoria: string; subcategoria: string | null }>,
+    skipEntryIds: Set<number> = new Set(),
   ) => {
     // Reschedule approved unpaid scheduled bills (move to next day)
     if (scheduledUnpaidToReschedule.length > 0) {
@@ -224,7 +225,8 @@ const TransactionForm = () => {
       });
     }
 
-    setBankEntries((prev) => [...prev, ...enriched]);
+    const finalEntries = skipEntryIds.size > 0 ? enriched.filter((e) => !skipEntryIds.has(e.id)) : enriched;
+    setBankEntries((prev) => [...prev, ...finalEntries]);
     setShowImportModeDialog(false);
     setPendingParsedEntries([]);
     setPendingImportPeriod(null);
@@ -255,6 +257,9 @@ const TransactionForm = () => {
         deleteDailyIncomesByDateRange(pendingImportPeriod.start, pendingImportPeriod.end);
       }
       toast({ title: "Período limpo", description: "As transações antigas foram removidas. Revise e aprove os novos lançamentos abaixo." });
+    } else if (mode === "add") {
+      // For "add" mode, look at all existing saidas to detect possible date moves
+      existingTxForPeriod = transactions.filter((t) => t.tipo === "saida");
     }
 
     // Detect candidates needing approval (date change scenarios)
@@ -262,10 +267,28 @@ const TransactionForm = () => {
     const usedExistingIds = new Set<number>();
     const enriched = filtered.map((entry) => {
       let matchedExisting: (typeof transactions)[0] | undefined;
-      if (mode === "replace" && entry.tipo === "saida" && existingTxForPeriod.length > 0) {
-        matchedExisting = existingTxForPeriod.find(
-          (t) => t.tipo === "saida" && Math.abs(t.valor - entry.valor) < 0.01 && !usedExistingIds.has(t.id),
-        );
+      if (entry.tipo === "saida" && existingTxForPeriod.length > 0) {
+        if (mode === "replace") {
+          matchedExisting = existingTxForPeriod.find(
+            (t) => t.tipo === "saida" && Math.abs(t.valor - entry.valor) < 0.01 && !usedExistingIds.has(t.id),
+          );
+        } else {
+          // add mode: require matching value AND similar empresa AND date within ±15 days
+          const entryISO = entry.data;
+          const entryDate = new Date(entryISO);
+          const entryDescLower = entry.empresa.toLowerCase().trim();
+          matchedExisting = existingTxForPeriod.find((t) => {
+            if (Math.abs(t.valor - entry.valor) > 0.01) return false;
+            if (usedExistingIds.has(t.id)) return false;
+            const tISO = brToISO(t.data);
+            if (tISO === entryISO) return false; // same date = treat as duplicate, not a move
+            const tDate = new Date(tISO);
+            const diffDays = Math.abs((tDate.getTime() - entryDate.getTime()) / 86400000);
+            if (diffDays > 15) return false;
+            const tDescLower = t.empresa.toLowerCase().trim();
+            return tDescLower.includes(entryDescLower) || entryDescLower.includes(tDescLower) || tDescLower === entryDescLower;
+          });
+        }
         if (matchedExisting) {
           usedExistingIds.add(matchedExisting.id);
         }
@@ -2028,7 +2051,7 @@ const TransactionForm = () => {
           <AlertDialogHeader>
             <AlertDialogTitle>Aprovar mudanças de data</AlertDialogTitle>
             <AlertDialogDescription>
-              Algumas contas lançadas estão em datas diferentes do extrato. Selecione quais alterações deseja aplicar.
+              Estas contas já estão lançadas em outra data. Marque para mover (atualizar a data do lançamento existente) ou desmarque para manter como está e criar uma entrada nova a partir do extrato.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <div className="max-h-[50vh] overflow-y-auto space-y-2 my-2">
@@ -2087,15 +2110,17 @@ const TransactionForm = () => {
               size="sm"
               onClick={() => {
                 if (!pendingCommit) return;
+                const skipEntryIds = new Set<number>();
                 dateCandidates
                   .filter((c) => c.kind === "move" && approvedKeys.has(c.key))
                   .forEach((c) => {
-                    updateTransaction(c.existingId, { data: c.newDate });
+                    updateTransaction(c.existingId, { data: c.newDate, pago: true });
+                    if (c.entryId !== undefined) skipEntryIds.add(c.entryId);
                   });
                 const approvedReschedules = pendingCommit.scheduledUnpaid.filter((t) =>
                   approvedKeys.has(`resched-${t.id}`),
                 );
-                finalizeImport(pendingCommit.enriched, approvedReschedules);
+                finalizeImport(pendingCommit.enriched, approvedReschedules, skipEntryIds);
                 setShowDateApprovalDialog(false);
                 setDateCandidates([]);
                 setApprovedKeys(new Set());

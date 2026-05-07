@@ -37,8 +37,8 @@ interface CategoriesViewProps {
 }
 
 const CategoriesView = ({ selectedMonths, selectedYear, isViewer = false }: CategoriesViewProps) => {
-  const { transactions, addTransaction, updateTransaction, deleteTransaction, deleteRecurringFromDate } = useTransactions();
-  const { categories, getCategoryInfo, getCategoryColor, updateCategoryColor } = useCategories();
+  const { transactions, addTransaction, updateTransaction, deleteTransaction, deleteRecurringFromDate, reassignCategory } = useTransactions();
+  const { categories, addCategory, deleteCategory, getCategoryInfo, getCategoryColor, updateCategoryColor, updateCategoryName } = useCategories();
   const { subcategories, addSubcategory, deleteSubcategory, getSubcategoriesByCategory, getSubcategoryName } = useSubcategories();
   const { toast } = useToast();
   const [selectedCategory, setSelectedCategory] = useState<CategoryCode | null>(null);
@@ -51,6 +51,17 @@ const CategoriesView = ({ selectedMonths, selectedYear, isViewer = false }: Cate
   // Delete recurring dialog state
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [pendingDeleteTx, setPendingDeleteTx] = useState<{ id: number; groupId: string | null; data: string } | null>(null);
+
+  // Category management state
+  const [newCatName, setNewCatName] = useState("");
+  const [showNewCat, setShowNewCat] = useState(false);
+  const [editingCatCode, setEditingCatCode] = useState<string | null>(null);
+  const [editingCatName, setEditingCatName] = useState("");
+  const [catToDelete, setCatToDelete] = useState<{ code: string; name: string } | null>(null);
+
+  // Make recurring dialog state
+  const [makeRecurringTx, setMakeRecurringTx] = useState<any | null>(null);
+  const [recurringMonths, setRecurringMonths] = useState(12);
 
   // Inline edit state
   const [editingTxId, setEditingTxId] = useState<number | null>(null);
@@ -372,43 +383,178 @@ const CategoriesView = ({ selectedMonths, selectedYear, isViewer = false }: Cate
 
         {/* Category List */}
         <div className="rounded-xl bg-card border border-border p-6">
-          <h2 className="font-display font-semibold text-lg mb-4">Categorias de Saída</h2>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="font-display font-semibold text-lg">Categorias de Saída</h2>
+            {!isViewer && (
+              <Button size="sm" variant="ghost" className="h-7 text-xs gap-1" onClick={() => { setShowNewCat(!showNewCat); setNewCatName(""); }}>
+                <Plus className="w-3 h-3" /> Nova
+              </Button>
+            )}
+          </div>
+          {!isViewer && showNewCat && (
+            <div className="flex gap-2 mb-3">
+              <Input
+                value={newCatName}
+                onChange={(e) => setNewCatName(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && newCatName.trim()) {
+                    addCategory(newCatName.trim());
+                    setNewCatName("");
+                    setShowNewCat(false);
+                    toast({ title: "Categoria criada" });
+                  }
+                  if (e.key === "Escape") setShowNewCat(false);
+                }}
+                placeholder="Nome da categoria"
+                className="h-8 text-xs"
+                autoFocus
+              />
+              <Button size="sm" className="h-8 text-xs" onClick={() => {
+                if (newCatName.trim()) {
+                  addCategory(newCatName.trim());
+                  setNewCatName("");
+                  setShowNewCat(false);
+                  toast({ title: "Categoria criada" });
+                }
+              }}>OK</Button>
+            </div>
+          )}
           <div className="space-y-2 max-h-[400px] overflow-y-auto">
             {categoryData.length === 0 ? (
               <p className="text-sm text-muted-foreground text-center py-8">Nenhuma saída neste período</p>
             ) : (
               categoryData.map((cat) => {
                 const isSelected = selectedCategory === cat.code;
+                const isEditing = editingCatCode === cat.code;
                 return (
-                  <button
+                  <div
                     key={cat.code}
-                    onClick={() => {
-                      const newCat = isSelected ? null : cat.code;
-                      setSelectedCategory(newCat);
-                      setDetailOpen(false);
-                    }}
                     className={`
                       w-full flex items-center justify-between p-3 rounded-lg transition-all text-left
                       ${isSelected ? "bg-primary/10 border border-primary/30" : "bg-secondary/40 border border-transparent hover:bg-secondary/70"}
                     `}
                   >
-                    <div className="flex items-center gap-3 min-w-0">
+                    <button
+                      onClick={() => {
+                        if (isEditing) return;
+                        const newCat = isSelected ? null : cat.code;
+                        setSelectedCategory(newCat);
+                        setDetailOpen(false);
+                      }}
+                      className="flex items-center gap-3 min-w-0 flex-1 text-left"
+                    >
                       <ColorPicker
                         currentColor={getCategoryColor(cat.code)}
                         onColorChange={(color) => updateCategoryColor(cat.code, color)}
                       />
-                      <div className="min-w-0">
-                        <p className="text-sm font-medium truncate">{cat.name}</p>
+                      <div className="min-w-0 flex-1">
+                        {isEditing ? (
+                          <Input
+                            value={editingCatName}
+                            onChange={(e) => setEditingCatName(e.target.value)}
+                            onClick={(e) => e.stopPropagation()}
+                            onKeyDown={(e) => {
+                              e.stopPropagation();
+                              if (e.key === "Enter" && editingCatName.trim()) {
+                                updateCategoryName(cat.code, editingCatName.trim());
+                                setEditingCatCode(null);
+                                toast({ title: "Categoria renomeada" });
+                              }
+                              if (e.key === "Escape") setEditingCatCode(null);
+                            }}
+                            className="h-7 text-xs"
+                            autoFocus
+                          />
+                        ) : (
+                          <p className="text-sm font-medium truncate">{cat.name}</p>
+                        )}
                         <p className="text-xs text-muted-foreground">{cat.percentage.toFixed(1)}%</p>
                       </div>
-                    </div>
-                    <div className="text-right flex-shrink-0 ml-2">
+                    </button>
+                    <div className="text-right flex-shrink-0 ml-2 flex items-center gap-1">
                       <p className="text-sm font-semibold text-expense">{formatCurrency(cat.total)}</p>
+                      {!isViewer && cat.code !== "O" && (
+                        <>
+                          {isEditing ? (
+                            <>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  if (editingCatName.trim()) {
+                                    updateCategoryName(cat.code, editingCatName.trim());
+                                    setEditingCatCode(null);
+                                    toast({ title: "Categoria renomeada" });
+                                  }
+                                }}
+                                className="p-1 rounded hover:bg-primary/10"
+                              >
+                                <Check className="w-3.5 h-3.5 text-primary" />
+                              </button>
+                              <button onClick={(e) => { e.stopPropagation(); setEditingCatCode(null); }} className="p-1 rounded hover:bg-destructive/10">
+                                <X className="w-3.5 h-3.5 text-muted-foreground" />
+                              </button>
+                            </>
+                          ) : (
+                            <>
+                              <button
+                                onClick={(e) => { e.stopPropagation(); setEditingCatCode(cat.code); setEditingCatName(cat.name); }}
+                                className="p-1 rounded hover:bg-primary/10"
+                                title="Renomear"
+                              >
+                                <Pencil className="w-3.5 h-3.5 text-muted-foreground hover:text-primary" />
+                              </button>
+                              <button
+                                onClick={(e) => { e.stopPropagation(); setCatToDelete({ code: cat.code, name: cat.name }); }}
+                                className="p-1 rounded hover:bg-destructive/10"
+                                title="Excluir"
+                              >
+                                <Trash2 className="w-3.5 h-3.5 text-muted-foreground hover:text-destructive" />
+                              </button>
+                            </>
+                          )}
+                        </>
+                      )}
                     </div>
-                  </button>
+                  </div>
                 );
               })
             )}
+            {/* Show categories without spending too, so they can still be managed */}
+            {!isViewer && categories.filter(c => !categoryData.some(cd => cd.code === c.code)).map((cat) => (
+              <div key={cat.code} className="w-full flex items-center justify-between p-2 rounded-lg bg-secondary/20 border border-transparent text-left opacity-60 hover:opacity-100">
+                <div className="flex items-center gap-3 min-w-0 flex-1">
+                  <ColorPicker currentColor={getCategoryColor(cat.code)} onColorChange={(color) => updateCategoryColor(cat.code, color)} />
+                  {editingCatCode === cat.code ? (
+                    <Input
+                      value={editingCatName}
+                      onChange={(e) => setEditingCatName(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" && editingCatName.trim()) {
+                          updateCategoryName(cat.code, editingCatName.trim());
+                          setEditingCatCode(null);
+                          toast({ title: "Categoria renomeada" });
+                        }
+                        if (e.key === "Escape") setEditingCatCode(null);
+                      }}
+                      className="h-7 text-xs"
+                      autoFocus
+                    />
+                  ) : (
+                    <p className="text-xs text-muted-foreground truncate">{cat.name} <span className="text-[10px]">(sem lançamentos)</span></p>
+                  )}
+                </div>
+                {cat.code !== "O" && (
+                  <div className="flex items-center gap-1">
+                    <button onClick={() => { setEditingCatCode(cat.code); setEditingCatName(cat.name); }} className="p-1 rounded hover:bg-primary/10">
+                      <Pencil className="w-3.5 h-3.5 text-muted-foreground hover:text-primary" />
+                    </button>
+                    <button onClick={() => setCatToDelete({ code: cat.code, name: cat.name })} className="p-1 rounded hover:bg-destructive/10">
+                      <Trash2 className="w-3.5 h-3.5 text-muted-foreground hover:text-destructive" />
+                    </button>
+                  </div>
+                )}
+              </div>
+            ))}
           </div>
         </div>
       </div>
@@ -742,9 +888,23 @@ const CategoriesView = ({ selectedMonths, selectedYear, isViewer = false }: Cate
                           startEditTx(t);
                         }}
                         className="p-1 rounded hover:bg-primary/10 transition-colors"
+                        title="Editar"
                       >
                         <Pencil className="w-3.5 h-3.5 text-muted-foreground hover:text-primary" />
                       </button>
+                      {!t.recurrence_group_id && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setMakeRecurringTx(t);
+                            setRecurringMonths(12);
+                          }}
+                          className="p-1 rounded hover:bg-primary/10 transition-colors"
+                          title="Tornar recorrente (repetir nos próximos meses)"
+                        >
+                          <Repeat className="w-3.5 h-3.5 text-muted-foreground hover:text-primary" />
+                        </button>
+                      )}
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
@@ -861,6 +1021,98 @@ const CategoriesView = ({ selectedMonths, selectedYear, isViewer = false }: Cate
               }}
             >
               Este e futuros
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Delete category dialog */}
+      <AlertDialog open={!!catToDelete} onOpenChange={(open) => !open && setCatToDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir categoria "{catToDelete?.name}"?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Todos os lançamentos desta categoria serão movidos para "Outros". Essa ação não pode ser desfeita.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={async () => {
+                if (!catToDelete) return;
+                reassignCategory(catToDelete.code, "O");
+                await deleteCategory(catToDelete.code);
+                if (selectedCategory === catToDelete.code) setSelectedCategory(null);
+                toast({ title: "Categoria excluída", description: `${catToDelete.name} — lançamentos movidos para Outros` });
+                setCatToDelete(null);
+              }}
+            >
+              Excluir
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Make recurring dialog */}
+      <AlertDialog open={!!makeRecurringTx} onOpenChange={(open) => !open && setMakeRecurringTx(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Tornar recorrente</AlertDialogTitle>
+            <AlertDialogDescription>
+              Repetir "{makeRecurringTx?.empresa}" ({makeRecurringTx && formatCurrency(makeRecurringTx.valor)}) nos próximos meses, mantendo o mesmo dia do mês.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="my-3">
+            <label className="text-xs text-muted-foreground">Quantos meses?</label>
+            <Input
+              type="number"
+              min={1}
+              max={60}
+              value={recurringMonths}
+              onChange={(e) => setRecurringMonths(Math.max(1, Math.min(60, parseInt(e.target.value) || 1)))}
+              className="mt-1 w-24"
+            />
+            <p className="text-[11px] text-muted-foreground mt-1">Será criada 1 cópia para cada mês adicional (mín. 1, máx. 60).</p>
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={async () => {
+                const t = makeRecurringTx;
+                if (!t) return;
+                const groupId = crypto.randomUUID();
+                // Mark original
+                updateTransaction(t.id, { recurrence_type: "monthly", recurrence_group_id: groupId });
+                // Create future copies
+                const [d, m, y] = t.data.split("/").map(Number);
+                let created = 0;
+                for (let i = 1; i < recurringMonths; i++) {
+                  const newDate = new Date(y, m - 1 + i, d);
+                  const dd = String(newDate.getDate()).padStart(2, "0");
+                  const mm = String(newDate.getMonth() + 1).padStart(2, "0");
+                  const yyyy = newDate.getFullYear();
+                  const ok = await addTransaction({
+                    empresa: t.empresa,
+                    valor: t.valor,
+                    data: `${dd}/${mm}/${yyyy}`,
+                    categoria: t.categoria,
+                    subcategoria: t.subcategoria || null,
+                    pago: false,
+                    agendado: true,
+                    tipo: t.tipo,
+                    forma_pagamento: t.forma_pagamento || null,
+                    pix_code: t.pix_code || null,
+                    recurrence_type: "monthly",
+                    recurrence_group_id: groupId,
+                  });
+                  if (ok) created++;
+                }
+                toast({ title: "Recorrência criada", description: `${created} lançamento(s) futuro(s) gerado(s).` });
+                setMakeRecurringTx(null);
+              }}
+            >
+              Criar recorrência
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
