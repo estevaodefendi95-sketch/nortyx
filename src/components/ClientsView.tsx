@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { useOrganization } from "@/context/OrganizationContext";
 import { formatCurrency } from "@/data/cashflow";
 import { useToast } from "@/hooks/use-toast";
 import { Badge } from "@/components/ui/badge";
