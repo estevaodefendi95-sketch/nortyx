@@ -7,7 +7,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowDown, CheckCircle2, Clock, AlertCircle, ChevronDown, Plus, X, Copy, StickyNote, Trash2, Repeat, Pencil, Check } from "lucide-react";
+import { ArrowDown, CheckCircle2, Clock, AlertCircle, ChevronDown, Plus, X, Copy, StickyNote, Trash2, Repeat, Pencil, Check, MessageSquare } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import ColorPicker from "@/components/ColorPicker";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
@@ -67,6 +67,28 @@ const CategoriesView = ({ selectedMonths, selectedYear, isViewer = false }: Cate
   const [editingTxId, setEditingTxId] = useState<number | null>(null);
   const [editTxEmpresa, setEditTxEmpresa] = useState("");
   const [editTxValor, setEditTxValor] = useState("");
+
+  // Observação (nota) inline state
+  const [expandedNoteId, setExpandedNoteId] = useState<number | null>(null);
+  const [noteDraft, setNoteDraft] = useState("");
+
+  const toggleNote = (t: any) => {
+    if (expandedNoteId === t.id) {
+      setExpandedNoteId(null);
+      setNoteDraft("");
+    } else {
+      setExpandedNoteId(t.id);
+      setNoteDraft(t.observacao || "");
+    }
+  };
+
+  const saveNote = (id: number) => {
+    const value = noteDraft.trim();
+    updateTransaction(id, { observacao: value || null });
+    toast({ title: value ? "Observação salva" : "Observação removida" });
+    setExpandedNoteId(null);
+    setNoteDraft("");
+  };
 
   const startEditTx = (t: any) => {
     setEditingTxId(t.id);
