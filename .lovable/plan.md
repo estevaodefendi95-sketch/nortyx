@@ -1,44 +1,41 @@
-## Problema
+## Objetivo
 
-A tabela `org_dashboard_settings` só permite INSERT/UPDATE para usuários com papel `admin` na mesma organização. O super user (`estevaodefendi95@gmail.com`) e os donos (owner) da org não conseguem salvar — daí o erro `new row violates row-level security policy`.
+Permitir que owners/admins de uma organização adicionem mais usuários à mesma empresa.
 
-## Solução
+## Abordagem
 
-Criar nova migração adicionando policies de RLS em `org_dashboard_settings`:
+Como pode haver dois cenários (usuário **já cadastrado** ou **ainda não cadastrado**), implemento ambos:
 
-1. **Super user** pode inserir e atualizar configurações de qualquer organização (`is_super_user(auth.uid())`).
-2. **Owners** da organização podem inserir e atualizar as configurações da própria org.
-3. Manter as policies existentes de admin intactas.
+### 1. Tabela de convites (`organization_invites`)
+- `id`, `organization_id`, `email`, `role`, `invited_by`, `created_at`, `accepted_at`
+- RLS: owner/admin da org pode criar/listar/excluir; usuário pode ler convites do próprio e-mail; super user gerencia tudo.
 
-### SQL planejado
+### 2. Função `accept_pending_invites(_user_id)`
+- Roda no signup/login: busca convites pelo e-mail, cria entrada em `organization_members`, aprova o profile e marca o convite como aceito.
 
-```sql
-CREATE POLICY "Super user can insert dashboard settings"
-ON public.org_dashboard_settings FOR INSERT TO authenticated
-WITH CHECK (is_super_user(auth.uid()));
+### 3. Edge Function `add-org-member`
+- Caminho rápido: se o e-mail já corresponde a um usuário existente, adiciona direto em `organization_members` (sem precisar de aceite).
+- Valida que o caller é owner/admin da org (ou super user) usando service role.
 
-CREATE POLICY "Super user can update dashboard settings"
-ON public.org_dashboard_settings FOR UPDATE TO authenticated
-USING (is_super_user(auth.uid()))
-WITH CHECK (is_super_user(auth.uid()));
+### 4. UI em `OrgSettings.tsx`
+- Novo card **"Membros da Organização"**:
+  - Lista membros atuais (nome + papel) com botão de remover.
+  - Campo de e-mail + select de papel (member/admin/viewer) + botão **"Adicionar membro"**.
+  - Lista de convites pendentes com botão de cancelar.
+- Ao adicionar: chama edge function. Se 404 (não cadastrado), insere convite na tabela e mostra mensagem "Convite criado — peça para a pessoa se cadastrar com este e-mail".
 
-CREATE POLICY "Org owners can insert dashboard settings"
-ON public.org_dashboard_settings FOR INSERT TO authenticated
-WITH CHECK (
-  EXISTS (SELECT 1 FROM public.organization_members
-          WHERE user_id = auth.uid()
-            AND organization_id = org_dashboard_settings.organization_id
-            AND role = 'owner'::org_role)
-);
+### 5. Integração no signup
+- Em `useAuth` (ou após signup em `Auth.tsx`): após login bem-sucedido, chamar `supabase.rpc('accept_pending_invites', { _user_id: user.id })` e depois `refreshOrganization()`.
 
-CREATE POLICY "Org owners can update dashboard settings"
-ON public.org_dashboard_settings FOR UPDATE TO authenticated
-USING (
-  EXISTS (SELECT 1 FROM public.organization_members
-          WHERE user_id = auth.uid()
-            AND organization_id = org_dashboard_settings.organization_id
-            AND role = 'owner'::org_role)
-);
-```
+## Arquivos afetados
 
-Nenhuma alteração de código frontend necessária — só RLS.
+- **Migração nova**: cria `organization_invites` + RPC `accept_pending_invites`.
+- **Nova edge function**: `supabase/functions/add-org-member/index.ts` (verify_jwt padrão).
+- **`src/pages/OrgSettings.tsx`**: novo card de membros + estado/handlers.
+- **`src/hooks/useAuth.tsx`** (ou `Auth.tsx`): chamar `accept_pending_invites` após login.
+
+## Permissões resultantes
+
+- Owner/Admin da org → pode convidar e adicionar membros.
+- Super user → pode gerenciar membros de qualquer org.
+- Membros normais → só veem convites enviados ao próprio e-mail.
