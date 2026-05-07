@@ -466,9 +466,10 @@ const CalendarView = ({ initialMonth, selectedYear: propYear, isViewer = false }
                     <span className="text-[10px] text-muted-foreground">{dayOfWeek}</span>
                     <span className={`text-sm font-bold ${isTodayDay && !isSelected ? "text-primary" : isSelected ? "text-primary" : ""}`}>{day}</span>
                     {hasData && (
-                      <div className="flex gap-0.5 mt-0.5">
+                      <div className="flex gap-0.5 mt-0.5 items-center">
                         {dayIncome > 0 && <div className="w-1.5 h-1.5 rounded-full bg-income" />}
                         {dayExpense > 0 && <div className="w-1.5 h-1.5 rounded-full bg-expense" />}
+                        {billingChargesByDay.has(day) && <User className="w-2 h-2 text-income" />}
                       </div>
                     )}
                   </button>
