@@ -1025,6 +1025,98 @@ const CategoriesView = ({ selectedMonths, selectedYear, isViewer = false }: Cate
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Delete category dialog */}
+      <AlertDialog open={!!catToDelete} onOpenChange={(open) => !open && setCatToDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir categoria "{catToDelete?.name}"?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Todos os lançamentos desta categoria serão movidos para "Outros". Essa ação não pode ser desfeita.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={async () => {
+                if (!catToDelete) return;
+                reassignCategory(catToDelete.code, "O");
+                await deleteCategory(catToDelete.code);
+                if (selectedCategory === catToDelete.code) setSelectedCategory(null);
+                toast({ title: "Categoria excluída", description: `${catToDelete.name} — lançamentos movidos para Outros` });
+                setCatToDelete(null);
+              }}
+            >
+              Excluir
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Make recurring dialog */}
+      <AlertDialog open={!!makeRecurringTx} onOpenChange={(open) => !open && setMakeRecurringTx(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Tornar recorrente</AlertDialogTitle>
+            <AlertDialogDescription>
+              Repetir "{makeRecurringTx?.empresa}" ({makeRecurringTx && formatCurrency(makeRecurringTx.valor)}) nos próximos meses, mantendo o mesmo dia do mês.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="my-3">
+            <label className="text-xs text-muted-foreground">Quantos meses?</label>
+            <Input
+              type="number"
+              min={1}
+              max={60}
+              value={recurringMonths}
+              onChange={(e) => setRecurringMonths(Math.max(1, Math.min(60, parseInt(e.target.value) || 1)))}
+              className="mt-1 w-24"
+            />
+            <p className="text-[11px] text-muted-foreground mt-1">Será criada 1 cópia para cada mês adicional (mín. 1, máx. 60).</p>
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={async () => {
+                const t = makeRecurringTx;
+                if (!t) return;
+                const groupId = crypto.randomUUID();
+                // Mark original
+                updateTransaction(t.id, { recurrence_type: "monthly", recurrence_group_id: groupId });
+                // Create future copies
+                const [d, m, y] = t.data.split("/").map(Number);
+                let created = 0;
+                for (let i = 1; i < recurringMonths; i++) {
+                  const newDate = new Date(y, m - 1 + i, d);
+                  const dd = String(newDate.getDate()).padStart(2, "0");
+                  const mm = String(newDate.getMonth() + 1).padStart(2, "0");
+                  const yyyy = newDate.getFullYear();
+                  const ok = await addTransaction({
+                    empresa: t.empresa,
+                    valor: t.valor,
+                    data: `${dd}/${mm}/${yyyy}`,
+                    categoria: t.categoria,
+                    subcategoria: t.subcategoria || null,
+                    pago: false,
+                    agendado: true,
+                    tipo: t.tipo,
+                    forma_pagamento: t.forma_pagamento || null,
+                    pix_code: t.pix_code || null,
+                    recurrence_type: "monthly",
+                    recurrence_group_id: groupId,
+                  });
+                  if (ok) created++;
+                }
+                toast({ title: "Recorrência criada", description: `${created} lançamento(s) futuro(s) gerado(s).` });
+                setMakeRecurringTx(null);
+              }}
+            >
+              Criar recorrência
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
