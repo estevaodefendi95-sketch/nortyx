@@ -442,6 +442,36 @@ export type Database = {
           },
         ]
       }
+      organization_invites: {
+        Row: {
+          accepted_at: string | null
+          created_at: string
+          email: string
+          id: string
+          invited_by: string | null
+          organization_id: string
+          role: Database["public"]["Enums"]["org_role"]
+        }
+        Insert: {
+          accepted_at?: string | null
+          created_at?: string
+          email: string
+          id?: string
+          invited_by?: string | null
+          organization_id: string
+          role?: Database["public"]["Enums"]["org_role"]
+        }
+        Update: {
+          accepted_at?: string | null
+          created_at?: string
+          email?: string
+          id?: string
+          invited_by?: string | null
+          organization_id?: string
+          role?: Database["public"]["Enums"]["org_role"]
+        }
+        Relationships: []
+      }
       organization_members: {
         Row: {
           created_at: string
@@ -815,6 +845,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      accept_pending_invites: { Args: { _user_id: string }; Returns: number }
       create_organization_with_owner: {
         Args: { _name: string; _slug: string; _user_id: string }
         Returns: string

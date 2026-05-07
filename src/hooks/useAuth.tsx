@@ -30,6 +30,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [isViewer, setIsViewer] = useState(false);
 
   const fetchApprovalAndRole = async (userId: string) => {
+    // Accept any pending org invites for this user (by email)
+    try {
+      await supabase.rpc("accept_pending_invites" as any, { _user_id: userId });
+    } catch {}
     const [profileRes, rolesRes] = await Promise.all([
       supabase.from("profiles").select("approved").eq("user_id", userId).single(),
       supabase.from("user_roles").select("role").eq("user_id", userId),

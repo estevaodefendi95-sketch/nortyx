@@ -9,8 +9,9 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, Camera, X, Save, Loader2 } from "lucide-react";
+import { ArrowLeft, Camera, X, Save, Loader2, UserPlus, Trash2, Mail, Users } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 const ALL_TABS = [
   { id: "dados", label: "Dados" },
@@ -45,6 +46,15 @@ const OrgSettings = () => {
   const [cmvCategories, setCmvCategories] = useState<string[]>(["C", "B"]);
   const [rankingTitle, setRankingTitle] = useState("Top 10");
   const [rankingTitle2, setRankingTitle2] = useState("Top 10");
+
+  // Members management
+  type Member = { id: string; user_id: string; role: string; display_name: string | null };
+  type Invite = { id: string; email: string; role: string; created_at: string };
+  const [members, setMembers] = useState<Member[]>([]);
+  const [invites, setInvites] = useState<Invite[]>([]);
+  const [inviteEmail, setInviteEmail] = useState("");
+  const [inviteRole, setInviteRole] = useState<"member" | "admin">("member");
+  const [inviting, setInviting] = useState(false);
 
   const isOwner = membership?.role === "owner" || membership?.role === "admin";
   const isSuperUser = user?.email === SUPER_EMAIL;
@@ -90,6 +100,93 @@ const OrgSettings = () => {
     };
     load();
   }, [organization]);
+
+  // Load members and pending invites
+  const loadMembers = async () => {
+    if (!organization) return;
+    const { data: mems } = await supabase
+      .from("organization_members")
+      .select("id, user_id, role")
+      .eq("organization_id", organization.id);
+    if (mems && mems.length) {
+      const ids = mems.map((m) => m.user_id);
+      const { data: profs } = await supabase
+        .from("profiles")
+        .select("user_id, display_name")
+        .in("user_id", ids);
+      const nameMap = new Map(profs?.map((p) => [p.user_id, p.display_name]) || []);
+      setMembers(mems.map((m) => ({ ...m, display_name: nameMap.get(m.user_id) ?? null })));
+    } else {
+      setMembers([]);
+    }
+    const { data: invs } = await supabase
+      .from("organization_invites" as any)
+      .select("id, email, role, created_at")
+      .eq("organization_id", organization.id)
+      .is("accepted_at", null)
+      .order("created_at", { ascending: false });
+    setInvites((invs as any) || []);
+  };
+
+  useEffect(() => {
+    loadMembers();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [organization]);
+
+  const handleInvite = async () => {
+    if (!organization || !inviteEmail.trim()) return;
+    setInviting(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("add-org-member", {
+        body: {
+          email: inviteEmail.trim(),
+          organization_id: organization.id,
+          role: inviteRole,
+        },
+      });
+      if (error) throw error;
+      if ((data as any)?.error) throw new Error((data as any).error);
+      toast({
+        title: (data as any)?.invited ? "Convite criado" : "Membro adicionado",
+        description: (data as any)?.invited
+          ? "Peça para a pessoa se cadastrar com este e-mail para entrar automaticamente."
+          : "O usuário agora faz parte da organização.",
+      });
+      setInviteEmail("");
+      setInviteRole("member");
+      await loadMembers();
+    } catch (e: any) {
+      toast({ title: "Erro", description: e.message || "Falha ao adicionar", variant: "destructive" });
+    } finally {
+      setInviting(false);
+    }
+  };
+
+  const handleRemoveMember = async (memberId: string, memberUserId: string) => {
+    if (!organization) return;
+    if (memberUserId === user?.id) {
+      toast({ title: "Ação não permitida", description: "Você não pode remover a si mesmo.", variant: "destructive" });
+      return;
+    }
+    const { error } = await supabase.from("organization_members").delete().eq("id", memberId);
+    if (error) {
+      toast({ title: "Erro", description: error.message, variant: "destructive" });
+      return;
+    }
+    setMembers((prev) => prev.filter((m) => m.id !== memberId));
+    toast({ title: "Membro removido" });
+  };
+
+  const handleCancelInvite = async (inviteId: string) => {
+    const { error } = await (supabase.from("organization_invites" as any) as any).delete().eq("id", inviteId);
+    if (error) {
+      toast({ title: "Erro", description: error.message, variant: "destructive" });
+      return;
+    }
+    setInvites((prev) => prev.filter((i) => i.id !== inviteId));
+    toast({ title: "Convite cancelado" });
+  };
+
 
   useEffect(() => {
     if (organization) {
@@ -373,6 +470,80 @@ const OrgSettings = () => {
                     </button>
                   ))}
                 </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Members */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2"><Users className="w-5 h-5" /> Membros da Organização</CardTitle>
+            <CardDescription>Adicione mais usuários ao seu time</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex flex-col sm:flex-row gap-2">
+              <Input
+                type="email"
+                placeholder="email@exemplo.com"
+                value={inviteEmail}
+                onChange={(e) => setInviteEmail(e.target.value)}
+                className="flex-1"
+              />
+              <Select value={inviteRole} onValueChange={(v) => setInviteRole(v as "member" | "admin")}>
+                <SelectTrigger className="w-full sm:w-[140px]">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="member">Membro</SelectItem>
+                  <SelectItem value="admin">Administrador</SelectItem>
+                </SelectContent>
+              </Select>
+              <Button onClick={handleInvite} disabled={inviting || !inviteEmail.trim()}>
+                {inviting ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <UserPlus className="w-4 h-4 mr-2" />}
+                Adicionar
+              </Button>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Se o e-mail já estiver cadastrado, o usuário entra na hora. Caso contrário, criamos um convite e ele será adicionado automaticamente ao se cadastrar.
+            </p>
+
+            {members.length > 0 && (
+              <div className="space-y-2">
+                <Label className="text-xs uppercase tracking-wider text-muted-foreground">Membros ativos</Label>
+                {members.map((m) => (
+                  <div key={m.id} className="flex items-center justify-between p-2.5 rounded-lg border border-border bg-card/50">
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium truncate">{m.display_name || "Sem nome"}</p>
+                      <p className="text-xs text-muted-foreground capitalize">{m.role}</p>
+                    </div>
+                    {m.user_id !== user?.id && m.role !== "owner" && (
+                      <Button variant="ghost" size="icon" onClick={() => handleRemoveMember(m.id, m.user_id)}>
+                        <Trash2 className="w-4 h-4 text-destructive" />
+                      </Button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {invites.length > 0 && (
+              <div className="space-y-2">
+                <Label className="text-xs uppercase tracking-wider text-muted-foreground">Convites pendentes</Label>
+                {invites.map((inv) => (
+                  <div key={inv.id} className="flex items-center justify-between p-2.5 rounded-lg border border-dashed border-border bg-card/30">
+                    <div className="min-w-0 flex items-center gap-2">
+                      <Mail className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                      <div className="min-w-0">
+                        <p className="text-sm truncate">{inv.email}</p>
+                        <p className="text-xs text-muted-foreground capitalize">{inv.role}</p>
+                      </div>
+                    </div>
+                    <Button variant="ghost" size="icon" onClick={() => handleCancelInvite(inv.id)}>
+                      <X className="w-4 h-4" />
+                    </Button>
+                  </div>
+                ))}
               </div>
             )}
           </CardContent>
