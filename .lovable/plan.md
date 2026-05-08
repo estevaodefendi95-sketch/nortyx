@@ -1,68 +1,43 @@
-## Objetivo
+## Diagnóstico
 
-1. Permitir que **qualquer usuário** com mais de uma empresa associada possa trocar a empresa ativa no próprio perfil (hoje só o super user faz isso).
-2. Redesenhar o seletor de empresas do usuário no painel admin (`AdminApproval`) para escalar bem quando houver muitas empresas, melhorando usabilidade e edição.
+Confirmado no banco:
+- Usuário `nortyx.` (`ee14e46e…`) tem **2 memberships**: `Lema.` (owner) e `nortyx.` (member).
+- RLS de `organization_members` e `organizations` permite enxergar ambas.
+- O código atual em `OrganizationContext.tsx` já popula `availableOrganizations` para usuários comuns com 2+ memberships, e `Index.tsx` mostra o popover quando `availableOrganizations.length > 1`.
 
----
+Apesar disso, o screenshot do usuário `nortyx.` (logado como Lema.) não mostra o ícone `Building2` ao lado do nome da empresa — ou seja, o estado `availableOrganizations` está chegando com tamanho ≤ 1 em runtime.
 
-## 1) Troca de empresa pelo próprio usuário
+Causas prováveis (a confirmar com instrumentação):
+1. A query `organizations .in("id", orgIds)` está retornando 1 só registro por algum motivo de RLS/cache.
+2. O contexto está re-rodando e sobrescrevendo `availableOrganizations` com `[]` (linha 91, branch não-super) sem voltar a popular caso a query `memberships` falhe silenciosamente.
+3. Estado pré-cached no navegador (não recarregou após o último deploy).
 
-### Contexto atual
-- `OrganizationContext` já carrega `availableOrganizations` apenas para o super user; usuários comuns recebem `[]`, mesmo tendo múltiplas memberships.
-- O switcher no cabeçalho (`src/pages/Index.tsx`, linhas 139–168) só aparece quando `isSuperUser && availableOrganizations.length > 1`.
+## Plano de correção
 
-### Mudança
-- **`src/context/OrganizationContext.tsx`**:
-  - Para usuários não super, quando houver mais de uma membership, carregar todas as organizações vinculadas e popular `availableOrganizations` com elas.
-  - `switchOrganization` continua o mesmo (já grava em `localStorage` e recarrega).
-- **`src/pages/Index.tsx`**:
-  - Trocar a condição do popover de troca de empresa para `availableOrganizations.length > 1` (sem mais o gate de `isSuperUser`).
-  - Manter o mesmo visual (botão `Building2` + popover com lista).
+### 1) Endurecer `OrganizationContext.tsx`
+- Não zerar `availableOrganizations` para `[]` no início do branch não-super; só atribuir após o resultado real.
+- Logar (`console.warn`) quando `memberships.length > 1` mas `availableOrganizations` terminar com `< 2` itens, com os erros das queries de `organization_members` e `organizations`.
+- Garantir que mesmo se a query de `organizations` falhar, montamos um fallback mínimo a partir de `memberships` (id + nome resolvido depois) para não ocultar o switcher.
+- Ordenar `availableOrganizations` deixando a empresa ativa primeiro (cosmético).
 
-Resultado: usuário com 2+ empresas vê o ícone de prédio no cabeçalho e troca a empresa ativa direto, sem ir ao admin.
+### 2) Tornar o switcher mais resiliente em `Index.tsx`
+- Mudar a condição do popover para `availableOrganizations.length > 1 || (availableOrganizations.length === 1 && availableOrganizations[0].id !== organization?.id)` — defensivo contra estados intermediários.
+- Manter aparência atual (ícone `Building2` + popover com lista).
 
----
+### 3) Forçar refresh quando memberships mudarem
+- Em `OrganizationContext`, escutar mudanças realtime na tabela `organization_members` filtradas por `user_id` do usuário logado. Quando houver INSERT/DELETE para esse usuário, chamar `refreshOrganization()`.
+- Isso garante que se o admin acabou de adicionar a 2ª empresa para `nortyx.`, ele veja o switcher sem precisar deslogar.
 
-## 2) Novo seletor de empresas no admin
-
-### Problema atual
-Em `AdminApproval.tsx` (linhas 549–596), as empresas viram uma fileira de pills com estrela e check inline. Com muitas empresas, a linha quebra muito, fica difícil escanear quais estão marcadas e qual é a principal.
-
-### Novo layout (por usuário aprovado)
-Substituir a fileira de pills por um **bloco "Empresas" mais estruturado**:
-
-```text
-Empresas                              [+ Adicionar empresa ▾]
-─────────────────────────────────────────────────────────────
-[★] ● Lema.        principal               [×]
-[☆] ● nortyx.                              [×]
-```
-
-Componentes:
-- **Lista vertical** das empresas que o usuário JÁ pertence:
-  - Botão de estrela à esquerda → define como principal (estrela cheia se for principal, badge "principal" ao lado do nome).
-  - Bolinha colorida + nome da empresa.
-  - Botão `×` à direita → remove a empresa do usuário (com a regra atual de não permitir remover a última).
-- **Combobox/Popover "Adicionar empresa"** (usando `Command` do shadcn) à direita do título:
-  - Mostra apenas empresas em que o usuário NÃO é membro.
-  - Campo de busca por nome (importante quando houver muitas empresas).
-  - Ao clicar em uma, vincula o usuário (`organization_members.insert`) e fecha o popover.
-- Se o usuário já pertence a todas as empresas existentes, o botão "Adicionar empresa" fica desabilitado com texto "Todas adicionadas".
-
-Reaproveitar handlers existentes: `handleToggleOrg` (para adicionar/remover) e `handleSetPrimaryOrg`.
-
-### Impacto visual
-- Cards de usuário ficam um pouco mais altos quando ele pertence a muitas empresas, mas sempre uma empresa por linha (escaneável).
-- Ações (principal, remover) ficam claras com ícones dedicados em vez de toda a pill servir como toggle.
-
----
-
-## Fora do escopo
-- Mudar `OrgSettings`, fluxo de convite por e-mail, criação de novas empresas.
-- Alterar permissões/roles por empresa (continua role único por usuário).
-- Alterar a regra "usuário precisa ter ao menos 1 empresa".
+### 4) Verificação
+- Após aplicar, abrir o preview com a sessão de `nortyx.`, conferir no console:
+  - `memberships.length === 2`
+  - `availableOrganizations.length === 2`
+  - ícone `Building2` aparece e o popover lista `Lema.` e `nortyx.`.
+- Se ainda assim não aparecer, os logs do passo 1 vão apontar exatamente qual query devolveu menos linhas que o esperado.
 
 ## Arquivos afetados
-- `src/context/OrganizationContext.tsx` — popular `availableOrganizations` para usuários comuns.
-- `src/pages/Index.tsx` — remover o gate `isSuperUser` no switcher do cabeçalho.
-- `src/pages/AdminApproval.tsx` — novo bloco de empresas com lista vertical + combobox de busca.
+- `src/context/OrganizationContext.tsx` — fallback robusto + logs + assinatura realtime de `organization_members`.
+- `src/pages/Index.tsx` — condição defensiva no switcher (mudança mínima).
+
+## Fora do escopo
+- Mudanças no `AdminApproval`, em RLS, ou no fluxo de convite/onboarding.
