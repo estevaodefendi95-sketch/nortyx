@@ -263,21 +263,34 @@ const Index = () => {
           </div>
 
           {/* Summary row - below header on all sizes */}
-          <div className="flex items-center gap-2 sm:gap-4 mt-1.5 flex-wrap">
-            <span className="text-xs sm:text-sm text-muted-foreground flex items-center gap-1">
-              <ArrowUpDown className="w-3 h-3 sm:w-3.5 sm:h-3.5 hidden sm:inline" />
-              <span className="text-income font-medium">{formatCurrency(filteredIncome)}</span>
-            </span>
-            <span className="text-xs sm:text-sm text-muted-foreground">
-              <span className="text-expense font-medium">{formatCurrency(filteredExpenses)}</span>
-            </span>
-            <span className="text-xs sm:text-sm text-muted-foreground">
-              Saldo: <span className={`font-medium ${saldo >= 0 ? "text-income" : "text-expense"}`}>{formatCurrency(saldo)}</span>
-            </span>
+          <div className="flex items-center gap-2 sm:gap-4 mt-1.5 flex-wrap min-h-[1.25rem]">
+            {summaryLoading ? (
+              <>
+                <Skeleton className="h-4 w-20" />
+                <Skeleton className="h-4 w-20" />
+                <Skeleton className="h-4 w-28" />
+              </>
+            ) : (
+              <>
+                <span className="text-xs sm:text-sm text-muted-foreground flex items-center gap-1">
+                  <ArrowUpDown className="w-3 h-3 sm:w-3.5 sm:h-3.5 hidden sm:inline" />
+                  <span className="text-income font-medium">{formatCurrency(filteredIncome)}</span>
+                </span>
+                <span className="text-xs sm:text-sm text-muted-foreground">
+                  <span className="text-expense font-medium">{formatCurrency(filteredExpenses)}</span>
+                </span>
+                <span className="text-xs sm:text-sm text-muted-foreground">
+                  Saldo: <span className={`font-medium ${saldo >= 0 ? "text-income" : "text-expense"}`}>{formatCurrency(saldo)}</span>
+                </span>
+              </>
+            )}
           </div>
 
           {/* Desktop tabs */}
           {!isMobile && (
+            tabsLoading || bootLoading ? (
+              <Skeleton className="h-10 w-full sm:w-80 mt-2" />
+            ) : (
             <div className="flex gap-1 bg-secondary/50 rounded-lg p-1 mt-2 w-full sm:w-fit">
               {tabs.map((tab) => {
                 const Icon = tab.icon;
