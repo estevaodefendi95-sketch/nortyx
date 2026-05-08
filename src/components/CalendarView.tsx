@@ -56,6 +56,8 @@ const CalendarView = ({ initialMonth, selectedYear: propYear, isViewer = false }
     data_cobranca: string;
     status: string;
     client_name: string;
+    boleto_url: string | null;
+    nf_url: string | null;
   }
   const [billingCharges, setBillingCharges] = useState<BillingChargeWithClient[]>([]);
 
