@@ -313,6 +313,7 @@ const Index = () => {
                 );
               })}
             </div>
+            )
           )}
 
           {/* Year + Month Multi-Select Filter */}
