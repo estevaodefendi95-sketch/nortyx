@@ -1311,7 +1311,26 @@ const TransactionForm = () => {
 
                   {showBilling && (
                     <div className="rounded-lg border border-border bg-secondary/20 p-3 space-y-3">
-                      <div>
+                      <div className="flex items-center justify-between gap-2 pb-2 border-b border-border/40">
+                        <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                          <Sparkles className="w-3.5 h-3.5 text-primary" />
+                          Preencher automaticamente a partir de boleto/NF
+                        </div>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          className="h-7 text-xs"
+                          onClick={() => {
+                            setReaderBoleto(boletoFile);
+                            setReaderNf(nfFile);
+                            setReaderExtracted(null);
+                            setReaderOpen(true);
+                          }}
+                        >
+                          <Upload className="w-3 h-3 mr-1" /> Ler arquivos
+                        </Button>
+                      </div>
                         <Label htmlFor="clientNome" className="text-xs">Nome do cliente *</Label>
                         <Popover open={clientPopoverOpen} onOpenChange={setClientPopoverOpen}>
                           <PopoverTrigger asChild>
