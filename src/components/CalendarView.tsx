@@ -71,7 +71,7 @@ const CalendarView = ({ initialMonth, selectedYear: propYear, isViewer = false }
     const fetchBillingCharges = async () => {
       const { data } = await supabase
         .from("billing_charges")
-        .select("id, valor, data_cobranca, status, billing_clients(nome)")
+        .select("id, valor, data_cobranca, status, boleto_url, nf_url, billing_clients(nome)")
         .eq("organization_id", orgId)
         .order("data_cobranca");
       if (!cancelled && data) {
@@ -82,6 +82,8 @@ const CalendarView = ({ initialMonth, selectedYear: propYear, isViewer = false }
             data_cobranca: c.data_cobranca,
             status: c.status,
             client_name: c.billing_clients?.nome || "Cliente",
+            boleto_url: c.boleto_url ?? null,
+            nf_url: c.nf_url ?? null,
           }))
         );
       }
