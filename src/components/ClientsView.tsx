@@ -8,7 +8,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ChevronDown, ChevronUp, Check, Pencil, X, Mail, Phone, CreditCard, Repeat, Trash2, Send } from "lucide-react";
+import { ChevronDown, ChevronUp, Check, Pencil, X, Mail, Phone, CreditCard, Repeat, Trash2, Send, Paperclip, FileText, Upload } from "lucide-react";
+import { uploadChargeAttachment, removeChargeAttachment, validateAttachment } from "@/lib/billingAttachments";
 
 const MONTHS_FULL = [
   "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
