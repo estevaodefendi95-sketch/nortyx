@@ -1420,6 +1420,47 @@ const TransactionForm = () => {
                           <p className="text-[10px] text-muted-foreground mt-0.5">Mín. 1, máx. 60 meses</p>
                         </div>
                       )}
+
+                      <div className="grid grid-cols-2 gap-2 pt-2 border-t border-border/40">
+                        {(["boleto", "nf"] as const).map((kind) => {
+                          const file = kind === "boleto" ? boletoFile : nfFile;
+                          const setter = kind === "boleto" ? setBoletoFile : setNfFile;
+                          const label = kind === "boleto" ? "Boleto" : "Nota fiscal";
+                          return (
+                            <div key={kind}>
+                              <Label className="text-xs flex items-center gap-1.5">
+                                <Paperclip className="w-3 h-3" /> {label}
+                                {billingClient.recorrente && <span className="text-[9px] text-muted-foreground">(1ª cobrança)</span>}
+                              </Label>
+                              <label className="mt-1 flex items-center gap-2 text-xs cursor-pointer rounded-md border border-input px-2 py-1.5 hover:bg-accent/40">
+                                <Upload className="w-3 h-3" />
+                                <span className="truncate flex-1">{file?.name || "Selecionar arquivo (PDF, JPG, PNG)"}</span>
+                                <input
+                                  type="file"
+                                  accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png"
+                                  className="hidden"
+                                  onChange={(e) => {
+                                    const f = e.target.files?.[0];
+                                    if (!f) return;
+                                    const err = validateAttachment(f);
+                                    if (err) {
+                                      toast({ title: "Arquivo inválido", description: err, variant: "destructive" });
+                                      e.target.value = "";
+                                      return;
+                                    }
+                                    setter(f);
+                                  }}
+                                />
+                              </label>
+                              {file && (
+                                <button type="button" className="text-[10px] text-muted-foreground hover:text-destructive mt-0.5" onClick={() => setter(null)}>
+                                  Remover
+                                </button>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
                     </div>
                   )}
                 </div>
