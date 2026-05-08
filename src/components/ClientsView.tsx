@@ -249,7 +249,27 @@ const ClientsView = ({ selectedMonths, selectedYear, isViewer = false }: Clients
     setCharges((prev) => prev.map((c) => (c.id === chargeId ? { ...c, email_enviado: true, status: "enviada" } : c)));
   };
 
-  const startEdit = (client: BillingClient) => {
+  const handleAttachmentChange = async (chargeId: string, kind: "boleto" | "nf", file: File | null) => {
+    if (!organization?.id) return;
+    const charge = charges.find((c) => c.id === chargeId);
+    if (!charge) return;
+    try {
+      if (file) {
+        const err = validateAttachment(file);
+        if (err) { toast({ title: "Arquivo inválido", description: err, variant: "destructive" }); return; }
+        toast({ title: "Enviando anexo..." });
+        const url = await uploadChargeAttachment(organization.id, chargeId, kind, file);
+        setCharges((prev) => prev.map((c) => c.id === chargeId ? { ...c, [kind === "boleto" ? "boleto_url" : "nf_url"]: url } as BillingCharge : c));
+        toast({ title: "Anexo enviado" });
+      } else {
+        await removeChargeAttachment(organization.id, chargeId, kind, kind === "boleto" ? charge.boleto_url : charge.nf_url);
+        setCharges((prev) => prev.map((c) => c.id === chargeId ? { ...c, [kind === "boleto" ? "boleto_url" : "nf_url"]: null } as BillingCharge : c));
+        toast({ title: "Anexo removido" });
+      }
+    } catch (e: any) {
+      toast({ title: "Erro no anexo", description: e?.message || "Tente novamente.", variant: "destructive" });
+    }
+  };
     setEditingClient(client.id);
     setEditForm({ nome: client.nome, email: client.email, telefone: client.telefone, forma_cobranca: client.forma_cobranca });
   };
