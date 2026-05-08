@@ -136,7 +136,7 @@ const Index = () => {
                 </span>
               </div>
 
-              {isSuperUser && availableOrganizations.length > 1 && (
+              {availableOrganizations.length > 1 && (
                 <Popover>
                   <PopoverTrigger asChild>
                     <button

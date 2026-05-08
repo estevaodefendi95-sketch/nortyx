@@ -128,33 +128,44 @@ export const OrganizationProvider = ({ children }: { children: ReactNode }) => {
         }
         localStorage.setItem("paggio_active_org", selectedOrg.id);
       } else if (memberships && memberships.length > 0) {
-        const activeMembership = memberships.find((m) => m.organization_id === preferredOrgId) || memberships[0];
-
-        const { data: org, error: orgError } = await supabase
+        // Load all organizations the user belongs to
+        const orgIds = memberships.map((m) => m.organization_id);
+        const { data: orgsData } = await supabase
           .from("organizations")
           .select("*")
-          .eq("id", activeMembership.organization_id)
-          .single();
+          .in("id", orgIds);
 
-        if (orgError) throw orgError;
+        const userOrgs: Organization[] = (orgsData || []).map((o: any) => ({
+          id: o.id,
+          name: o.name,
+          slug: o.slug,
+          logo_url: o.logo_url,
+          primary_color: o.primary_color,
+          plan: o.plan,
+          subscription_status: o.subscription_status,
+        }));
+        userOrgs.sort((a, b) => a.name.localeCompare(b.name));
+        setAvailableOrganizations(userOrgs);
 
-        setOrganization({
-          id: org.id,
-          name: org.name,
-          slug: org.slug,
-          logo_url: org.logo_url,
-          primary_color: org.primary_color,
-          plan: org.plan,
-          subscription_status: org.subscription_status,
-        });
-        setMembership({
-          id: activeMembership.id,
-          organization_id: activeMembership.organization_id,
-          user_id: activeMembership.user_id,
-          role: activeMembership.role as OrgMember["role"],
-          created_at: activeMembership.created_at,
-        });
-        localStorage.setItem("paggio_active_org", activeMembership.organization_id);
+        const activeMembership =
+          memberships.find((m) => m.organization_id === preferredOrgId) || memberships[0];
+        const activeOrg =
+          userOrgs.find((o) => o.id === activeMembership.organization_id) || null;
+
+        if (!activeOrg) {
+          setOrganization(null);
+          setMembership(null);
+        } else {
+          setOrganization(activeOrg);
+          setMembership({
+            id: activeMembership.id,
+            organization_id: activeMembership.organization_id,
+            user_id: activeMembership.user_id,
+            role: activeMembership.role as OrgMember["role"],
+            created_at: activeMembership.created_at,
+          });
+          localStorage.setItem("paggio_active_org", activeMembership.organization_id);
+        }
       } else {
         setOrganization(null);
         setMembership(null);
