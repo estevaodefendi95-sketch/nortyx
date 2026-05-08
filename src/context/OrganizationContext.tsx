@@ -66,7 +66,11 @@ export const OrganizationProvider = ({ children }: { children: ReactNode }) => {
         .select("*")
         .eq("user_id", user.id);
 
-      if (memError) throw memError;
+      if (memError) {
+        console.warn("[OrgContext] memberships query error:", memError);
+        throw memError;
+      }
+      console.log("[OrgContext] memberships loaded:", memberships?.length ?? 0, memberships);
 
       // For super user, load all organizations
       let allOrgs: Organization[] = [];
@@ -87,9 +91,9 @@ export const OrganizationProvider = ({ children }: { children: ReactNode }) => {
           }));
         }
         setAvailableOrganizations(allOrgs);
-      } else {
-        setAvailableOrganizations([]);
       }
+      // For non-super users, do NOT clear availableOrganizations here — it will be set
+      // below from the actual orgs query (or kept as fallback) to avoid hiding the switcher.
 
       if ((!memberships || memberships.length === 0) && allOrgs.length === 0) {
         setOrganization(null);
@@ -130,12 +134,16 @@ export const OrganizationProvider = ({ children }: { children: ReactNode }) => {
       } else if (memberships && memberships.length > 0) {
         // Load all organizations the user belongs to
         const orgIds = memberships.map((m) => m.organization_id);
-        const { data: orgsData } = await supabase
+        const { data: orgsData, error: orgsErr } = await supabase
           .from("organizations")
           .select("*")
           .in("id", orgIds);
 
-        const userOrgs: Organization[] = (orgsData || []).map((o: any) => ({
+        if (orgsErr) {
+          console.warn("[OrgContext] organizations query error:", orgsErr);
+        }
+
+        let userOrgs: Organization[] = (orgsData || []).map((o: any) => ({
           id: o.id,
           name: o.name,
           slug: o.slug,
@@ -144,8 +152,32 @@ export const OrganizationProvider = ({ children }: { children: ReactNode }) => {
           plan: o.plan,
           subscription_status: o.subscription_status,
         }));
+
+        // Fallback: if RLS hid some orgs, synthesize minimal entries from memberships
+        // so the switcher never disappears when the user clearly has 2+ memberships.
+        if (userOrgs.length < memberships.length) {
+          console.warn(
+            `[OrgContext] organizations returned ${userOrgs.length} but user has ${memberships.length} memberships — using fallback entries.`
+          );
+          const knownIds = new Set(userOrgs.map((o) => o.id));
+          for (const m of memberships) {
+            if (!knownIds.has(m.organization_id)) {
+              userOrgs.push({
+                id: m.organization_id,
+                name: "Empresa",
+                slug: "",
+                logo_url: null,
+                primary_color: "#3B82F6",
+                plan: "free",
+                subscription_status: "active",
+              });
+            }
+          }
+        }
+
         userOrgs.sort((a, b) => a.name.localeCompare(b.name));
         setAvailableOrganizations(userOrgs);
+        console.log("[OrgContext] availableOrganizations:", userOrgs.length, userOrgs.map((o) => o.name));
 
         const activeMembership =
           memberships.find((m) => m.organization_id === preferredOrgId) || memberships[0];
@@ -167,6 +199,7 @@ export const OrganizationProvider = ({ children }: { children: ReactNode }) => {
           localStorage.setItem("paggio_active_org", activeMembership.organization_id);
         }
       } else {
+        setAvailableOrganizations([]);
         setOrganization(null);
         setMembership(null);
       }
@@ -183,6 +216,24 @@ export const OrganizationProvider = ({ children }: { children: ReactNode }) => {
     if (authLoading) return;
     loadOrganization();
   }, [user, authLoading, loadOrganization]);
+
+  // Refresh when this user's memberships change in the DB
+  useEffect(() => {
+    if (!user) return;
+    const channel = supabase
+      .channel(`org-members-${user.id}`)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "organization_members", filter: `user_id=eq.${user.id}` },
+        () => {
+          loadOrganization();
+        }
+      )
+      .subscribe();
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user, loadOrganization]);
 
   const switchOrganization = useCallback(async (orgId: string) => {
     localStorage.setItem("paggio_active_org", orgId);
