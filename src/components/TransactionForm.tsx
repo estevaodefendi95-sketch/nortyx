@@ -13,6 +13,8 @@ import {
   ContextMenuTrigger,
 } from "@/components/ui/context-menu";
 import { parseFile, extractPDFText, parsePDFText, type ParsedBankEntry } from "@/lib/bankParser";
+import { uploadChargeAttachment, validateAttachment } from "@/lib/billingAttachments";
+import { Paperclip } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
