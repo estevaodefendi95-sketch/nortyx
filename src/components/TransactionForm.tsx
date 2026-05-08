@@ -2264,6 +2264,197 @@ const TransactionForm = () => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Reader: boleto/NF → preencher cobrança */}
+      <Dialog open={readerOpen} onOpenChange={setReaderOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Sparkles className="w-4 h-4 text-primary" /> Ler boleto / NF
+            </DialogTitle>
+            <DialogDescription className="text-xs">
+              Envie o boleto e/ou a nota fiscal. A IA identifica o cliente e os dados da cobrança para você aprovar.
+            </DialogDescription>
+          </DialogHeader>
+
+          {!readerExtracted ? (
+            <div className="space-y-3">
+              {(["boleto", "nf"] as const).map((kind) => {
+                const file = kind === "boleto" ? readerBoleto : readerNf;
+                const setter = kind === "boleto" ? setReaderBoleto : setReaderNf;
+                const label = kind === "boleto" ? "Boleto" : "Nota fiscal";
+                return (
+                  <div key={kind}>
+                    <Label className="text-xs flex items-center gap-1.5">
+                      <Paperclip className="w-3 h-3" /> {label}
+                    </Label>
+                    <label className="mt-1 flex items-center gap-2 text-xs cursor-pointer rounded-md border border-input px-2 py-2 hover:bg-accent/40">
+                      <Upload className="w-3 h-3" />
+                      <span className="truncate flex-1">{file?.name || "Selecionar arquivo (PDF, JPG, PNG)"}</span>
+                      <input
+                        type="file"
+                        accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png"
+                        className="hidden"
+                        onChange={(e) => {
+                          const f = e.target.files?.[0];
+                          if (!f) return;
+                          const err = validateAttachment(f);
+                          if (err) {
+                            toast({ title: "Arquivo inválido", description: err, variant: "destructive" });
+                            e.target.value = "";
+                            return;
+                          }
+                          setter(f);
+                        }}
+                      />
+                    </label>
+                    {file && (
+                      <button type="button" className="text-[10px] text-muted-foreground hover:text-destructive mt-0.5" onClick={() => setter(null)}>
+                        Remover
+                      </button>
+                    )}
+                  </div>
+                );
+              })}
+              <DialogFooter>
+                <Button type="button" variant="outline" size="sm" onClick={() => setReaderOpen(false)}>Cancelar</Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  disabled={readerLoading || (!readerBoleto && !readerNf)}
+                  onClick={async () => {
+                    setReaderLoading(true);
+                    try {
+                      const fileToB64 = (f: File) => new Promise<{ base64: string; mimeType: string }>((resolve, reject) => {
+                        const r = new FileReader();
+                        r.onload = () => {
+                          const result = String(r.result || "");
+                          const base64 = result.split(",")[1] || "";
+                          resolve({ base64, mimeType: f.type || "application/octet-stream" });
+                        };
+                        r.onerror = () => reject(r.error);
+                        r.readAsDataURL(f);
+                      });
+                      const payload: any = { knownClients: existingClients.map((c) => ({ nome: c.nome, email: c.email })) };
+                      if (readerBoleto) payload.boleto = await fileToB64(readerBoleto);
+                      if (readerNf) payload.nf = await fileToB64(readerNf);
+
+                      const { data, error } = await supabase.functions.invoke("read-billing-doc", { body: payload });
+                      if (error) throw error;
+                      const ext = (data as any)?.extracted || {};
+                      const matched = !!(data as any)?.matchedClientHint;
+                      setReaderExtracted({
+                        cliente_nome: ext.cliente_nome || "",
+                        cliente_email: ext.cliente_email || "",
+                        cliente_telefone: ext.cliente_telefone || "",
+                        valor: ext.valor ? String(ext.valor) : "",
+                        data_vencimento: ext.data_vencimento || "",
+                        descricao: ext.descricao || "",
+                        forma_cobranca: ext.forma_cobranca || "",
+                        matched,
+                      });
+                    } catch (err: any) {
+                      console.error(err);
+                      toast({ title: "Falha ao ler documento", description: err?.message || "Tente novamente", variant: "destructive" });
+                    } finally {
+                      setReaderLoading(false);
+                    }
+                  }}
+                >
+                  {readerLoading ? <><Loader2 className="w-3 h-3 mr-1 animate-spin" /> Lendo...</> : <><Sparkles className="w-3 h-3 mr-1" /> Ler com IA</>}
+                </Button>
+              </DialogFooter>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              <div className="flex items-center gap-2">
+                {readerExtracted.matched ? (
+                  <Badge variant="secondary" className="bg-primary/15 text-primary border-primary/30">Cliente existente</Badge>
+                ) : (
+                  <Badge variant="outline">Novo cliente</Badge>
+                )}
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div className="col-span-2">
+                  <Label className="text-xs">Nome do cliente</Label>
+                  <Input className="mt-1 text-sm" value={readerExtracted.cliente_nome} onChange={(e) => setReaderExtracted((s) => s && { ...s, cliente_nome: e.target.value })} />
+                </div>
+                <div>
+                  <Label className="text-xs">E-mail</Label>
+                  <Input className="mt-1 text-sm" value={readerExtracted.cliente_email} onChange={(e) => setReaderExtracted((s) => s && { ...s, cliente_email: e.target.value })} />
+                </div>
+                <div>
+                  <Label className="text-xs">Telefone</Label>
+                  <Input className="mt-1 text-sm" value={readerExtracted.cliente_telefone} onChange={(e) => setReaderExtracted((s) => s && { ...s, cliente_telefone: e.target.value })} />
+                </div>
+                <div>
+                  <Label className="text-xs">Valor</Label>
+                  <Input type="number" step="0.01" className="mt-1 text-sm" value={readerExtracted.valor} onChange={(e) => setReaderExtracted((s) => s && { ...s, valor: e.target.value })} />
+                </div>
+                <div>
+                  <Label className="text-xs">Vencimento</Label>
+                  <Input type="date" className="mt-1 text-sm" value={readerExtracted.data_vencimento} onChange={(e) => setReaderExtracted((s) => s && { ...s, data_vencimento: e.target.value })} />
+                </div>
+                <div className="col-span-2">
+                  <Label className="text-xs">Descrição</Label>
+                  <Input className="mt-1 text-sm" value={readerExtracted.descricao} onChange={(e) => setReaderExtracted((s) => s && { ...s, descricao: e.target.value })} />
+                </div>
+                <div className="col-span-2">
+                  <Label className="text-xs">Forma de cobrança</Label>
+                  <div className="grid grid-cols-3 gap-2 mt-1.5">
+                    {(["boleto", "pix", "transferencia"] as const).map((opt) => (
+                      <button
+                        key={opt}
+                        type="button"
+                        onClick={() => setReaderExtracted((s) => s && { ...s, forma_cobranca: s.forma_cobranca === opt ? "" : opt })}
+                        className={`px-2 py-1.5 rounded-lg text-xs font-medium transition-all border ${
+                          readerExtracted.forma_cobranca === opt
+                            ? "bg-primary/15 border-primary/40 text-primary"
+                            : "bg-secondary/40 border-transparent text-muted-foreground hover:bg-secondary/70"
+                        }`}
+                      >
+                        {opt === "boleto" ? "Boleto" : opt === "pix" ? "PIX" : "Transferência"}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+              <DialogFooter>
+                <Button type="button" variant="outline" size="sm" onClick={() => setReaderExtracted(null)}>Voltar</Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  onClick={() => {
+                    if (!readerExtracted) return;
+                    setBillingClient((b) => ({
+                      ...b,
+                      nome: readerExtracted.cliente_nome || b.nome,
+                      email: readerExtracted.cliente_email || b.email,
+                      telefone: readerExtracted.cliente_telefone || b.telefone,
+                      forma_cobranca: readerExtracted.forma_cobranca || b.forma_cobranca,
+                    }));
+                    setForm((f) => ({
+                      ...f,
+                      empresa: readerExtracted.descricao || readerExtracted.cliente_nome || f.empresa,
+                      valor: readerExtracted.valor || f.valor,
+                      data: readerExtracted.data_vencimento || f.data,
+                      tipo: "entrada",
+                    }));
+                    if (readerBoleto) setBoletoFile(readerBoleto);
+                    if (readerNf) setNfFile(readerNf);
+                    setShowBilling(true);
+                    setReaderOpen(false);
+                    setReaderExtracted(null);
+                    toast({ title: "Dados preenchidos", description: "Revise e clique em Salvar para confirmar." });
+                  }}
+                >
+                  <Check className="w-3 h-3 mr-1" /> Aprovar e preencher
+                </Button>
+              </DialogFooter>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
