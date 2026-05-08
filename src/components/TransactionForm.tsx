@@ -143,6 +143,8 @@ const TransactionForm = () => {
   });
   const [existingClients, setExistingClients] = useState<{ id: string; nome: string; email: string; telefone: string | null; forma_cobranca: string | null }[]>([]);
   const [clientPopoverOpen, setClientPopoverOpen] = useState(false);
+  const [boletoFile, setBoletoFile] = useState<File | null>(null);
+  const [nfFile, setNfFile] = useState<File | null>(null);
 
   // Fetch existing billing clients (scoped to active organization) when billing section opens
   useEffect(() => {
