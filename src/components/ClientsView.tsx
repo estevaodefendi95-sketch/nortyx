@@ -513,6 +513,36 @@ const ClientsView = ({ selectedMonths, selectedYear, isViewer = false }: Clients
                                     />
                                   </div>
                                 )}
+                                <div className="grid grid-cols-2 gap-2 pt-2 border-t border-border/40">
+                                  {(["boleto", "nf"] as const).map((kind) => {
+                                    const url = kind === "boleto" ? charge.boleto_url : charge.nf_url;
+                                    const label = kind === "boleto" ? "Boleto" : "Nota fiscal";
+                                    return (
+                                      <div key={kind}>
+                                        <Label className="text-xs flex items-center gap-1.5">
+                                          {kind === "boleto" ? <Paperclip className="w-3 h-3" /> : <FileText className="w-3 h-3" />} {label}
+                                        </Label>
+                                        {url ? (
+                                          <div className="flex items-center gap-1 mt-1">
+                                            <a href={url} target="_blank" rel="noopener noreferrer" className="text-xs text-primary underline flex-1 truncate">Visualizar</a>
+                                            <label className="text-[10px] cursor-pointer text-muted-foreground hover:text-foreground" title="Substituir">
+                                              <Upload className="w-3 h-3" />
+                                              <input type="file" accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) handleAttachmentChange(charge.id, kind, f); e.target.value = ""; }} />
+                                            </label>
+                                            <button type="button" className="text-[10px] text-destructive" onClick={() => handleAttachmentChange(charge.id, kind, null)} title="Remover">
+                                              <X className="w-3 h-3" />
+                                            </button>
+                                          </div>
+                                        ) : (
+                                          <label className="mt-1 flex items-center gap-1.5 text-xs cursor-pointer rounded border border-input px-2 py-1 hover:bg-accent/40">
+                                            <Upload className="w-3 h-3" /> Anexar
+                                            <input type="file" accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) handleAttachmentChange(charge.id, kind, f); e.target.value = ""; }} />
+                                          </label>
+                                        )}
+                                      </div>
+                                    );
+                                  })}
+                                </div>
                                 <div className="flex gap-2">
                                   <Button size="sm" onClick={saveChargeEdit} className="gap-1"><Check className="w-3 h-3" /> Salvar</Button>
                                   <Button size="sm" variant="outline" onClick={() => setEditingCharge(null)}><X className="w-3 h-3" /></Button>
