@@ -39,12 +39,15 @@ type Tab = "calendar" | "categories" | "lancamento" | "dados" | "clientes";
 const Index = () => {
   const { transactions, dailyIncomes } = useTransactions();
   const { getPendingBills } = usePaymentReminder();
-  const { signOut, isAdmin, isViewer } = useAuth();
+  const { signOut, isAdmin, isViewer, loading: authLoading } = useAuth();
   const navigate = useNavigate();
   const isMobile = useIsMobile();
-  const { visibleTabs } = useTabVisibility();
+  const { visibleTabs, loading: tabsLoading } = useTabVisibility();
   const { logoUrl: companyLogo, companyName } = useOrgBranding();
-  const { membership, availableOrganizations, isSuperUser, switchOrganization, organization } = useOrganization();
+  const { membership, availableOrganizations, isSuperUser, switchOrganization, organization, loading: orgLoading } = useOrganization();
+  const { isLoading: txLoading } = useTransactions();
+  const bootLoading = authLoading || orgLoading;
+  const summaryLoading = bootLoading || txLoading;
   const pendingBills = useMemo(() => getPendingBills(), [getPendingBills]);
   const [pendingUsersCount, setPendingUsersCount] = useState(0);
   const [activeTab, setActiveTab] = useState<Tab>("dados");
