@@ -146,6 +146,22 @@ const TransactionForm = () => {
   const [boletoFile, setBoletoFile] = useState<File | null>(null);
   const [nfFile, setNfFile] = useState<File | null>(null);
 
+  // Doc reader (boleto/NF → preencher cobrança)
+  const [readerOpen, setReaderOpen] = useState(false);
+  const [readerBoleto, setReaderBoleto] = useState<File | null>(null);
+  const [readerNf, setReaderNf] = useState<File | null>(null);
+  const [readerLoading, setReaderLoading] = useState(false);
+  const [readerExtracted, setReaderExtracted] = useState<{
+    cliente_nome: string;
+    cliente_email: string;
+    cliente_telefone: string;
+    valor: string;
+    data_vencimento: string;
+    descricao: string;
+    forma_cobranca: string;
+    matched: boolean;
+  } | null>(null);
+
   // Fetch existing billing clients (scoped to active organization) when billing section opens
   useEffect(() => {
     if (!showBilling || !organization?.id) return;
