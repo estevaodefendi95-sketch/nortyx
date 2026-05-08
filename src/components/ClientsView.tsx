@@ -270,6 +270,8 @@ const ClientsView = ({ selectedMonths, selectedYear, isViewer = false }: Clients
       toast({ title: "Erro no anexo", description: e?.message || "Tente novamente.", variant: "destructive" });
     }
   };
+
+  const startEdit = (client: BillingClient) => {
     setEditingClient(client.id);
     setEditForm({ nome: client.nome, email: client.email, telefone: client.telefone, forma_cobranca: client.forma_cobranca });
   };
