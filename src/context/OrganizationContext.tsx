@@ -66,7 +66,11 @@ export const OrganizationProvider = ({ children }: { children: ReactNode }) => {
         .select("*")
         .eq("user_id", user.id);
 
-      if (memError) throw memError;
+      if (memError) {
+        console.warn("[OrgContext] memberships query error:", memError);
+        throw memError;
+      }
+      console.log("[OrgContext] memberships loaded:", memberships?.length ?? 0, memberships);
 
       // For super user, load all organizations
       let allOrgs: Organization[] = [];
@@ -87,9 +91,9 @@ export const OrganizationProvider = ({ children }: { children: ReactNode }) => {
           }));
         }
         setAvailableOrganizations(allOrgs);
-      } else {
-        setAvailableOrganizations([]);
       }
+      // For non-super users, do NOT clear availableOrganizations here — it will be set
+      // below from the actual orgs query (or kept as fallback) to avoid hiding the switcher.
 
       if ((!memberships || memberships.length === 0) && allOrgs.length === 0) {
         setOrganization(null);
