@@ -1,52 +1,53 @@
-## Anexar boleto e NF nas cobranças
+# Leitor de boleto/NF na entrada de cobrança
 
-Permitir anexar **boleto** e **nota fiscal** (PDF, JPG ou PNG) tanto no momento do lançamento da entrada quanto ao editar uma cobrança existente na área de Clientes. No e-mail enviado ao cliente, os arquivos serão incluídos como **links de download** (o sistema de e-mail do app não suporta anexos binários — a alternativa padrão é o link, com a mesma utilidade prática para o cliente).
+Hoje, no formulário de lançamento, ao marcar **"Vincular cliente para cobrança"** o usuário precisa digitar manualmente nome, e-mail, valor, data e anexar boleto/NF. A proposta é permitir **enviar o boleto e/ou a NF primeiro**, deixar a IA ler os arquivos, **identificar o cliente** (existente ou novo), **preencher automaticamente** todos os campos e exigir uma **tela de revisão/aprovação** antes de salvar.
 
-### 1. Banco de dados
+## Fluxo de uso
 
-Nova migração:
-- Adiciona em `billing_charges` as colunas `boleto_url text` e `nf_url text` (nullable).
-- Cria o bucket de storage **`billing-attachments`** (privado).
-- Políticas de storage: somente membros da empresa dona da cobrança podem ler/enviar/excluir arquivos do próprio `organization_id/...`. Super user com acesso total.
+1. Em "Lançamento" → Tipo **Entrada**, abre-se uma nova ação acima da seção de cobrança: **"Ler boleto / NF para preencher"**.
+2. Usuário envia 1 arquivo de boleto (PDF/JPG/PNG) e/ou 1 arquivo de NF (PDF/JPG/PNG) — mesmas regras já usadas em anexos (até 10MB, validação via `validateAttachment`).
+3. Aparece um indicador "Lendo documento..." enquanto a edge function processa.
+4. Volta um **dialog de revisão "Confirmar dados extraídos"** mostrando, lado a lado, os campos lidos e quem foi reconhecido:
+   - Cliente (nome, e-mail, telefone) — com badge "Cliente existente" (match em `billing_clients` por e-mail ou nome) ou "Novo cliente".
+   - Valor, data de vencimento, descrição/empresa.
+   - Forma de cobrança sugerida (boleto, pix, etc.).
+   - Pré-visualização miniatura dos arquivos enviados.
+5. Usuário pode editar qualquer campo nesse dialog.
+6. Botões: **"Cancelar"** e **"Aprovar e preencher"**. Ao aprovar:
+   - Os campos são jogados no formulário principal (`empresa`, `valor`, `data`, e `billingClient.*`).
+   - Os arquivos enviados ficam pendurados no estado `boletoFile` / `nfFile` já existentes para serem feitos upload no `handleSubmit` (sem upload duplicado agora).
+   - A seção de cobrança é aberta automaticamente (`setShowBilling(true)`).
+7. O usuário ainda precisa clicar em **"Salvar"** normal — a aprovação só preenche; ela não persiste sozinha. Isso garante o "solicitar aprovação" pedido.
 
-Caminho dos arquivos: `billing-attachments/{organization_id}/{charge_id}/boleto.{ext}` e `.../nf.{ext}`.
+## Identificação do cliente
 
-### 2. Lançamento de entrada (`TransactionForm.tsx`)
+- Match preferencial: e-mail (case-insensitive) na lista já carregada de `billing_clients` da organização.
+- Fallback: nome normalizado (lowercase + trim) com similaridade simples.
+- Se não houver match → "Novo cliente" (será criado no submit pelo fluxo já existente).
 
-Dentro do bloco "Vincular cliente para cobrança":
-- Dois campos novos: **Boleto** e **Nota Fiscal**, cada um com botão "Selecionar arquivo" (aceitando `.pdf,.jpg,.jpeg,.png`, limite ~10MB) e indicação do nome do arquivo escolhido.
-- Validação: se o arquivo tiver tipo/tamanho inválido, bloqueia o envio com mensagem clara.
-- Ao salvar:
-  1. Cria/atualiza o cliente.
-  2. Insere a(s) cobrança(s) (já com `organization_id`).
-  3. Faz upload dos arquivos para o bucket no caminho da **primeira cobrança** apenas (recorrentes ficam sem anexo até serem editadas, conforme escolha).
-  4. Atualiza essa cobrança com `boleto_url` / `nf_url` (URL pública assinada do path).
-- Se algum upload falhar, mostra toast de aviso mas mantém a cobrança criada.
+## Mudanças técnicas
 
-### 3. Edição de cobrança (`ClientsView.tsx`)
+### Nova edge function `supabase/functions/read-billing-doc/index.ts`
+- Espelha o padrão de `extract-dda` (Lovable AI Gateway, `google/gemini-2.5-flash`, vision).
+- Aceita `{ boleto?: { base64, mimeType }, nf?: { base64, mimeType }, knownClients: [{nome,email}] }`.
+- Prompt em PT-BR pedindo extrair: `cliente_nome`, `cliente_email`, `cliente_telefone`, `valor` (decimal), `data_vencimento` (YYYY-MM-DD), `descricao`, `forma_cobranca` ("boleto"|"pix"|"transferencia"|"cartao"). Para boleto, identificar o **sacado/pagador** (não o beneficiário). Para NF, identificar o **tomador**. Quando ambos existirem, priorizar dados da NF para nome/e-mail e dados do boleto para valor/vencimento.
+- Inclui no prompt a lista de clientes conhecidos para que a IA use exatamente o mesmo `nome`/`email` quando reconhecer.
+- Retorna JSON único `{ extracted: {...}, matchedClientId?: string }`.
+- `verify_jwt` segue o padrão dos outros (default).
 
-No formulário de edição de cobrança (já existente):
-- Adicionar duas linhas: **Boleto** e **Nota Fiscal**.
-  - Se já existe arquivo: mostra link "Visualizar", botão "Substituir" e botão "Remover".
-  - Se não existe: botão "Anexar arquivo".
-- Mesma validação de tipo/tamanho.
-- "Salvar" persiste qualquer troca (upload + update da coluna; remoção apaga o arquivo do storage e zera a coluna).
+### `src/components/TransactionForm.tsx`
+- Novo estado: `pendingBoletoFile`, `pendingNfFile`, `extractDialogOpen`, `extractedData`, `isExtracting`.
+- Novo bloco UI dentro da seção de cobrança (visível quando `tipo === "entrada"`), antes dos campos manuais:
+  - Botão **"Ler boleto/NF e preencher"** que abre input de arquivo (aceita múltiplos: 1 boleto + 1 NF, identificados por toggle).
+  - Após upload converte para base64 e chama `supabase.functions.invoke("read-billing-doc", ...)`.
+  - Abre `Dialog` de confirmação (componente novo inline) com formulário editável.
+  - Ao "Aprovar": faz `setBillingClient(...)`, `setEmpresa`, `setValor`, `setData`, `setBoletoFile(pendingBoletoFile)`, `setNfFile(pendingNfFile)`, `setShowBilling(true)`, fecha o dialog.
+- Não muda `handleSubmit`: o upload dos anexos já acontece via `uploadChargeAttachment` no fluxo existente.
 
-### 4. Visualização auxiliar
+### Nada de mudanças em DB nem em storage
+- Reaproveita `billing-attachments` bucket, colunas `boleto_url` / `nf_url` já criadas, e `billingAttachments.ts`.
 
-- Na listagem compacta de cada cobrança em `ClientsView.tsx`, mostrar pequenos ícones (📎 boleto / 📄 NF) clicáveis quando os arquivos existirem, abrindo em nova aba.
-- Mesmos ícones aparecem no calendário (`CalendarView.tsx`) dentro do popover/tooltip da cobrança.
-
-### 5. E-mail de cobrança (`send-billing-email` + template `billing-reminder`)
-
-- Buscar `boleto_url` e `nf_url` ao montar o e-mail.
-- Passar via `templateData` para o template React Email.
-- O template renderiza dois botões/links extras quando os campos estão presentes: "Baixar boleto" e "Baixar nota fiscal".
-- Caso ambos estejam vazios, o e-mail fica idêntico ao atual.
-- Importante: o pipeline de e-mail do app não envia arquivo como anexo; usamos link de download (URL assinada de longa validade ou pública via storage). Isso garante que o cliente receba os documentos clicando no e-mail.
-
-### 6. Detalhes técnicos
-
-- Helper único `uploadChargeAttachment(chargeId, kind: 'boleto'|'nf', file)` em `src/lib/billingAttachments.ts` para reaproveitar entre `TransactionForm` e `ClientsView`.
-- URL armazenada: usar `getPublicUrl` se o bucket for público, ou `createSignedUrl` com validade longa (ex.: 1 ano) e regenerar quando o e-mail for enviado.
-- Ao excluir uma cobrança, também remover os objetos correspondentes no storage (best-effort).
+## Fora de escopo
+- Não altera o leitor de DDA (saídas/extrato) — fica restrito à entrada/cobrança.
+- Não cria automação para enviar e-mail de cobrança após aprovação; o envio segue o botão atual.
+- Não persiste nada antes da aprovação — arquivos só sobem após o "Salvar".
