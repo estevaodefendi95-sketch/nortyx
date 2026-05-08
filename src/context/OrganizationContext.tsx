@@ -217,6 +217,24 @@ export const OrganizationProvider = ({ children }: { children: ReactNode }) => {
     loadOrganization();
   }, [user, authLoading, loadOrganization]);
 
+  // Refresh when this user's memberships change in the DB
+  useEffect(() => {
+    if (!user) return;
+    const channel = supabase
+      .channel(`org-members-${user.id}`)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "organization_members", filter: `user_id=eq.${user.id}` },
+        () => {
+          loadOrganization();
+        }
+      )
+      .subscribe();
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user, loadOrganization]);
+
   const switchOrganization = useCallback(async (orgId: string) => {
     localStorage.setItem("paggio_active_org", orgId);
     await loadOrganization();
