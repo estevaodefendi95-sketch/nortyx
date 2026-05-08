@@ -5,7 +5,7 @@ import { useCategories } from "@/context/CategoriesContext";
 import { useTransactions } from "@/context/TransactionsContext";
 import { useOrganization } from "@/context/OrganizationContext";
 import { Badge } from "@/components/ui/badge";
-import { ChevronLeft, ChevronRight, CheckCircle2, Clock, AlertCircle, ArrowUp, ArrowDown, Pencil, Check, X, Scale, CalendarDays, Trash2, ChevronDown, ChevronUp as ChevronUpIcon, User } from "lucide-react";
+import { ChevronLeft, ChevronRight, CheckCircle2, Clock, AlertCircle, ArrowUp, ArrowDown, Pencil, Check, X, Scale, CalendarDays, Trash2, ChevronDown, ChevronUp as ChevronUpIcon, User, Paperclip, FileText } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
