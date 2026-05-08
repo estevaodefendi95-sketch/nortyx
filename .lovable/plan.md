@@ -1,43 +1,43 @@
-## Diagnóstico
+# Polir carregamento inicial da tela principal
 
-Confirmado no banco:
-- Usuário `nortyx.` (`ee14e46e…`) tem **2 memberships**: `Lema.` (owner) e `nortyx.` (member).
-- RLS de `organization_members` e `organizations` permite enxergar ambas.
-- O código atual em `OrganizationContext.tsx` já popula `availableOrganizations` para usuários comuns com 2+ memberships, e `Index.tsx` mostra o popover quando `availableOrganizations.length > 1`.
+## Problema
+Ao abrir `/`, há um "flash" onde o cabeçalho aparece com nome de empresa vazio, valores em R$ 0,00 e abas piscando antes dos dados de auth/organização/transações chegarem. Isso parece um bug de "layout antigo".
 
-Apesar disso, o screenshot do usuário `nortyx.` (logado como Lema.) não mostra o ícone `Building2` ao lado do nome da empresa — ou seja, o estado `availableOrganizations` está chegando com tamanho ≤ 1 em runtime.
+## Causa
+- `AuthProvider`, `OrganizationProvider` e `TransactionsProvider` carregam dados em sequência (auth → org → transactions).
+- A `Index` renderiza o layout completo imediatamente, mostrando estados vazios (logo placeholder, nome em branco, valores R$ 0,00, contadores zerados) antes desses providers terminarem.
+- O switcher de empresas (`Building2`), o badge de notificações e os ícones de admin aparecem depois — causando "saltos" visuais.
 
-Causas prováveis (a confirmar com instrumentação):
-1. A query `organizations .in("id", orgIds)` está retornando 1 só registro por algum motivo de RLS/cache.
-2. O contexto está re-rodando e sobrescrevendo `availableOrganizations` com `[]` (linha 91, branch não-super) sem voltar a popular caso a query `memberships` falhe silenciosamente.
-3. Estado pré-cached no navegador (não recarregou após o último deploy).
+## Solução: skeletons consistentes durante o boot
 
-## Plano de correção
+Manter o layout atual, apenas adicionando placeholders animados (`<Skeleton/>` do shadcn) enquanto `loading` for verdadeiro nos providers.
 
-### 1) Endurecer `OrganizationContext.tsx`
-- Não zerar `availableOrganizations` para `[]` no início do branch não-super; só atribuir após o resultado real.
-- Logar (`console.warn`) quando `memberships.length > 1` mas `availableOrganizations` terminar com `< 2` itens, com os erros das queries de `organization_members` e `organizations`.
-- Garantir que mesmo se a query de `organizations` falhar, montamos um fallback mínimo a partir de `memberships` (id + nome resolvido depois) para não ocultar o switcher.
-- Ordenar `availableOrganizations` deixando a empresa ativa primeiro (cosmético).
+### Mudanças
 
-### 2) Tornar o switcher mais resiliente em `Index.tsx`
-- Mudar a condição do popover para `availableOrganizations.length > 1 || (availableOrganizations.length === 1 && availableOrganizations[0].id !== organization?.id)` — defensivo contra estados intermediários.
-- Manter aparência atual (ícone `Building2` + popover com lista).
+**1. `src/pages/Index.tsx`**
+- Ler `loading` de `useAuth()` e de `useOrganization()`, e `isLoading` de `useTransactions()`.
+- Definir `bootLoading = authLoading || orgLoading` (essencial pra evitar piscar do header).
+- Definir `dataLoading = txLoading` (afeta valores e conteúdo das views).
+- No header, quando `bootLoading`:
+  - Logo: manter círculo, sem ícone de câmera placeholder (já neutro).
+  - Nome da empresa: substituir por `<Skeleton className="h-6 w-32" />`.
+  - Botão de switcher de empresa: ocultar (já que depende de `availableOrganizations`).
+  - Ícones de admin/settings: ocultar até `authLoading` terminar (evita aparecer/sumir).
+- Linha de resumo (income/expense/saldo): quando `dataLoading || bootLoading`, mostrar 3 `<Skeleton className="h-4 w-24" />` no lugar dos valores.
+- Abas (desktop) e bottom nav (mobile): renderizar normalmente já que dependem só de `visibleTabs` (que não depende de fetch crítico). Se `visibleTabs` ainda não carregou, mostrar `<Skeleton className="h-9 w-full" />` no lugar da barra de abas.
+- Conteúdo principal (`<main>`): se `bootLoading`, mostrar bloco de skeleton genérico (3-4 cards) em vez de renderizar `DadosView` com dados vazios.
 
-### 3) Forçar refresh quando memberships mudarem
-- Em `OrganizationContext`, escutar mudanças realtime na tabela `organization_members` filtradas por `user_id` do usuário logado. Quando houver INSERT/DELETE para esse usuário, chamar `refreshOrganization()`.
-- Isso garante que se o admin acabou de adicionar a 2ª empresa para `nortyx.`, ele veja o switcher sem precisar deslogar.
+**2. `src/hooks/useTabVisibility.ts`** (verificar se expõe `loading`)
+- Se não expõe, adicionar flag `loading` para alinhar com o padrão.
 
-### 4) Verificação
-- Após aplicar, abrir o preview com a sessão de `nortyx.`, conferir no console:
-  - `memberships.length === 2`
-  - `availableOrganizations.length === 2`
-  - ícone `Building2` aparece e o popover lista `Lema.` e `nortyx.`.
-- Se ainda assim não aparecer, os logs do passo 1 vão apontar exatamente qual query devolveu menos linhas que o esperado.
+**3. Animação suave**
+- Envolver header e main num wrapper com `transition-opacity` para fade-in quando `bootLoading` terminar.
 
-## Arquivos afetados
-- `src/context/OrganizationContext.tsx` — fallback robusto + logs + assinatura realtime de `organization_members`.
-- `src/pages/Index.tsx` — condição defensiva no switcher (mudança mínima).
+### Fora de escopo
+- Lógica de auth, RLS, organizações ou transações.
+- Redesign visual: manter cores, tipografia, espaçamentos atuais.
+- Otimização de queries (não pedido).
 
-## Fora do escopo
-- Mudanças no `AdminApproval`, em RLS, ou no fluxo de convite/onboarding.
+### Verificação
+- Recarregar `/` com cache limpo: header deve mostrar skeletons → fade para conteúdo real, sem nome vazio nem valores R$ 0,00 piscando.
+- Trocar de empresa: switcher mantém comportamento atual.

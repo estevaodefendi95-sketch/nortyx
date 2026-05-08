@@ -22,6 +22,7 @@ import { useOrgBranding } from "@/hooks/useOrgBranding";
 import { useOrganization } from "@/context/OrganizationContext";
 import { supabase } from "@/integrations/supabase/client";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Skeleton } from "@/components/ui/skeleton";
 
 const MONTHS_PT = [
   "Jan", "Fev", "Mar", "Abr", "Mai", "Jun",
@@ -38,12 +39,15 @@ type Tab = "calendar" | "categories" | "lancamento" | "dados" | "clientes";
 const Index = () => {
   const { transactions, dailyIncomes } = useTransactions();
   const { getPendingBills } = usePaymentReminder();
-  const { signOut, isAdmin, isViewer } = useAuth();
+  const { signOut, isAdmin, isViewer, loading: authLoading } = useAuth();
   const navigate = useNavigate();
   const isMobile = useIsMobile();
-  const { visibleTabs } = useTabVisibility();
+  const { visibleTabs, loading: tabsLoading } = useTabVisibility();
   const { logoUrl: companyLogo, companyName } = useOrgBranding();
-  const { membership, availableOrganizations, isSuperUser, switchOrganization, organization } = useOrganization();
+  const { membership, availableOrganizations, isSuperUser, switchOrganization, organization, loading: orgLoading } = useOrganization();
+  const { isLoading: txLoading } = useTransactions();
+  const bootLoading = authLoading || orgLoading;
+  const summaryLoading = bootLoading || txLoading;
   const pendingBills = useMemo(() => getPendingBills(), [getPendingBills]);
   const [pendingUsersCount, setPendingUsersCount] = useState(0);
   const [activeTab, setActiveTab] = useState<Tab>("dados");
@@ -131,12 +135,16 @@ const Index = () => {
               </div>
 
               <div className="min-w-0">
-                <span className="text-xl sm:text-2xl font-display font-bold truncate text-primary">
-                  {companyName}
-                </span>
+                {bootLoading ? (
+                  <Skeleton className="h-7 w-32" />
+                ) : (
+                  <span className="text-xl sm:text-2xl font-display font-bold truncate text-primary">
+                    {companyName}
+                  </span>
+                )}
               </div>
 
-              {(availableOrganizations.length > 1 ||
+              {!bootLoading && (availableOrganizations.length > 1 ||
                 (availableOrganizations.length === 1 && availableOrganizations[0].id !== organization?.id)) && (
                 <Popover>
                   <PopoverTrigger asChild>
@@ -212,7 +220,7 @@ const Index = () => {
 
               <ThemeToggle />
 
-              {isAdmin && (
+              {!authLoading && isAdmin && (
                 <>
                   <button
                     onClick={() => navigate("/admin/history")}
@@ -234,7 +242,7 @@ const Index = () => {
                 </>
               )}
 
-              {isOrgOwner && (
+              {!bootLoading && isOrgOwner && (
                 <button
                   onClick={() => navigate("/settings")}
                   className="p-2 rounded-lg hover:bg-secondary transition-colors flex-shrink-0"
@@ -255,21 +263,34 @@ const Index = () => {
           </div>
 
           {/* Summary row - below header on all sizes */}
-          <div className="flex items-center gap-2 sm:gap-4 mt-1.5 flex-wrap">
-            <span className="text-xs sm:text-sm text-muted-foreground flex items-center gap-1">
-              <ArrowUpDown className="w-3 h-3 sm:w-3.5 sm:h-3.5 hidden sm:inline" />
-              <span className="text-income font-medium">{formatCurrency(filteredIncome)}</span>
-            </span>
-            <span className="text-xs sm:text-sm text-muted-foreground">
-              <span className="text-expense font-medium">{formatCurrency(filteredExpenses)}</span>
-            </span>
-            <span className="text-xs sm:text-sm text-muted-foreground">
-              Saldo: <span className={`font-medium ${saldo >= 0 ? "text-income" : "text-expense"}`}>{formatCurrency(saldo)}</span>
-            </span>
+          <div className="flex items-center gap-2 sm:gap-4 mt-1.5 flex-wrap min-h-[1.25rem]">
+            {summaryLoading ? (
+              <>
+                <Skeleton className="h-4 w-20" />
+                <Skeleton className="h-4 w-20" />
+                <Skeleton className="h-4 w-28" />
+              </>
+            ) : (
+              <>
+                <span className="text-xs sm:text-sm text-muted-foreground flex items-center gap-1">
+                  <ArrowUpDown className="w-3 h-3 sm:w-3.5 sm:h-3.5 hidden sm:inline" />
+                  <span className="text-income font-medium">{formatCurrency(filteredIncome)}</span>
+                </span>
+                <span className="text-xs sm:text-sm text-muted-foreground">
+                  <span className="text-expense font-medium">{formatCurrency(filteredExpenses)}</span>
+                </span>
+                <span className="text-xs sm:text-sm text-muted-foreground">
+                  Saldo: <span className={`font-medium ${saldo >= 0 ? "text-income" : "text-expense"}`}>{formatCurrency(saldo)}</span>
+                </span>
+              </>
+            )}
           </div>
 
           {/* Desktop tabs */}
           {!isMobile && (
+            tabsLoading || bootLoading ? (
+              <Skeleton className="h-10 w-full sm:w-80 mt-2" />
+            ) : (
             <div className="flex gap-1 bg-secondary/50 rounded-lg p-1 mt-2 w-full sm:w-fit">
               {tabs.map((tab) => {
                 const Icon = tab.icon;
@@ -292,6 +313,7 @@ const Index = () => {
                 );
               })}
             </div>
+            )
           )}
 
           {/* Year + Month Multi-Select Filter */}
@@ -354,18 +376,32 @@ const Index = () => {
 
       {/* Content */}
       <main className="container max-w-7xl mx-auto px-3 sm:px-4 py-4 sm:py-6 space-y-4 sm:space-y-6">
-        {activeTab === "calendar" && (
-          <>
-            <div className="hidden lg:block">
-              <EvolutionChart selectedYear={selectedYear} />
+        {bootLoading ? (
+          <div className="space-y-4 animate-in fade-in duration-300">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <Skeleton className="h-24 w-full rounded-xl" />
+              <Skeleton className="h-24 w-full rounded-xl" />
+              <Skeleton className="h-24 w-full rounded-xl" />
             </div>
-            <CalendarView initialMonth={selectedMonths.length === 1 ? selectedMonths[0] : null} selectedYear={selectedYear} isViewer={isViewer} />
-          </>
+            <Skeleton className="h-64 w-full rounded-xl" />
+            <Skeleton className="h-48 w-full rounded-xl" />
+          </div>
+        ) : (
+          <div className="animate-in fade-in duration-300">
+            {activeTab === "calendar" && (
+              <>
+                <div className="hidden lg:block">
+                  <EvolutionChart selectedYear={selectedYear} />
+                </div>
+                <CalendarView initialMonth={selectedMonths.length === 1 ? selectedMonths[0] : null} selectedYear={selectedYear} isViewer={isViewer} />
+              </>
+            )}
+            {activeTab === "categories" && <CategoriesView selectedMonths={selectedMonths} selectedYear={selectedYear} isViewer={isViewer} />}
+            {activeTab === "clientes" && <ClientsView selectedMonths={selectedMonths} selectedYear={selectedYear} isViewer={isViewer} />}
+            {activeTab === "lancamento" && <TransactionForm />}
+            {activeTab === "dados" && <DadosView selectedMonths={selectedMonths} selectedYear={selectedYear} isViewer={isViewer} />}
+          </div>
         )}
-        {activeTab === "categories" && <CategoriesView selectedMonths={selectedMonths} selectedYear={selectedYear} isViewer={isViewer} />}
-        {activeTab === "clientes" && <ClientsView selectedMonths={selectedMonths} selectedYear={selectedYear} isViewer={isViewer} />}
-        {activeTab === "lancamento" && <TransactionForm />}
-        {activeTab === "dados" && <DadosView selectedMonths={selectedMonths} selectedYear={selectedYear} isViewer={isViewer} />}
       </main>
 
       {/* Mobile Bottom Navigation */}
