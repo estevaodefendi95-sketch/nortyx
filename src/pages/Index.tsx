@@ -136,7 +136,8 @@ const Index = () => {
                 </span>
               </div>
 
-              {availableOrganizations.length > 1 && (
+              {(availableOrganizations.length > 1 ||
+                (availableOrganizations.length === 1 && availableOrganizations[0].id !== organization?.id)) && (
                 <Popover>
                   <PopoverTrigger asChild>
                     <button
