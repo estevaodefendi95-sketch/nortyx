@@ -376,18 +376,32 @@ const Index = () => {
 
       {/* Content */}
       <main className="container max-w-7xl mx-auto px-3 sm:px-4 py-4 sm:py-6 space-y-4 sm:space-y-6">
-        {activeTab === "calendar" && (
-          <>
-            <div className="hidden lg:block">
-              <EvolutionChart selectedYear={selectedYear} />
+        {bootLoading ? (
+          <div className="space-y-4 animate-in fade-in duration-300">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <Skeleton className="h-24 w-full rounded-xl" />
+              <Skeleton className="h-24 w-full rounded-xl" />
+              <Skeleton className="h-24 w-full rounded-xl" />
             </div>
-            <CalendarView initialMonth={selectedMonths.length === 1 ? selectedMonths[0] : null} selectedYear={selectedYear} isViewer={isViewer} />
-          </>
+            <Skeleton className="h-64 w-full rounded-xl" />
+            <Skeleton className="h-48 w-full rounded-xl" />
+          </div>
+        ) : (
+          <div className="animate-in fade-in duration-300">
+            {activeTab === "calendar" && (
+              <>
+                <div className="hidden lg:block">
+                  <EvolutionChart selectedYear={selectedYear} />
+                </div>
+                <CalendarView initialMonth={selectedMonths.length === 1 ? selectedMonths[0] : null} selectedYear={selectedYear} isViewer={isViewer} />
+              </>
+            )}
+            {activeTab === "categories" && <CategoriesView selectedMonths={selectedMonths} selectedYear={selectedYear} isViewer={isViewer} />}
+            {activeTab === "clientes" && <ClientsView selectedMonths={selectedMonths} selectedYear={selectedYear} isViewer={isViewer} />}
+            {activeTab === "lancamento" && <TransactionForm />}
+            {activeTab === "dados" && <DadosView selectedMonths={selectedMonths} selectedYear={selectedYear} isViewer={isViewer} />}
+          </div>
         )}
-        {activeTab === "categories" && <CategoriesView selectedMonths={selectedMonths} selectedYear={selectedYear} isViewer={isViewer} />}
-        {activeTab === "clientes" && <ClientsView selectedMonths={selectedMonths} selectedYear={selectedYear} isViewer={isViewer} />}
-        {activeTab === "lancamento" && <TransactionForm />}
-        {activeTab === "dados" && <DadosView selectedMonths={selectedMonths} selectedYear={selectedYear} isViewer={isViewer} />}
       </main>
 
       {/* Mobile Bottom Navigation */}
