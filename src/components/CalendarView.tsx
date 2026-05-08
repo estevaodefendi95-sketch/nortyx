@@ -709,8 +709,11 @@ const CalendarView = ({ initialMonth, selectedYear: propYear, isViewer = false }
                 const isSelected = selectedDay === day;
                 const isTodayDay = isToday(day);
                 const hasData = dayIncome > 0 || dayExpense > 0;
+                const dow = new Date(currentYear, currentMonth, day).getDay();
+                const isWeekday = dow >= 1 && dow <= 5;
 
                 const saldoInicial = (day > 1 ? (cumulativeBalance.get(day - 1) ?? 0) : previousMonthEndBalance) + dayIncome;
+                const showSiOnly = !hasData && isWeekday;
 
                 return (
                   <button
@@ -719,14 +722,14 @@ const CalendarView = ({ initialMonth, selectedYear: propYear, isViewer = false }
                     className={`
                       relative p-1.5 rounded-lg text-left transition-all min-h-[100px] group
                       ${isSelected ? "bg-primary/15 border-2 border-primary/40 glow-primary" : isTodayDay ? "bg-accent/30 border-2 border-primary ring-2 ring-primary/20" : "hover:bg-secondary border border-transparent"}
-                      ${hasData ? "cursor-pointer" : "cursor-default opacity-50"}
+                      ${hasData ? "cursor-pointer" : showSiOnly ? "cursor-default" : "cursor-default opacity-50"}
                     `}
                   >
                     <div className="flex items-center justify-between">
                       <span className={`text-xs font-medium ${isTodayDay ? "bg-primary text-primary-foreground rounded-full w-5 h-5 flex items-center justify-center" : isSelected ? "text-primary" : "text-foreground"}`}>{day}</span>
                       {billingChargesByDay.has(day) && <User className="w-3 h-3 text-income" />}
                     </div>
-                    {hasData && (
+                    {hasData ? (
                       <div className="mt-0.5 space-y-0">
                         <p className={`text-[9px] font-medium truncate ${saldoInicial >= 0 ? "text-muted-foreground" : "text-expense/70"}`}>
                           SI: {formatCurrency(saldoInicial)}
@@ -745,7 +748,13 @@ const CalendarView = ({ initialMonth, selectedYear: propYear, isViewer = false }
                           SD: {formatCurrency(cumBal)}
                         </p>
                       </div>
-                    )}
+                    ) : showSiOnly ? (
+                      <div className="mt-0.5">
+                        <p className={`text-[9px] font-medium truncate ${saldoInicial >= 0 ? "text-muted-foreground" : "text-expense/70"}`}>
+                          SI: {formatCurrency(saldoInicial)}
+                        </p>
+                      </div>
+                    ) : null}
                   </button>
                 );
               })}
