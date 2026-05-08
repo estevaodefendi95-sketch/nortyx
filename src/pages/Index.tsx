@@ -135,12 +135,16 @@ const Index = () => {
               </div>
 
               <div className="min-w-0">
-                <span className="text-xl sm:text-2xl font-display font-bold truncate text-primary">
-                  {companyName}
-                </span>
+                {bootLoading ? (
+                  <Skeleton className="h-7 w-32" />
+                ) : (
+                  <span className="text-xl sm:text-2xl font-display font-bold truncate text-primary">
+                    {companyName}
+                  </span>
+                )}
               </div>
 
-              {(availableOrganizations.length > 1 ||
+              {!bootLoading && (availableOrganizations.length > 1 ||
                 (availableOrganizations.length === 1 && availableOrganizations[0].id !== organization?.id)) && (
                 <Popover>
                   <PopoverTrigger asChild>
