@@ -560,6 +560,12 @@ const ClientsView = ({ selectedMonths, selectedYear, isViewer = false }: Clients
                                 {charge.recorrente && charge.meses_restantes != null && charge.meses_restantes > 0 && (
                                   <Badge variant="outline" className="text-[9px] px-1.5 py-0">{charge.meses_restantes} {charge.meses_restantes === 1 ? "mês" : "meses"}</Badge>
                                 )}
+                                {charge.boleto_url && (
+                                  <a href={charge.boleto_url} target="_blank" rel="noopener noreferrer" title="Boleto" className="text-muted-foreground hover:text-primary"><Paperclip className="w-3 h-3" /></a>
+                                )}
+                                {charge.nf_url && (
+                                  <a href={charge.nf_url} target="_blank" rel="noopener noreferrer" title="Nota fiscal" className="text-muted-foreground hover:text-primary"><FileText className="w-3 h-3" /></a>
+                                )}
                               </div>
                               <div className="flex items-center gap-1.5">
                                 <span className="text-sm font-medium">{formatCurrency(charge.valor)}</span>
