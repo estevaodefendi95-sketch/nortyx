@@ -1331,6 +1331,7 @@ const TransactionForm = () => {
                           <Upload className="w-3 h-3 mr-1" /> Ler arquivos
                         </Button>
                       </div>
+                      <div>
                         <Label htmlFor="clientNome" className="text-xs">Nome do cliente *</Label>
                         <Popover open={clientPopoverOpen} onOpenChange={setClientPopoverOpen}>
                           <PopoverTrigger asChild>
