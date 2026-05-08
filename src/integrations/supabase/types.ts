@@ -60,12 +60,14 @@ export type Database = {
       }
       billing_charges: {
         Row: {
+          boleto_url: string | null
           client_id: string
           created_at: string
           data_cobranca: string
           email_enviado: boolean
           id: string
           meses_restantes: number | null
+          nf_url: string | null
           organization_id: string | null
           recorrente: boolean
           status: string
@@ -73,12 +75,14 @@ export type Database = {
           valor: number
         }
         Insert: {
+          boleto_url?: string | null
           client_id: string
           created_at?: string
           data_cobranca: string
           email_enviado?: boolean
           id?: string
           meses_restantes?: number | null
+          nf_url?: string | null
           organization_id?: string | null
           recorrente?: boolean
           status?: string
@@ -86,12 +90,14 @@ export type Database = {
           valor: number
         }
         Update: {
+          boleto_url?: string | null
           client_id?: string
           created_at?: string
           data_cobranca?: string
           email_enviado?: boolean
           id?: string
           meses_restantes?: number | null
+          nf_url?: string | null
           organization_id?: string | null
           recorrente?: boolean
           status?: string

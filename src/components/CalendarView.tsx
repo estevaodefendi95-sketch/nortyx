@@ -5,7 +5,7 @@ import { useCategories } from "@/context/CategoriesContext";
 import { useTransactions } from "@/context/TransactionsContext";
 import { useOrganization } from "@/context/OrganizationContext";
 import { Badge } from "@/components/ui/badge";
-import { ChevronLeft, ChevronRight, CheckCircle2, Clock, AlertCircle, ArrowUp, ArrowDown, Pencil, Check, X, Scale, CalendarDays, Trash2, ChevronDown, ChevronUp as ChevronUpIcon, User } from "lucide-react";
+import { ChevronLeft, ChevronRight, CheckCircle2, Clock, AlertCircle, ArrowUp, ArrowDown, Pencil, Check, X, Scale, CalendarDays, Trash2, ChevronDown, ChevronUp as ChevronUpIcon, User, Paperclip, FileText } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
@@ -56,6 +56,8 @@ const CalendarView = ({ initialMonth, selectedYear: propYear, isViewer = false }
     data_cobranca: string;
     status: string;
     client_name: string;
+    boleto_url: string | null;
+    nf_url: string | null;
   }
   const [billingCharges, setBillingCharges] = useState<BillingChargeWithClient[]>([]);
 
@@ -69,7 +71,7 @@ const CalendarView = ({ initialMonth, selectedYear: propYear, isViewer = false }
     const fetchBillingCharges = async () => {
       const { data } = await supabase
         .from("billing_charges")
-        .select("id, valor, data_cobranca, status, billing_clients(nome)")
+        .select("id, valor, data_cobranca, status, boleto_url, nf_url, billing_clients(nome)")
         .eq("organization_id", orgId)
         .order("data_cobranca");
       if (!cancelled && data) {
@@ -80,6 +82,8 @@ const CalendarView = ({ initialMonth, selectedYear: propYear, isViewer = false }
             data_cobranca: c.data_cobranca,
             status: c.status,
             client_name: c.billing_clients?.nome || "Cliente",
+            boleto_url: c.boleto_url ?? null,
+            nf_url: c.nf_url ?? null,
           }))
         );
       }
@@ -582,6 +586,8 @@ const CalendarView = ({ initialMonth, selectedYear: propYear, isViewer = false }
                             <Badge variant="outline" className={`text-[9px] px-1.5 py-0 ${charge.status === "paga" ? "border-primary/30 text-primary" : charge.status === "atrasado" ? "border-destructive/30 text-destructive" : "border-warning/30 text-warning"}`}>
                               {charge.status === "paga" ? "Pago" : charge.status === "atrasado" ? "Atrasado" : "Pendente"}
                             </Badge>
+                            {charge.boleto_url && (<a href={charge.boleto_url} target="_blank" rel="noopener noreferrer" title="Boleto" className="text-muted-foreground hover:text-primary"><Paperclip className="w-3 h-3" /></a>)}
+                            {charge.nf_url && (<a href={charge.nf_url} target="_blank" rel="noopener noreferrer" title="Nota fiscal" className="text-muted-foreground hover:text-primary"><FileText className="w-3 h-3" /></a>)}
                           </div>
                         </div>
                       ))}
@@ -856,6 +862,8 @@ const CalendarView = ({ initialMonth, selectedYear: propYear, isViewer = false }
                             <Badge variant="outline" className={`text-[9px] px-1.5 py-0 ${charge.status === "paga" ? "border-primary/30 text-primary" : charge.status === "atrasado" ? "border-destructive/30 text-destructive" : "border-warning/30 text-warning"}`}>
                               {charge.status === "paga" ? "Pago" : charge.status === "atrasado" ? "Atrasado" : "Pendente"}
                             </Badge>
+                            {charge.boleto_url && (<a href={charge.boleto_url} target="_blank" rel="noopener noreferrer" title="Boleto" className="text-muted-foreground hover:text-primary"><Paperclip className="w-3 h-3" /></a>)}
+                            {charge.nf_url && (<a href={charge.nf_url} target="_blank" rel="noopener noreferrer" title="Nota fiscal" className="text-muted-foreground hover:text-primary"><FileText className="w-3 h-3" /></a>)}
                           </div>
                         </div>
                       ))}

@@ -76,6 +76,8 @@ Deno.serve(async (req) => {
                 valor,
                 dataCobranca: charge.data_cobranca,
                 formaCobranca: formaLabel,
+                boletoUrl: (charge as any).boleto_url || null,
+                nfUrl: (charge as any).nf_url || null,
               },
             },
           })

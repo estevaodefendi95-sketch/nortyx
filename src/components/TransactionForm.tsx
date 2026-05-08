@@ -13,6 +13,8 @@ import {
   ContextMenuTrigger,
 } from "@/components/ui/context-menu";
 import { parseFile, extractPDFText, parsePDFText, type ParsedBankEntry } from "@/lib/bankParser";
+import { uploadChargeAttachment, validateAttachment } from "@/lib/billingAttachments";
+import { Paperclip } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -141,6 +143,8 @@ const TransactionForm = () => {
   });
   const [existingClients, setExistingClients] = useState<{ id: string; nome: string; email: string; telefone: string | null; forma_cobranca: string | null }[]>([]);
   const [clientPopoverOpen, setClientPopoverOpen] = useState(false);
+  const [boletoFile, setBoletoFile] = useState<File | null>(null);
+  const [nfFile, setNfFile] = useState<File | null>(null);
 
   // Fetch existing billing clients (scoped to active organization) when billing section opens
   useEffect(() => {
@@ -653,10 +657,32 @@ const TransactionForm = () => {
               organization_id: orgId,
             });
           }
-          const { error: chargesError } = await supabase.from("billing_charges").insert(chargesData);
+          const { data: insertedCharges, error: chargesError } = await supabase
+            .from("billing_charges")
+            .insert(chargesData)
+            .select("id, data_cobranca");
           if (chargesError) throw chargesError;
 
+          // Upload attachments to the FIRST charge (chronologically earliest)
+          if (insertedCharges && insertedCharges.length && (boletoFile || nfFile)) {
+            const sorted = [...insertedCharges].sort((a, b) => {
+              const [da, ma, ya] = (a.data_cobranca as string).split("/").map(Number);
+              const [db, mb, yb] = (b.data_cobranca as string).split("/").map(Number);
+              return new Date(ya, ma - 1, da).getTime() - new Date(yb, mb - 1, db).getTime();
+            });
+            const firstId = sorted[0].id as string;
+            try {
+              if (boletoFile) await uploadChargeAttachment(orgId, firstId, "boleto", boletoFile);
+              if (nfFile) await uploadChargeAttachment(orgId, firstId, "nf", nfFile);
+            } catch (upErr: any) {
+              console.error("Erro ao subir anexo:", upErr);
+              toast({ title: "Cobrança criada, mas anexo falhou", description: upErr?.message || "Tente anexar novamente na área de Clientes.", variant: "destructive" });
+            }
+          }
+
           toast({ title: "Cliente vinculado à cobrança", description: `${billingClient.nome} — ${chargeCount} cobrança(s) criada(s).` });
+          setBoletoFile(null);
+          setNfFile(null);
         } catch (err: any) {
           console.error("Erro ao salvar cliente de cobrança:", err);
           toast({
@@ -1394,6 +1420,47 @@ const TransactionForm = () => {
                           <p className="text-[10px] text-muted-foreground mt-0.5">Mín. 1, máx. 60 meses</p>
                         </div>
                       )}
+
+                      <div className="grid grid-cols-2 gap-2 pt-2 border-t border-border/40">
+                        {(["boleto", "nf"] as const).map((kind) => {
+                          const file = kind === "boleto" ? boletoFile : nfFile;
+                          const setter = kind === "boleto" ? setBoletoFile : setNfFile;
+                          const label = kind === "boleto" ? "Boleto" : "Nota fiscal";
+                          return (
+                            <div key={kind}>
+                              <Label className="text-xs flex items-center gap-1.5">
+                                <Paperclip className="w-3 h-3" /> {label}
+                                {billingClient.recorrente && <span className="text-[9px] text-muted-foreground">(1ª cobrança)</span>}
+                              </Label>
+                              <label className="mt-1 flex items-center gap-2 text-xs cursor-pointer rounded-md border border-input px-2 py-1.5 hover:bg-accent/40">
+                                <Upload className="w-3 h-3" />
+                                <span className="truncate flex-1">{file?.name || "Selecionar arquivo (PDF, JPG, PNG)"}</span>
+                                <input
+                                  type="file"
+                                  accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png"
+                                  className="hidden"
+                                  onChange={(e) => {
+                                    const f = e.target.files?.[0];
+                                    if (!f) return;
+                                    const err = validateAttachment(f);
+                                    if (err) {
+                                      toast({ title: "Arquivo inválido", description: err, variant: "destructive" });
+                                      e.target.value = "";
+                                      return;
+                                    }
+                                    setter(f);
+                                  }}
+                                />
+                              </label>
+                              {file && (
+                                <button type="button" className="text-[10px] text-muted-foreground hover:text-destructive mt-0.5" onClick={() => setter(null)}>
+                                  Remover
+                                </button>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
                     </div>
                   )}
                 </div>

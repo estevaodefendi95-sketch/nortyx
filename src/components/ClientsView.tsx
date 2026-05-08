@@ -8,7 +8,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ChevronDown, ChevronUp, Check, Pencil, X, Mail, Phone, CreditCard, Repeat, Trash2, Send } from "lucide-react";
+import { ChevronDown, ChevronUp, Check, Pencil, X, Mail, Phone, CreditCard, Repeat, Trash2, Send, Paperclip, FileText, Upload } from "lucide-react";
+import { uploadChargeAttachment, removeChargeAttachment, validateAttachment } from "@/lib/billingAttachments";
 
 const MONTHS_FULL = [
   "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
@@ -32,6 +33,8 @@ interface BillingCharge {
   status: string;
   email_enviado: boolean;
   meses_restantes: number | null;
+  boleto_url: string | null;
+  nf_url: string | null;
 }
 
 interface ClientsViewProps {
@@ -244,6 +247,28 @@ const ClientsView = ({ selectedMonths, selectedYear, isViewer = false }: Clients
     toast({ title: "E-mail processado", description: data?.message || "Cobrança processada" });
     // Refresh charge status
     setCharges((prev) => prev.map((c) => (c.id === chargeId ? { ...c, email_enviado: true, status: "enviada" } : c)));
+  };
+
+  const handleAttachmentChange = async (chargeId: string, kind: "boleto" | "nf", file: File | null) => {
+    if (!organization?.id) return;
+    const charge = charges.find((c) => c.id === chargeId);
+    if (!charge) return;
+    try {
+      if (file) {
+        const err = validateAttachment(file);
+        if (err) { toast({ title: "Arquivo inválido", description: err, variant: "destructive" }); return; }
+        toast({ title: "Enviando anexo..." });
+        const url = await uploadChargeAttachment(organization.id, chargeId, kind, file);
+        setCharges((prev) => prev.map((c) => c.id === chargeId ? { ...c, [kind === "boleto" ? "boleto_url" : "nf_url"]: url } as BillingCharge : c));
+        toast({ title: "Anexo enviado" });
+      } else {
+        await removeChargeAttachment(organization.id, chargeId, kind, kind === "boleto" ? charge.boleto_url : charge.nf_url);
+        setCharges((prev) => prev.map((c) => c.id === chargeId ? { ...c, [kind === "boleto" ? "boleto_url" : "nf_url"]: null } as BillingCharge : c));
+        toast({ title: "Anexo removido" });
+      }
+    } catch (e: any) {
+      toast({ title: "Erro no anexo", description: e?.message || "Tente novamente.", variant: "destructive" });
+    }
   };
 
   const startEdit = (client: BillingClient) => {
@@ -488,6 +513,36 @@ const ClientsView = ({ selectedMonths, selectedYear, isViewer = false }: Clients
                                     />
                                   </div>
                                 )}
+                                <div className="grid grid-cols-2 gap-2 pt-2 border-t border-border/40">
+                                  {(["boleto", "nf"] as const).map((kind) => {
+                                    const url = kind === "boleto" ? charge.boleto_url : charge.nf_url;
+                                    const label = kind === "boleto" ? "Boleto" : "Nota fiscal";
+                                    return (
+                                      <div key={kind}>
+                                        <Label className="text-xs flex items-center gap-1.5">
+                                          {kind === "boleto" ? <Paperclip className="w-3 h-3" /> : <FileText className="w-3 h-3" />} {label}
+                                        </Label>
+                                        {url ? (
+                                          <div className="flex items-center gap-1 mt-1">
+                                            <a href={url} target="_blank" rel="noopener noreferrer" className="text-xs text-primary underline flex-1 truncate">Visualizar</a>
+                                            <label className="text-[10px] cursor-pointer text-muted-foreground hover:text-foreground" title="Substituir">
+                                              <Upload className="w-3 h-3" />
+                                              <input type="file" accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) handleAttachmentChange(charge.id, kind, f); e.target.value = ""; }} />
+                                            </label>
+                                            <button type="button" className="text-[10px] text-destructive" onClick={() => handleAttachmentChange(charge.id, kind, null)} title="Remover">
+                                              <X className="w-3 h-3" />
+                                            </button>
+                                          </div>
+                                        ) : (
+                                          <label className="mt-1 flex items-center gap-1.5 text-xs cursor-pointer rounded border border-input px-2 py-1 hover:bg-accent/40">
+                                            <Upload className="w-3 h-3" /> Anexar
+                                            <input type="file" accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) handleAttachmentChange(charge.id, kind, f); e.target.value = ""; }} />
+                                          </label>
+                                        )}
+                                      </div>
+                                    );
+                                  })}
+                                </div>
                                 <div className="flex gap-2">
                                   <Button size="sm" onClick={saveChargeEdit} className="gap-1"><Check className="w-3 h-3" /> Salvar</Button>
                                   <Button size="sm" variant="outline" onClick={() => setEditingCharge(null)}><X className="w-3 h-3" /></Button>
@@ -504,6 +559,12 @@ const ClientsView = ({ selectedMonths, selectedYear, isViewer = false }: Clients
                                 {charge.recorrente && <Repeat className="w-3 h-3 text-muted-foreground" />}
                                 {charge.recorrente && charge.meses_restantes != null && charge.meses_restantes > 0 && (
                                   <Badge variant="outline" className="text-[9px] px-1.5 py-0">{charge.meses_restantes} {charge.meses_restantes === 1 ? "mês" : "meses"}</Badge>
+                                )}
+                                {charge.boleto_url && (
+                                  <a href={charge.boleto_url} target="_blank" rel="noopener noreferrer" title="Boleto" className="text-muted-foreground hover:text-primary"><Paperclip className="w-3 h-3" /></a>
+                                )}
+                                {charge.nf_url && (
+                                  <a href={charge.nf_url} target="_blank" rel="noopener noreferrer" title="Nota fiscal" className="text-muted-foreground hover:text-primary"><FileText className="w-3 h-3" /></a>
                                 )}
                               </div>
                               <div className="flex items-center gap-1.5">
