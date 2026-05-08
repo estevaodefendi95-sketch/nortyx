@@ -220,7 +220,7 @@ const Index = () => {
 
               <ThemeToggle />
 
-              {isAdmin && (
+              {!authLoading && isAdmin && (
                 <>
                   <button
                     onClick={() => navigate("/admin/history")}
@@ -242,7 +242,7 @@ const Index = () => {
                 </>
               )}
 
-              {isOrgOwner && (
+              {!bootLoading && isOrgOwner && (
                 <button
                   onClick={() => navigate("/settings")}
                   className="p-2 rounded-lg hover:bg-secondary transition-colors flex-shrink-0"
