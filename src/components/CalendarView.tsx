@@ -586,6 +586,8 @@ const CalendarView = ({ initialMonth, selectedYear: propYear, isViewer = false }
                             <Badge variant="outline" className={`text-[9px] px-1.5 py-0 ${charge.status === "paga" ? "border-primary/30 text-primary" : charge.status === "atrasado" ? "border-destructive/30 text-destructive" : "border-warning/30 text-warning"}`}>
                               {charge.status === "paga" ? "Pago" : charge.status === "atrasado" ? "Atrasado" : "Pendente"}
                             </Badge>
+                            {charge.boleto_url && (<a href={charge.boleto_url} target="_blank" rel="noopener noreferrer" title="Boleto" className="text-muted-foreground hover:text-primary"><Paperclip className="w-3 h-3" /></a>)}
+                            {charge.nf_url && (<a href={charge.nf_url} target="_blank" rel="noopener noreferrer" title="Nota fiscal" className="text-muted-foreground hover:text-primary"><FileText className="w-3 h-3" /></a>)}
                           </div>
                         </div>
                       ))}
@@ -860,6 +862,8 @@ const CalendarView = ({ initialMonth, selectedYear: propYear, isViewer = false }
                             <Badge variant="outline" className={`text-[9px] px-1.5 py-0 ${charge.status === "paga" ? "border-primary/30 text-primary" : charge.status === "atrasado" ? "border-destructive/30 text-destructive" : "border-warning/30 text-warning"}`}>
                               {charge.status === "paga" ? "Pago" : charge.status === "atrasado" ? "Atrasado" : "Pendente"}
                             </Badge>
+                            {charge.boleto_url && (<a href={charge.boleto_url} target="_blank" rel="noopener noreferrer" title="Boleto" className="text-muted-foreground hover:text-primary"><Paperclip className="w-3 h-3" /></a>)}
+                            {charge.nf_url && (<a href={charge.nf_url} target="_blank" rel="noopener noreferrer" title="Nota fiscal" className="text-muted-foreground hover:text-primary"><FileText className="w-3 h-3" /></a>)}
                           </div>
                         </div>
                       ))}
