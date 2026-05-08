@@ -549,53 +549,105 @@ const AdminApproval = () => {
                   })}
                 </div>
                 {/* Empresas controls */}
-                {allOrgs.length > 0 && (
-                  <div className="flex items-center gap-1.5 flex-wrap pt-1 border-t border-border/50">
-                    <Building2 className="w-3 h-3 text-muted-foreground" />
-                    <span className="text-[10px] text-muted-foreground mr-1">Empresas:</span>
-                    {allOrgs.map((org) => {
-                      const isMember = user.organizationIds?.includes(org.id);
-                      const isPrimary = user.primaryOrgId === org.id;
-                      return (
-                        <div
-                          key={org.id}
-                          className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full border text-[10px] transition-colors ${
-                            isMember
-                              ? "bg-primary/10 border-primary/40 text-foreground"
-                              : "bg-transparent border-border text-muted-foreground hover:bg-muted/30"
-                          }`}
-                        >
-                          {isMember && (
-                            <button
-                              type="button"
-                              onClick={() => !isPrimary && handleSetPrimaryOrg(user, org.id)}
-                              disabled={isPrimary || actionLoading === user.id}
-                              title={isPrimary ? "Empresa principal" : "Definir como principal"}
-                              className="flex items-center"
-                            >
-                              <Star
-                                className={`w-3 h-3 ${isPrimary ? "fill-primary text-primary" : "text-muted-foreground hover:text-primary"}`}
-                              />
-                            </button>
-                          )}
-                          <button
-                            type="button"
-                            onClick={() => handleToggleOrg(user, org.id)}
-                            disabled={actionLoading === user.id}
-                            className="flex items-center gap-1"
-                          >
-                            <span
-                              className="inline-block w-1.5 h-1.5 rounded-full"
-                              style={{ backgroundColor: org.primary_color || "hsl(var(--muted-foreground))" }}
-                            />
-                            {org.name}
-                            {isMember && <Check className="w-2.5 h-2.5 text-primary" />}
-                          </button>
+                {allOrgs.length > 0 && (() => {
+                  const memberOrgs = allOrgs.filter((o) => user.organizationIds?.includes(o.id));
+                  const availableToAdd = allOrgs.filter((o) => !user.organizationIds?.includes(o.id));
+                  return (
+                    <div className="pt-2 border-t border-border/50 space-y-1.5">
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-1.5">
+                          <Building2 className="w-3 h-3 text-muted-foreground" />
+                          <span className="text-[10px] text-muted-foreground uppercase tracking-wider">Empresas</span>
                         </div>
-                      );
-                    })}
-                  </div>
-                )}
+                        <Popover>
+                          <PopoverTrigger asChild>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              className="h-6 px-2 text-[10px] gap-1"
+                              disabled={availableToAdd.length === 0 || actionLoading === user.id}
+                            >
+                              <Plus className="w-3 h-3" />
+                              {availableToAdd.length === 0 ? "Todas adicionadas" : "Adicionar"}
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent align="end" className="w-60 p-0">
+                            <Command>
+                              <CommandInput placeholder="Buscar empresa..." className="h-8" />
+                              <CommandList>
+                                <CommandEmpty>Nenhuma empresa</CommandEmpty>
+                                <CommandGroup>
+                                  {availableToAdd.map((org) => (
+                                    <CommandItem
+                                      key={org.id}
+                                      value={org.name}
+                                      onSelect={() => handleToggleOrg(user, org.id)}
+                                      className="text-xs gap-2"
+                                    >
+                                      <span
+                                        className="inline-block w-2 h-2 rounded-full flex-shrink-0"
+                                        style={{ backgroundColor: org.primary_color || "hsl(var(--muted-foreground))" }}
+                                      />
+                                      <span className="truncate">{org.name}</span>
+                                    </CommandItem>
+                                  ))}
+                                </CommandGroup>
+                              </CommandList>
+                            </Command>
+                          </PopoverContent>
+                        </Popover>
+                      </div>
+                      {memberOrgs.length === 0 ? (
+                        <p className="text-[10px] text-muted-foreground italic">Nenhuma empresa vinculada</p>
+                      ) : (
+                        <div className="space-y-1">
+                          {memberOrgs.map((org) => {
+                            const isPrimary = user.primaryOrgId === org.id;
+                            const canRemove = (user.organizationIds?.length || 0) > 1;
+                            return (
+                              <div
+                                key={org.id}
+                                className={`flex items-center gap-2 px-2 py-1.5 rounded-md border text-xs ${
+                                  isPrimary ? "bg-primary/5 border-primary/30" : "bg-muted/20 border-border"
+                                }`}
+                              >
+                                <button
+                                  type="button"
+                                  onClick={() => !isPrimary && handleSetPrimaryOrg(user, org.id)}
+                                  disabled={isPrimary || actionLoading === user.id}
+                                  title={isPrimary ? "Empresa principal" : "Definir como principal"}
+                                  className="flex items-center"
+                                >
+                                  <Star
+                                    className={`w-3.5 h-3.5 ${isPrimary ? "fill-primary text-primary" : "text-muted-foreground hover:text-primary"}`}
+                                  />
+                                </button>
+                                <span
+                                  className="inline-block w-2 h-2 rounded-full flex-shrink-0"
+                                  style={{ backgroundColor: org.primary_color || "hsl(var(--muted-foreground))" }}
+                                />
+                                <span className="truncate flex-1 text-foreground">{org.name}</span>
+                                {isPrimary && (
+                                  <span className="text-[9px] uppercase tracking-wider text-primary font-medium">Principal</span>
+                                )}
+                                <button
+                                  type="button"
+                                  onClick={() => handleToggleOrg(user, org.id)}
+                                  disabled={!canRemove || actionLoading === user.id}
+                                  title={canRemove ? "Remover empresa" : "Usuário precisa ter ao menos uma empresa"}
+                                  className="p-0.5 rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-muted-foreground"
+                                >
+                                  <X className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
               </div>
                 ))}
               </div>
