@@ -657,10 +657,32 @@ const TransactionForm = () => {
               organization_id: orgId,
             });
           }
-          const { error: chargesError } = await supabase.from("billing_charges").insert(chargesData);
+          const { data: insertedCharges, error: chargesError } = await supabase
+            .from("billing_charges")
+            .insert(chargesData)
+            .select("id, data_cobranca");
           if (chargesError) throw chargesError;
 
+          // Upload attachments to the FIRST charge (chronologically earliest)
+          if (insertedCharges && insertedCharges.length && (boletoFile || nfFile)) {
+            const sorted = [...insertedCharges].sort((a, b) => {
+              const [da, ma, ya] = (a.data_cobranca as string).split("/").map(Number);
+              const [db, mb, yb] = (b.data_cobranca as string).split("/").map(Number);
+              return new Date(ya, ma - 1, da).getTime() - new Date(yb, mb - 1, db).getTime();
+            });
+            const firstId = sorted[0].id as string;
+            try {
+              if (boletoFile) await uploadChargeAttachment(orgId, firstId, "boleto", boletoFile);
+              if (nfFile) await uploadChargeAttachment(orgId, firstId, "nf", nfFile);
+            } catch (upErr: any) {
+              console.error("Erro ao subir anexo:", upErr);
+              toast({ title: "Cobrança criada, mas anexo falhou", description: upErr?.message || "Tente anexar novamente na área de Clientes.", variant: "destructive" });
+            }
+          }
+
           toast({ title: "Cliente vinculado à cobrança", description: `${billingClient.nome} — ${chargeCount} cobrança(s) criada(s).` });
+          setBoletoFile(null);
+          setNfFile(null);
         } catch (err: any) {
           console.error("Erro ao salvar cliente de cobrança:", err);
           toast({
