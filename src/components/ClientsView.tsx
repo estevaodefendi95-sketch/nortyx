@@ -33,6 +33,8 @@ interface BillingCharge {
   status: string;
   email_enviado: boolean;
   meses_restantes: number | null;
+  boleto_url: string | null;
+  nf_url: string | null;
 }
 
 interface ClientsViewProps {
