@@ -36,7 +36,7 @@ serve(async (req) => {
 
       const testPayload = JSON.stringify({
         title: "Teste de notificação",
-        body: "Paggio Financeiro - Notificações push funcionando! ✅",
+        body: "nortyx - Notificações push funcionando! ✅",
       });
 
       let sent = 0;
