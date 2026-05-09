@@ -115,7 +115,7 @@ const Auth = () => {
           {branding?.logo_url && (
             <img src={branding.logo_url} alt={branding.name} className="w-16 h-16 mx-auto rounded-lg object-cover" />
           )}
-          <h1 className="text-3xl font-display font-bold text-secondary-foreground">{branding?.name || "PAGGIO"}</h1>
+          <h1 className="text-3xl font-display font-bold text-secondary-foreground">{branding?.name || "nortyx"}</h1>
           <p className="text-muted-foreground text-sm">
             {resetMode ? "Recuperar senha" : isLogin ? "Entre na sua conta" : "Crie sua conta"}
           </p>

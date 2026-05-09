@@ -27,9 +27,9 @@ export default defineConfig(({ mode }) => ({
         importScripts: ['/sw-push.js'],
       },
       manifest: {
-        name: "Paggio Financeiro",
-        short_name: "Paggio",
-        description: "Controle financeiro e fluxo de caixa do restaurante Paggio",
+        name: "nortyx",
+        short_name: "nortyx",
+        description: "Controle financeiro e fluxo de caixa",
         theme_color: "#0f1318",
         background_color: "#0f1318",
         display: "standalone",
