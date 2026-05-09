@@ -1,43 +1,54 @@
-# Polir carregamento inicial da tela principal
-
 ## Problema
-Ao abrir `/`, há um "flash" onde o cabeçalho aparece com nome de empresa vazio, valores em R$ 0,00 e abas piscando antes dos dados de auth/organização/transações chegarem. Isso parece um bug de "layout antigo".
 
-## Causa
-- `AuthProvider`, `OrganizationProvider` e `TransactionsProvider` carregam dados em sequência (auth → org → transactions).
-- A `Index` renderiza o layout completo imediatamente, mostrando estados vazios (logo placeholder, nome em branco, valores R$ 0,00, contadores zerados) antes desses providers terminarem.
-- O switcher de empresas (`Building2`), o badge de notificações e os ícones de admin aparecem depois — causando "saltos" visuais.
+A segunda imagem (layout antigo: switcher de empresa em formato de Select largo, sem ícones de admin) é o bundle anterior que o **Service Worker do PWA** está servindo do cache. Quando o app é aberto, o SW entrega os assets antigos primeiro; depois detecta uma nova versão, mas só aplica na próxima visita — por isso o usuário vê o layout antigo "piscar" antes do novo aparecer.
 
-## Solução: skeletons consistentes durante o boot
+Hoje o `vite.config.ts` usa `VitePWA({ registerType: "autoUpdate", skipWaiting: true, clientsClaim: true })`, mas o `src/main.tsx` **não chama `registerSW`** com handler de update. Resultado: o novo SW assume controle, mas a página já carregou com os assets antigos e nada força o reload.
 
-Manter o layout atual, apenas adicionando placeholders animados (`<Skeleton/>` do shadcn) enquanto `loading` for verdadeiro nos providers.
+## Solução (instantânea, sem mudar layout)
 
-### Mudanças
+### 1. `src/main.tsx` — registrar SW com auto-reload
 
-**1. `src/pages/Index.tsx`**
-- Ler `loading` de `useAuth()` e de `useOrganization()`, e `isLoading` de `useTransactions()`.
-- Definir `bootLoading = authLoading || orgLoading` (essencial pra evitar piscar do header).
-- Definir `dataLoading = txLoading` (afeta valores e conteúdo das views).
-- No header, quando `bootLoading`:
-  - Logo: manter círculo, sem ícone de câmera placeholder (já neutro).
-  - Nome da empresa: substituir por `<Skeleton className="h-6 w-32" />`.
-  - Botão de switcher de empresa: ocultar (já que depende de `availableOrganizations`).
-  - Ícones de admin/settings: ocultar até `authLoading` terminar (evita aparecer/sumir).
-- Linha de resumo (income/expense/saldo): quando `dataLoading || bootLoading`, mostrar 3 `<Skeleton className="h-4 w-24" />` no lugar dos valores.
-- Abas (desktop) e bottom nav (mobile): renderizar normalmente já que dependem só de `visibleTabs` (que não depende de fetch crítico). Se `visibleTabs` ainda não carregou, mostrar `<Skeleton className="h-9 w-full" />` no lugar da barra de abas.
-- Conteúdo principal (`<main>`): se `bootLoading`, mostrar bloco de skeleton genérico (3-4 cards) em vez de renderizar `DadosView` com dados vazios.
+Importar `registerSW` do `virtual:pwa-register` e disparar `window.location.reload()` assim que uma nova versão estiver pronta. Também checar atualização periódica (a cada 60s) enquanto a aba está aberta:
 
-**2. `src/hooks/useTabVisibility.ts`** (verificar se expõe `loading`)
-- Se não expõe, adicionar flag `loading` para alinhar com o padrão.
+```ts
+import { registerSW } from "virtual:pwa-register";
 
-**3. Animação suave**
-- Envolver header e main num wrapper com `transition-opacity` para fade-in quando `bootLoading` terminar.
+const updateSW = registerSW({
+  immediate: true,
+  onNeedRefresh() {
+    updateSW(true); // aplica skipWaiting e recarrega
+  },
+  onRegisteredSW(_swUrl, registration) {
+    if (registration) {
+      setInterval(() => registration.update(), 60_000);
+    }
+  },
+});
+```
 
-### Fora de escopo
-- Lógica de auth, RLS, organizações ou transações.
-- Redesign visual: manter cores, tipografia, espaçamentos atuais.
-- Otimização de queries (não pedido).
+### 2. `src/vite-env.d.ts` — adicionar referência de tipos do plugin
 
-### Verificação
-- Recarregar `/` com cache limpo: header deve mostrar skeletons → fade para conteúdo real, sem nome vazio nem valores R$ 0,00 piscando.
-- Trocar de empresa: switcher mantém comportamento atual.
+```ts
+/// <reference types="vite-plugin-pwa/client" />
+```
+
+### 3. `vite.config.ts` — manter `autoUpdate` e garantir limpeza
+
+Já está com `cleanupOutdatedCaches: true`, `skipWaiting: true`, `clientsClaim: true`. Adicionar `navigateFallback: 'index.html'` apenas se necessário (manter como está se já funciona). Sem mais mudanças aqui.
+
+## Resultado esperado
+
+- Usuário que já tinha o app aberto/instalado abre a página → SW antigo entrega o shell em cache → em paralelo busca o novo bundle → assim que novo SW está "waiting", `updateSW(true)` é chamado → página recarrega automaticamente para a versão nova **sem o flash do layout antigo persistir**.
+- Em sessões longas, a checagem a cada 60s garante que novos deploys sejam aplicados sem o usuário precisar refresh manual.
+
+## Fora de escopo
+
+- Mudanças de UI/cores/tabs.
+- Lógica de autenticação, organizações, transações.
+- Skeletons (já implementados na resposta anterior).
+
+## Verificação
+
+1. Build + abrir preview com o app já instalado/cache antigo.
+2. Confirmar que o reload automático acontece **uma vez** e mostra direto o layout novo (Building2 icon compacto + ícones de admin), sem piscar o Select largo antigo.
+3. Console deve mostrar log de SW atualizado; sem loops de reload.
