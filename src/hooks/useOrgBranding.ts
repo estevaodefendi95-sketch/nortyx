@@ -43,7 +43,7 @@ export function useOrgBranding() {
 
   return {
     logoUrl: organization?.logo_url ?? null,
-    companyName: organization?.name ?? "PAGGIO",
+    companyName: organization?.name ?? "nortyx",
     primaryColor: organization?.primary_color ?? "#3B82F6",
   };
 }
