@@ -103,6 +103,45 @@ export function parsePDFText(text: string): ParsedBankEntry[] {
     });
   }
 
+  // Pattern 2: "DD/MM/YYYY <desc> <signed value> <saldo>" — Sicredi e similares
+  // Ex.: "11/05/2026 PAGAMENTO PIX ... PIX_DEB -4.000,00 8.007,17"
+  const sicrediRegex = /(\d{2})\/(\d{2})\/(\d{4})\s+([\s\S]*?)\s+(-?\d{1,3}(?:\.\d{3})*,\d{2})\s+(-?\d{1,3}(?:\.\d{3})*,\d{2})(?=\s|$)/g;
+
+  let m2;
+  while ((m2 = sicrediRegex.exec(text)) !== null) {
+    const day = m2[1];
+    const month = m2[2];
+    const yr = m2[3];
+    let desc = m2[4].replace(/\s+/g, " ").trim();
+    const rawValue = m2[5];
+
+    if (/^SALDO/i.test(desc) && desc.length < 30) continue;
+    if (desc.length < 2) continue;
+
+    const isNegative = rawValue.startsWith("-");
+    const valor = parseFloat(rawValue.replace(/^-/, "").replace(/\./g, "").replace(",", "."));
+    if (isNaN(valor) || valor === 0) continue;
+
+    const data = `${yr}-${month}-${day}`;
+    const tipo: TransactionType = isNegative ? "saida" : "entrada";
+
+    const dedupKey = `${data}-${desc}-${valor}-${tipo}`;
+    if (seenIds.has(dedupKey)) continue;
+    seenIds.add(dedupKey);
+
+    entries.push({
+      id: Date.now() + Math.random() * 100000,
+      empresa: desc,
+      valor,
+      data,
+      tipo,
+      categoria: "O",
+      subcategoria: null,
+      pago: true,
+      approved: false,
+    });
+  }
+
   return entries;
 }
 
