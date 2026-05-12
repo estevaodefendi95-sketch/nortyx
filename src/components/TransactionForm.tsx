@@ -230,12 +230,10 @@ const TransactionForm = () => {
     return `${y}-${m}-${d}`;
   };
 
-  const finalizeImport = (
-    enriched: ParsedBankEntry[],
+  const commitImport = (
+    finalEntries: ParsedBankEntry[],
     scheduledUnpaidToReschedule: Array<{ id: number; empresa: string; valor: number; data: string; categoria: string; subcategoria: string | null }>,
-    skipEntryIds: Set<number> = new Set(),
   ) => {
-    // Reschedule approved unpaid scheduled bills (move to next day)
     if (scheduledUnpaidToReschedule.length > 0) {
       scheduledUnpaidToReschedule.forEach((t) => {
         const [day, month, year] = t.data.split("/").map(Number);
@@ -258,12 +256,109 @@ const TransactionForm = () => {
       });
     }
 
-    const finalEntries = skipEntryIds.size > 0 ? enriched.filter((e) => !skipEntryIds.has(e.id)) : enriched;
     setBankEntries((prev) => [...prev, ...finalEntries]);
     setShowImportModeDialog(false);
     setPendingParsedEntries([]);
     setPendingImportPeriod(null);
     setImportFilter("all");
+  };
+
+  const detectMatches = async (entries: ParsedBankEntry[]) => {
+    if (!orgId) return;
+
+    // Charges: entradas vs billing_charges pendentes/atrasados
+    const entradas = entries.filter((e) => e.tipo === "entrada");
+    if (entradas.length > 0) {
+      const { data: charges } = await supabase
+        .from("billing_charges")
+        .select("id, valor, data_cobranca, client_id, status")
+        .eq("organization_id", orgId)
+        .in("status", ["pendente", "atrasado"]);
+
+      if (charges && charges.length > 0) {
+        const clientIds = Array.from(new Set(charges.map((c: any) => c.client_id)));
+        const { data: clients } = await supabase
+          .from("billing_clients")
+          .select("id, nome")
+          .in("id", clientIds);
+        const clientMap = new Map<string, string>((clients || []).map((c: any) => [c.id, c.nome]));
+
+        const usedCharges = new Set<string>();
+        for (const e of entradas) {
+          const entryTs = new Date(e.data).getTime();
+          const cands = (charges as any[])
+            .filter((c) => !usedCharges.has(c.id) && Math.abs(Number(c.valor) - e.valor) < 0.01)
+            .map((c) => {
+              const cISO = c.data_cobranca && /^\d{4}-\d{2}-\d{2}$/.test(c.data_cobranca)
+                ? c.data_cobranca
+                : c.data_cobranca && /^\d{2}\/\d{2}\/\d{4}$/.test(c.data_cobranca)
+                  ? brToISO(c.data_cobranca)
+                  : null;
+              const diff = cISO ? Math.abs(new Date(cISO).getTime() - entryTs) : Number.MAX_SAFE_INTEGER;
+              return { c, diff };
+            })
+            .sort((a, b) => a.diff - b.diff);
+          if (cands.length > 0) {
+            const c = cands[0].c;
+            usedCharges.add(c.id);
+            e.matchedChargeId = c.id;
+            e.matchedChargeClient = clientMap.get(c.client_id) || "cliente";
+            e.matchedFrom = `Cobrança identificada: ${e.matchedChargeClient}`;
+          }
+        }
+      }
+    }
+
+    // Scheduled unpaid: saidas vs transactions agendado=true pago=false
+    const saidas = entries.filter((e) => e.tipo === "saida" && !e.matchedTransactionId);
+    if (saidas.length > 0) {
+      const usedTx = new Set<number>();
+      for (const e of saidas) {
+        const entryTs = new Date(e.data).getTime();
+        const cands = transactions
+          .filter(
+            (t) =>
+              t.tipo === "saida" &&
+              t.agendado &&
+              !t.pago &&
+              !usedTx.has(t.id) &&
+              Math.abs(t.valor - e.valor) < 0.01,
+          )
+          .map((t) => ({ t, diff: Math.abs(new Date(brToISO(t.data)).getTime() - entryTs) }))
+          .filter((x) => x.diff <= 30 * 86400000)
+          .sort((a, b) => a.diff - b.diff);
+        if (cands.length > 0) {
+          const t = cands[0].t;
+          usedTx.add(t.id);
+          e.matchedTransactionId = t.id;
+          e.matchedTransactionEmpresa = t.empresa;
+          e.matchedTransactionDate = t.data;
+          if (!e.matchedFrom) e.matchedFrom = `Agendado identificado: ${t.empresa} (${t.data})`;
+        }
+      }
+    }
+  };
+
+  const finalizeImport = async (
+    enriched: ParsedBankEntry[],
+    scheduledUnpaidToReschedule: Array<{ id: number; empresa: string; valor: number; data: string; categoria: string; subcategoria: string | null }>,
+    skipEntryIds: Set<number> = new Set(),
+  ) => {
+    const finalEntries = skipEntryIds.size > 0 ? enriched.filter((e) => !skipEntryIds.has(e.id)) : enriched;
+
+    // Detect matches against billing_charges + scheduled unpaid transactions
+    await detectMatches(finalEntries);
+
+    const matched = finalEntries.filter((e) => e.matchedChargeId || e.matchedTransactionId);
+    if (matched.length > 0) {
+      setPendingMatchEntries(finalEntries);
+      setPendingMatchReschedules(scheduledUnpaidToReschedule);
+      setApprovedMatchIds(new Set(matched.map((e) => e.id)));
+      setShowMatchApprovalDialog(true);
+      return;
+    }
+
+    commitImport(finalEntries, scheduledUnpaidToReschedule);
   };
 
   const applyImportEntries = (entries: ParsedBankEntry[], mode: "add" | "replace") => {
