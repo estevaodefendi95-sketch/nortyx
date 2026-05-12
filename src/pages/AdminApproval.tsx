@@ -2,11 +2,14 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
-import { Check, X, ArrowLeft, Loader2, Shield, Eye, Pencil, Bell, Clock, Send, LayoutGrid, Building2, Star, Plus } from "lucide-react";
+import { Check, X, ArrowLeft, Loader2, Shield, Eye, Pencil, Bell, Clock, Send, LayoutGrid, Building2, Star, Plus, UserPlus } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
+import { Switch } from "@/components/ui/switch";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 
@@ -47,8 +50,101 @@ const AdminApproval = () => {
   const [testPushLoading, setTestPushLoading] = useState(false);
   const [allOrgs, setAllOrgs] = useState<OrgInfo[]>([]);
   const [orgFilter, setOrgFilter] = useState<string>("all");
+
+  // Nova empresa
+  const [newOrgOpen, setNewOrgOpen] = useState(false);
+  const [newOrgName, setNewOrgName] = useState("");
+  const [newOrgSlug, setNewOrgSlug] = useState("");
+  const [newOrgColor, setNewOrgColor] = useState("#3B82F6");
+  const [newOrgSaving, setNewOrgSaving] = useState(false);
+
+  // Novo usuário
+  const [newUserOpen, setNewUserOpen] = useState(false);
+  const [nuEmail, setNuEmail] = useState("");
+  const [nuName, setNuName] = useState("");
+  const [nuPassword, setNuPassword] = useState("");
+  const [nuSendInvite, setNuSendInvite] = useState(false);
+  const [nuOrgId, setNuOrgId] = useState<string>("");
+  const [nuOrgRole, setNuOrgRole] = useState<"member" | "admin" | "owner">("member");
+  const [nuSystemRole, setNuSystemRole] = useState<"user" | "admin" | "viewer">("user");
+  const [nuTabs, setNuTabs] = useState<Record<string, boolean>>(() =>
+    Object.fromEntries(ALL_TABS.map((t) => [t.id, true]))
+  );
+  const [nuApproved, setNuApproved] = useState(true);
+  const [nuSaving, setNuSaving] = useState(false);
+
   const { toast } = useToast();
   const navigate = useNavigate();
+
+  const slugify = (s: string) =>
+    s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+      .replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 50);
+
+  const handleCreateOrg = async () => {
+    if (!newOrgName.trim()) return;
+    setNewOrgSaving(true);
+    try {
+      const slug = (newOrgSlug.trim() || slugify(newOrgName)) + "-" + Math.random().toString(36).slice(2, 6);
+      const { data, error } = await supabase
+        .from("organizations")
+        .insert({ name: newOrgName.trim(), slug, primary_color: newOrgColor } as any)
+        .select()
+        .single();
+      if (error) throw error;
+      toast({ title: "Empresa criada", description: newOrgName });
+      setAllOrgs((prev) => [...prev, {
+        id: data.id, name: data.name, primary_color: data.primary_color, logo_url: data.logo_url,
+      }].sort((a, b) => a.name.localeCompare(b.name)));
+      setNewOrgName(""); setNewOrgSlug(""); setNewOrgColor("#3B82F6");
+      setNewOrgOpen(false);
+    } catch (e: any) {
+      toast({ title: "Erro", description: e.message, variant: "destructive" });
+    }
+    setNewOrgSaving(false);
+  };
+
+  const handleCreateUser = async () => {
+    if (!nuEmail.trim() || !nuOrgId) {
+      toast({ title: "Preencha email e empresa", variant: "destructive" });
+      return;
+    }
+    if (!nuSendInvite && (!nuPassword || nuPassword.length < 6)) {
+      toast({ title: "Senha inválida", description: "Mínimo 6 caracteres ou marque enviar convite.", variant: "destructive" });
+      return;
+    }
+    setNuSaving(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("admin-create-user", {
+        body: {
+          email: nuEmail.trim(),
+          password: nuSendInvite ? undefined : nuPassword,
+          send_invite: nuSendInvite,
+          display_name: nuName.trim() || undefined,
+          organization_id: nuOrgId,
+          org_role: nuOrgRole,
+          system_role: nuSystemRole,
+          tab_visibility: nuTabs,
+          approved: nuApproved,
+        },
+      });
+      if (error) throw error;
+      if ((data as any)?.error) throw new Error((data as any).error);
+      toast({
+        title: nuSendInvite ? "Convite enviado" : "Usuário criado",
+        description: nuEmail,
+      });
+      setNuEmail(""); setNuName(""); setNuPassword(""); setNuSendInvite(false);
+      setNuOrgRole("member"); setNuSystemRole("user");
+      setNuTabs(Object.fromEntries(ALL_TABS.map((t) => [t.id, true])));
+      setNuApproved(true);
+      setNewUserOpen(false);
+      await fetchUsers();
+    } catch (e: any) {
+      toast({ title: "Erro", description: e.message, variant: "destructive" });
+    }
+    setNuSaving(false);
+  };
+
 
   // Fetch current push notification time from subscriptions
   useEffect(() => {
@@ -325,13 +421,21 @@ const AdminApproval = () => {
 
   return (
     <div className="min-h-screen bg-background p-4 max-w-2xl mx-auto space-y-6">
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-3 flex-wrap">
         <Button variant="ghost" size="icon" onClick={() => navigate("/")}>
           <ArrowLeft className="w-5 h-5" />
         </Button>
         <div className="flex items-center gap-2">
           <Shield className="w-5 h-5 text-primary" />
           <h1 className="text-xl font-bold text-foreground">Gerenciar Usuários</h1>
+        </div>
+        <div className="ml-auto flex items-center gap-2">
+          <Button size="sm" variant="outline" onClick={() => setNewOrgOpen(true)} className="gap-1">
+            <Building2 className="w-4 h-4" /> Nova Empresa
+          </Button>
+          <Button size="sm" onClick={() => { setNuOrgId(allOrgs[0]?.id || ""); setNewUserOpen(true); }} className="gap-1">
+            <UserPlus className="w-4 h-4" /> Criar Usuário
+          </Button>
         </div>
       </div>
 
@@ -671,6 +775,134 @@ const AdminApproval = () => {
           </section>
         </>
       )}
+
+      {/* Dialog: Nova Empresa */}
+      <Dialog open={newOrgOpen} onOpenChange={setNewOrgOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Nova Empresa</DialogTitle>
+            <DialogDescription>Crie uma empresa para vincular usuários.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="space-y-1.5">
+              <Label>Nome</Label>
+              <Input value={newOrgName} onChange={(e) => { setNewOrgName(e.target.value); if (!newOrgSlug) setNewOrgSlug(slugify(e.target.value)); }} placeholder="Minha Empresa" />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Slug</Label>
+              <Input value={newOrgSlug} onChange={(e) => setNewOrgSlug(slugify(e.target.value))} placeholder="minha-empresa" />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Cor principal</Label>
+              <div className="flex items-center gap-2">
+                <input type="color" value={newOrgColor} onChange={(e) => setNewOrgColor(e.target.value)} className="w-10 h-10 rounded border border-border cursor-pointer" />
+                <Input value={newOrgColor} onChange={(e) => setNewOrgColor(e.target.value)} className="w-32" />
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setNewOrgOpen(false)}>Cancelar</Button>
+            <Button onClick={handleCreateOrg} disabled={newOrgSaving || !newOrgName.trim()}>
+              {newOrgSaving && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+              Criar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog: Criar Usuário */}
+      <Dialog open={newUserOpen} onOpenChange={setNewUserOpen}>
+        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Criar Usuário</DialogTitle>
+            <DialogDescription>Provisione um novo usuário e vincule a uma empresa.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label>E-mail</Label>
+                <Input type="email" value={nuEmail} onChange={(e) => setNuEmail(e.target.value)} placeholder="usuario@exemplo.com" />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Nome</Label>
+                <Input value={nuName} onChange={(e) => setNuName(e.target.value)} placeholder="Nome do usuário" />
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between rounded-md border border-border p-2">
+              <Label className="text-sm">Enviar convite por e-mail (sem senha)</Label>
+              <Switch checked={nuSendInvite} onCheckedChange={setNuSendInvite} />
+            </div>
+            {!nuSendInvite && (
+              <div className="space-y-1.5">
+                <Label>Senha provisória</Label>
+                <Input type="text" value={nuPassword} onChange={(e) => setNuPassword(e.target.value)} placeholder="mínimo 6 caracteres" />
+              </div>
+            )}
+
+            <div className="space-y-1.5">
+              <Label>Empresa</Label>
+              <Select value={nuOrgId} onValueChange={setNuOrgId}>
+                <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
+                <SelectContent>
+                  {allOrgs.map((o) => (
+                    <SelectItem key={o.id} value={o.id}>{o.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label>Papel na empresa</Label>
+                <Select value={nuOrgRole} onValueChange={(v: any) => setNuOrgRole(v)}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="member">Membro</SelectItem>
+                    <SelectItem value="admin">Admin da empresa</SelectItem>
+                    <SelectItem value="owner">Owner</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label>Perfil do sistema</Label>
+                <Select value={nuSystemRole} onValueChange={(v: any) => setNuSystemRole(v)}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="user">Editor</SelectItem>
+                    <SelectItem value="viewer">Visualizador</SelectItem>
+                    <SelectItem value="admin">Administrador</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Abas visíveis</Label>
+              <div className="flex flex-wrap gap-3">
+                {ALL_TABS.map((tab) => (
+                  <label key={tab.id} className="flex items-center gap-2 cursor-pointer">
+                    <Checkbox checked={nuTabs[tab.id] !== false} onCheckedChange={(c) => setNuTabs((p) => ({ ...p, [tab.id]: !!c }))} />
+                    <span className="text-sm">{tab.label}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between rounded-md border border-border p-2">
+              <Label className="text-sm">Já aprovado</Label>
+              <Switch checked={nuApproved} onCheckedChange={setNuApproved} />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setNewUserOpen(false)}>Cancelar</Button>
+            <Button onClick={handleCreateUser} disabled={nuSaving}>
+              {nuSaving && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+              {nuSendInvite ? "Enviar convite" : "Criar usuário"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

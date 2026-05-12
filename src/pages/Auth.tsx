@@ -5,15 +5,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { Eye, EyeOff, Mail, Lock, User, Loader2 } from "lucide-react";
+import { Eye, EyeOff, Mail, Lock, Loader2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 
 const Auth = () => {
-  const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [name, setName] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [resetMode, setResetMode] = useState(false);
@@ -71,21 +69,10 @@ const Auth = () => {
         if (error) throw error;
         toast({ title: "Email enviado!", description: "Verifique sua caixa de entrada para redefinir a senha." });
         setResetMode(false);
-      } else if (isLogin) {
+      } else {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
         navigate("/");
-      } else {
-        const { error } = await supabase.auth.signUp({
-          email,
-          password,
-          options: {
-            data: { full_name: name },
-            emailRedirectTo: window.location.origin,
-          },
-        });
-        if (error) throw error;
-        toast({ title: "Conta criada!", description: "Verifique seu email para confirmar o cadastro." });
       }
     } catch (err: any) {
       toast({ title: "Erro", description: err.message, variant: "destructive" });
@@ -117,21 +104,11 @@ const Auth = () => {
           )}
           <h1 className="text-3xl font-display font-bold text-secondary-foreground">{branding?.name || "nortyx"}</h1>
           <p className="text-muted-foreground text-sm">
-            {resetMode ? "Recuperar senha" : isLogin ? "Entre na sua conta" : "Crie sua conta"}
+            {resetMode ? "Recuperar senha" : "Entre na sua conta"}
           </p>
         </div>
 
         <form onSubmit={handleEmailAuth} className="space-y-4">
-          {!isLogin && !resetMode && (
-            <div className="space-y-2">
-              <Label htmlFor="name">Nome</Label>
-              <div className="relative">
-                <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                <Input id="name" value={name} onChange={(e) => setName(e.target.value)} placeholder="Seu nome" className="pl-10" required />
-              </div>
-            </div>
-          )}
-
           <div className="space-y-2">
             <Label htmlFor="email">Email</Label>
             <div className="relative">
@@ -162,7 +139,7 @@ const Auth = () => {
             </div>
           )}
 
-          {isLogin && !resetMode && (
+          {!resetMode && (
             <button type="button" onClick={() => setResetMode(true)} className="text-xs hover:underline text-secondary-foreground">
               Esqueceu a senha?
             </button>
@@ -170,7 +147,7 @@ const Auth = () => {
 
           <Button type="submit" className="w-full" style={branding?.primary_color ? { backgroundColor: branding.primary_color } : undefined} disabled={loading}>
             {loading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-            {resetMode ? "Enviar link" : isLogin ? "Entrar" : "Cadastrar"}
+            {resetMode ? "Enviar link" : "Entrar"}
           </Button>
         </form>
 
@@ -194,13 +171,11 @@ const Auth = () => {
           </>
         )}
 
-        <p className="text-center text-sm text-muted-foreground">
+        <p className="text-center text-xs text-muted-foreground">
           {resetMode ? (
             <button onClick={() => setResetMode(false)} className="text-primary hover:underline">Voltar ao login</button>
-          ) : isLogin ? (
-            <>Não tem conta? <button onClick={() => setIsLogin(false)} className="text-primary hover:underline">Cadastre-se</button></>
           ) : (
-            <>Já tem conta? <button onClick={() => setIsLogin(true)} className="text-primary hover:underline">Faça login</button></>
+            <>Acesso somente por convite. Solicite ao administrador.</>
           )}
         </p>
       </div>

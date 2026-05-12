@@ -1,60 +1,67 @@
 ## Objetivo
 
-Após importar o extrato (PDF/OFX/CSV), identificar automaticamente — pelo valor e dentro do período — os lançamentos do extrato que correspondem a:
+Bloquear cadastro público no sistema. Apenas o administrador pode criar empresas e provisionar usuários. Usuários só conseguem entrar se o admin já tiver criado a conta deles dentro de uma empresa.
 
-1. **Cobranças** existentes (`billing_charges` com status `pendente`/`atrasado`) → entradas
-2. **Saídas agendadas** já cadastradas (`transactions` com `agendado=true && pago=false`) → débitos
-
-Antes de aplicar qualquer mudança, **abrir um diálogo de aprovação** listando os matches encontrados. O usuário escolhe item a item (com opção "aprovar todos") quais correspondências aceitar. Apenas os aprovados terão o status alterado:
-- Cobrança casada e aprovada → `billing_charges.status = 'paga'`
-- Saída agendada casada e aprovada → `transactions.pago = true` (atualiza data se diferente; **não duplica**)
-
-Itens não casados ou recusados seguem o fluxo normal (criam novo `daily_income` ou `transaction`).
+---
 
 ## Mudanças
 
-### 1. `src/lib/bankParser.ts`
-Adicionar campos opcionais em `ParsedBankEntry`:
-- `matchedChargeId?: string`
-- `matchedChargeClient?: string`
-- `matchedTransactionId?: number`
-- `matchedTransactionEmpresa?: string`
-- `matchedTransactionDate?: string` (BR)
+### 1. Desativar cadastro público
 
-### 2. `src/components/TransactionForm.tsx` — detecção de matches
-Em `applyImportEntries`, após enriquecer entries e antes de finalizar:
-- **Entradas**: consultar `billing_charges` da org com status `pendente`/`atrasado`. Casar 1‑para‑1 por valor (tolerância 0,01), priorizando `data_cobranca` mais próxima da data do extrato. Preencher `matchedChargeId`/`matchedChargeClient`.
-- **Saídas**: incluir transações `agendado=true && pago=false` no conjunto de candidatos a casar (independente do modo add/replace), 1‑para‑1 por valor, no período do extrato (±15 dias). Preencher `matchedTransactionId`.
+- Chamar `configure_auth` com `disable_signup: true` para bloquear `supabase.auth.signUp` no backend.
+- Em `src/pages/Auth.tsx`: remover/ocultar a aba "Criar conta" e o fluxo de signup. Exibir apenas login (e-mail+senha, Google, Apple). Mostrar aviso: *"Acesso somente por convite. Solicite ao administrador."*
+- Remover qualquer link público para `/auth?mode=signup` ou similar.
 
-### 3. Novo diálogo "Confirmar correspondências"
-Aparece **logo após** o diálogo de aprovação de mudança de data (ou direto, se não houver), antes de `finalizeImport`. Conteúdo:
-- Lista agrupada: "Cobranças identificadas" e "Contas agendadas identificadas"
-- Cada linha: descrição do extrato, valor, data, → match (cliente / empresa+data agendada), checkbox aprovar
-- Botões: "Aprovar todos", "Recusar todos", "Confirmar"
+### 2. Admin cria empresa em `/admin`
 
-Estado novo: `matchCandidates`, `approvedMatchIds: Set<number>` (entry.id), `showMatchApprovalDialog`.
+Botão **"Nova Empresa"** no cabeçalho de `AdminApproval.tsx` abre `Dialog`:
+- Nome, slug (auto a partir do nome), cor primária, logo opcional.
+- `INSERT` em `organizations` (RLS já permite a `authenticated` admin).
+- Atualiza `allOrgs` localmente.
 
-### 4. Aprovação dos lançamentos (`approveBankEntry` / `approveAllBankEntries`)
-- Se `entry.matchedTransactionId` **e** o usuário aprovou o match: `updateTransaction(matchedId, { pago: true, data: dataBR })`; **não** chamar `addTransaction`.
-- Se `entry.matchedChargeId` **e** aprovado: `update billing_charges set status='paga' where id = matchedChargeId` (substitui a busca atual por valor, que pode casar com cobrança errada).
-- Caso contrário: comportamento atual (cria novo registro).
+### 3. Admin cria usuário já configurado
 
-### 5. UI da tabela de revisão
-Mostrar badge ao lado da descrição quando `matchedFrom` indica match aprovado:
-- "Cobrança: <cliente>" (verde)
-- "Agendado: <empresa> <data>" (âmbar)
+Botão **"Criar Usuário"** no cabeçalho abre `Dialog` único com:
+- E-mail, **senha provisória** (ou opção "enviar convite por e-mail")
+- Nome de exibição
+- **Empresa** (Select de `allOrgs`) — define como `organization_id` principal
+- **Papel na empresa**: `member` / `admin` / `owner`
+- **Perfil do sistema**: Editor / Visualizador / Administrador → `user_roles`
+- **Abas visíveis**: checkboxes (`ALL_TABS`) → `tab_visibility`
+- "Já aprovado" (default ligado)
 
-## Fora do escopo
-- Não alterar parser/formatos de banco
-- Não criar tabelas novas
-- Não mexer em DDA, fornecedores, recorrência
+Fluxo no submit → nova edge function `admin-create-user`:
+1. Verifica que o caller é admin (via `has_role` ou super user).
+2. `supabase.auth.admin.createUser({ email, password, email_confirm: true })` usando `SUPABASE_SERVICE_ROLE_KEY`. Se `password` não for informado, usa `inviteUserByEmail` (convite com link de definir senha).
+3. Cria/atualiza `profiles` (display_name, organization_id, approved=true).
+4. `INSERT organization_members (user_id, organization_id, role)`.
+5. Aplica `user_roles` conforme perfil escolhido.
+6. Faz upsert em `tab_visibility` para cada aba.
+7. Retorna `{ ok, user_id }`.
 
-## Arquivos
-- `src/lib/bankParser.ts`
-- `src/components/TransactionForm.tsx`
+Front recarrega `fetchUsers()` ao final.
 
-## Verificação
-1. Período do extrato contém cobrança pendente de R$ X → diálogo lista o match → aprovar → após aprovar o lançamento, `billing_charges.status='paga'` no id correto.
-2. Recusar o match → cobrança permanece pendente, entrada vira `daily_income` normal.
-3. Período contém conta agendada de R$ Y não paga → diálogo lista → aprovar → conta agendada vira paga, **sem duplicata** na lista de transações.
-4. Sem matches → diálogo não aparece, fluxo segue direto.
+### 4. Reforço no front
+
+- `useAuth`/rotas: se um usuário logado não tiver nenhuma `organization_members`, deslogar e mostrar mensagem "Conta sem empresa associada — contate o administrador". Hoje já existe `PendingApproval`; reaproveitar com texto atualizado.
+
+---
+
+## Detalhes técnicos
+
+**Arquivos**
+- `src/pages/Auth.tsx` — remover signup, manter apenas login + OAuth.
+- `src/pages/AdminApproval.tsx` — dois novos diálogos (Nova Empresa, Criar Usuário) e handlers.
+- `src/pages/PendingApproval.tsx` — texto atualizado.
+- `supabase/functions/admin-create-user/index.ts` — **nova** edge function (usa `SUPABASE_SERVICE_ROLE_KEY`, valida admin do caller).
+- `supabase/config.toml` — entrada para a nova função (sem `verify_jwt = false`; vamos validar JWT em código).
+
+**Auth config**
+- `disable_signup: true`, `auto_confirm_email: false` (irrelevante pois admin cria com `email_confirm: true`), demais flags inalteradas.
+
+**Sem migrations.** RLS atual cobre todas as escritas necessárias quando feitas pelo service role.
+
+**Fora de escopo**
+- Edição/remoção de empresas existentes.
+- Auto-vincular invites pendentes anteriores (já tratado por `accept_pending_invites`, mas como signup público está desativado, isso deixa de importar).
+- Reset de senha pelo admin (pode ser próxima iteração via `auth.admin.updateUserById`).
