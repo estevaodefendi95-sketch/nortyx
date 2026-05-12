@@ -210,6 +210,12 @@ const TransactionForm = () => {
     scheduledUnpaid: Array<{ id: number; empresa: string; valor: number; data: string; categoria: string; subcategoria: string | null }>;
   } | null>(null);
 
+  // Match approval dialog state (cobranças/agendados identificados)
+  const [showMatchApprovalDialog, setShowMatchApprovalDialog] = useState(false);
+  const [pendingMatchEntries, setPendingMatchEntries] = useState<ParsedBankEntry[]>([]);
+  const [pendingMatchReschedules, setPendingMatchReschedules] = useState<Array<{ id: number; empresa: string; valor: number; data: string; categoria: string; subcategoria: string | null }>>([]);
+  const [approvedMatchIds, setApprovedMatchIds] = useState<Set<number>>(new Set());
+
   const getDateRange = (entries: ParsedBankEntry[]): { start: string; end: string } => {
     const dates = entries.map((e) => e.data).sort();
     return { start: dates[0], end: dates[dates.length - 1] };
