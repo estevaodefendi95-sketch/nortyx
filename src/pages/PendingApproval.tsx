@@ -12,9 +12,9 @@ const PendingApproval = () => {
           <Clock className="w-8 h-8 text-muted-foreground" />
         </div>
         <div className="space-y-2">
-          <h1 className="text-2xl font-display font-bold text-foreground">Aguardando aprovação</h1>
+          <h1 className="text-2xl font-display font-bold text-foreground">Acesso não liberado</h1>
           <p className="text-muted-foreground text-sm">
-            Sua conta foi criada com sucesso! Um administrador precisa aprovar seu acesso antes de continuar.
+            Sua conta ainda não está vinculada a uma empresa ou não foi aprovada. Entre em contato com o administrador para liberar o acesso.
           </p>
         </div>
         <Button variant="outline" onClick={signOut} className="w-full">
