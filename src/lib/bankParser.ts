@@ -15,6 +15,11 @@ export interface ParsedBankEntry {
   pago: boolean;
   approved: boolean;
   matchedFrom?: string; // suggestion from existing transaction
+  matchedChargeId?: string;
+  matchedChargeClient?: string;
+  matchedTransactionId?: number;
+  matchedTransactionEmpresa?: string;
+  matchedTransactionDate?: string; // BR dd/mm/yyyy
 }
 
 /**
