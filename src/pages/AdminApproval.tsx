@@ -421,13 +421,21 @@ const AdminApproval = () => {
 
   return (
     <div className="min-h-screen bg-background p-4 max-w-2xl mx-auto space-y-6">
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-3 flex-wrap">
         <Button variant="ghost" size="icon" onClick={() => navigate("/")}>
           <ArrowLeft className="w-5 h-5" />
         </Button>
         <div className="flex items-center gap-2">
           <Shield className="w-5 h-5 text-primary" />
           <h1 className="text-xl font-bold text-foreground">Gerenciar Usuários</h1>
+        </div>
+        <div className="ml-auto flex items-center gap-2">
+          <Button size="sm" variant="outline" onClick={() => setNewOrgOpen(true)} className="gap-1">
+            <Building2 className="w-4 h-4" /> Nova Empresa
+          </Button>
+          <Button size="sm" onClick={() => { setNuOrgId(allOrgs[0]?.id || ""); setNewUserOpen(true); }} className="gap-1">
+            <UserPlus className="w-4 h-4" /> Criar Usuário
+          </Button>
         </div>
       </div>
 
