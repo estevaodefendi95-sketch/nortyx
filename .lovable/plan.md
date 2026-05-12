@@ -1,39 +1,60 @@
-## Diagnóstico
+## Objetivo
 
-O código atual **já aceita PDF** na área de Extrato:
+Após importar o extrato (PDF/OFX/CSV), identificar automaticamente — pelo valor e dentro do período — os lançamentos do extrato que correspondem a:
 
-- `src/components/TransactionForm.tsx:1928` — `accept=".ofx,.ofc,.csv,.txt,.pdf,application/pdf"`
-- `src/components/TransactionForm.tsx:407-429` — branch dedicado que chama `extractPDFText` + `parsePDFText`
-- `src/lib/bankParser.ts` — parser de PDF via `pdfjs-dist` já implementado (formato Sicoob e similares)
+1. **Cobranças** existentes (`billing_charges` com status `pendente`/`atrasado`) → entradas
+2. **Saídas agendadas** já cadastradas (`transactions` com `agendado=true && pago=false`) → débitos
 
-Ou seja, o seletor não mostrar PDF do seu lado é **cache antigo do PWA / Service Worker** servindo um bundle anterior à mudança. Mesmo com o auto-update do SW que adicionamos, em alguns cenários (offline, SW antigo já controlando a aba) o usuário precisa de uma atualização forçada da primeira vez.
+Antes de aplicar qualquer mudança, **abrir um diálogo de aprovação** listando os matches encontrados. O usuário escolhe item a item (com opção "aprovar todos") quais correspondências aceitar. Apenas os aprovados terão o status alterado:
+- Cobrança casada e aprovada → `billing_charges.status = 'paga'`
+- Saída agendada casada e aprovada → `transactions.pago = true` (atualiza data se diferente; **não duplica**)
 
-## Plano
+Itens não casados ou recusados seguem o fluxo normal (criam novo `daily_income` ou `transaction`).
 
-### 1. Garantir bypass de cache no input do extrato
-Em `TransactionForm.tsx`, adicionar uma key/atributo dinâmico no `<input type="file">` do extrato para descartar qualquer instância antiga em DOM e confirmar que `accept` inclui PDF (já inclui — apenas validar visualmente).
+## Mudanças
 
-### 2. Forçar limpeza de Service Worker antigo
-Em `src/main.tsx`, antes do `registerSW`, fazer uma varredura única:
-- Listar `navigator.serviceWorker.getRegistrations()`
-- Se algum SW estiver controlando a página com versão diferente da atual, chamar `registration.unregister()` + `caches.keys() → caches.delete()` para limpar o cache HTTP antigo
-- Em seguida `location.reload()` (uma única vez, controlado por flag em `sessionStorage` para não entrar em loop)
+### 1. `src/lib/bankParser.ts`
+Adicionar campos opcionais em `ParsedBankEntry`:
+- `matchedChargeId?: string`
+- `matchedChargeClient?: string`
+- `matchedTransactionId?: number`
+- `matchedTransactionEmpresa?: string`
+- `matchedTransactionDate?: string` (BR)
 
-Isso resolve definitivamente o caso "input não mostra PDF" para usuários com o app instalado/aberto há tempo.
+### 2. `src/components/TransactionForm.tsx` — detecção de matches
+Em `applyImportEntries`, após enriquecer entries e antes de finalizar:
+- **Entradas**: consultar `billing_charges` da org com status `pendente`/`atrasado`. Casar 1‑para‑1 por valor (tolerância 0,01), priorizando `data_cobranca` mais próxima da data do extrato. Preencher `matchedChargeId`/`matchedChargeClient`.
+- **Saídas**: incluir transações `agendado=true && pago=false` no conjunto de candidatos a casar (independente do modo add/replace), 1‑para‑1 por valor, no período do extrato (±15 dias). Preencher `matchedTransactionId`.
 
-### 3. Mensagem visual mais explícita
-No card "Selecionar extrato bancário", reforçar o texto do botão: "Selecionar arquivo (PDF, OFX, CSV)" — deixa claro que PDF é aceito assim que a nova versão carrega.
+### 3. Novo diálogo "Confirmar correspondências"
+Aparece **logo após** o diálogo de aprovação de mudança de data (ou direto, se não houver), antes de `finalizeImport`. Conteúdo:
+- Lista agrupada: "Cobranças identificadas" e "Contas agendadas identificadas"
+- Cada linha: descrição do extrato, valor, data, → match (cliente / empresa+data agendada), checkbox aprovar
+- Botões: "Aprovar todos", "Recusar todos", "Confirmar"
 
-### 4. Verificação
-- Abrir preview → conferir que clicando em "Selecionar extrato bancário" o seletor nativo mostra PDFs
-- Subir um extrato Sicoob de exemplo (ou usar um genérico) → confirmar que `parsePDFText` extrai linhas e abre o diálogo de revisão
+Estado novo: `matchCandidates`, `approvedMatchIds: Set<number>` (entry.id), `showMatchApprovalDialog`.
 
-## Detalhes técnicos
+### 4. Aprovação dos lançamentos (`approveBankEntry` / `approveAllBankEntries`)
+- Se `entry.matchedTransactionId` **e** o usuário aprovou o match: `updateTransaction(matchedId, { pago: true, data: dataBR })`; **não** chamar `addTransaction`.
+- Se `entry.matchedChargeId` **e** aprovado: `update billing_charges set status='paga' where id = matchedChargeId` (substitui a busca atual por valor, que pode casar com cobrança errada).
+- Caso contrário: comportamento atual (cria novo registro).
 
-**Arquivos a editar:**
-- `src/main.tsx` — bloco de limpeza de SW antigo (uma execução por sessão via `sessionStorage.setItem('sw-cleaned','1')`)
-- `src/components/TransactionForm.tsx` linha ~1922-1928 — texto do label e adicionar `key={Date.now()}` opcional no input
+### 5. UI da tabela de revisão
+Mostrar badge ao lado da descrição quando `matchedFrom` indica match aprovado:
+- "Cobrança: <cliente>" (verde)
+- "Agendado: <empresa> <data>" (âmbar)
 
-**Fora de escopo:** alterar lógica do parser, suportar novos bancos, ou trocar parser local por IA (caso queira isso, é outra task).
+## Fora do escopo
+- Não alterar parser/formatos de banco
+- Não criar tabelas novas
+- Não mexer em DDA, fornecedores, recorrência
 
-**Resultado esperado:** após a próxima carga, o seletor de arquivos passa a listar PDFs normalmente e o fluxo de importação funciona ponta-a-ponta.
+## Arquivos
+- `src/lib/bankParser.ts`
+- `src/components/TransactionForm.tsx`
+
+## Verificação
+1. Período do extrato contém cobrança pendente de R$ X → diálogo lista o match → aprovar → após aprovar o lançamento, `billing_charges.status='paga'` no id correto.
+2. Recusar o match → cobrança permanece pendente, entrada vira `daily_income` normal.
+3. Período contém conta agendada de R$ Y não paga → diálogo lista → aprovar → conta agendada vira paga, **sem duplicata** na lista de transações.
+4. Sem matches → diálogo não aparece, fluxo segue direto.
