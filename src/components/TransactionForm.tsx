@@ -264,6 +264,7 @@ const TransactionForm = () => {
   };
 
   const detectMatches = async (entries: ParsedBankEntry[]) => {
+    const orgId = organization?.id;
     if (!orgId) return;
 
     // Charges: entradas vs billing_charges pendentes/atrasados
