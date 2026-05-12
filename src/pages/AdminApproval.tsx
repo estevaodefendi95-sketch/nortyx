@@ -50,8 +50,101 @@ const AdminApproval = () => {
   const [testPushLoading, setTestPushLoading] = useState(false);
   const [allOrgs, setAllOrgs] = useState<OrgInfo[]>([]);
   const [orgFilter, setOrgFilter] = useState<string>("all");
+
+  // Nova empresa
+  const [newOrgOpen, setNewOrgOpen] = useState(false);
+  const [newOrgName, setNewOrgName] = useState("");
+  const [newOrgSlug, setNewOrgSlug] = useState("");
+  const [newOrgColor, setNewOrgColor] = useState("#3B82F6");
+  const [newOrgSaving, setNewOrgSaving] = useState(false);
+
+  // Novo usuário
+  const [newUserOpen, setNewUserOpen] = useState(false);
+  const [nuEmail, setNuEmail] = useState("");
+  const [nuName, setNuName] = useState("");
+  const [nuPassword, setNuPassword] = useState("");
+  const [nuSendInvite, setNuSendInvite] = useState(false);
+  const [nuOrgId, setNuOrgId] = useState<string>("");
+  const [nuOrgRole, setNuOrgRole] = useState<"member" | "admin" | "owner">("member");
+  const [nuSystemRole, setNuSystemRole] = useState<"user" | "admin" | "viewer">("user");
+  const [nuTabs, setNuTabs] = useState<Record<string, boolean>>(() =>
+    Object.fromEntries(ALL_TABS.map((t) => [t.id, true]))
+  );
+  const [nuApproved, setNuApproved] = useState(true);
+  const [nuSaving, setNuSaving] = useState(false);
+
   const { toast } = useToast();
   const navigate = useNavigate();
+
+  const slugify = (s: string) =>
+    s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+      .replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 50);
+
+  const handleCreateOrg = async () => {
+    if (!newOrgName.trim()) return;
+    setNewOrgSaving(true);
+    try {
+      const slug = (newOrgSlug.trim() || slugify(newOrgName)) + "-" + Math.random().toString(36).slice(2, 6);
+      const { data, error } = await supabase
+        .from("organizations")
+        .insert({ name: newOrgName.trim(), slug, primary_color: newOrgColor } as any)
+        .select()
+        .single();
+      if (error) throw error;
+      toast({ title: "Empresa criada", description: newOrgName });
+      setAllOrgs((prev) => [...prev, {
+        id: data.id, name: data.name, primary_color: data.primary_color, logo_url: data.logo_url,
+      }].sort((a, b) => a.name.localeCompare(b.name)));
+      setNewOrgName(""); setNewOrgSlug(""); setNewOrgColor("#3B82F6");
+      setNewOrgOpen(false);
+    } catch (e: any) {
+      toast({ title: "Erro", description: e.message, variant: "destructive" });
+    }
+    setNewOrgSaving(false);
+  };
+
+  const handleCreateUser = async () => {
+    if (!nuEmail.trim() || !nuOrgId) {
+      toast({ title: "Preencha email e empresa", variant: "destructive" });
+      return;
+    }
+    if (!nuSendInvite && (!nuPassword || nuPassword.length < 6)) {
+      toast({ title: "Senha inválida", description: "Mínimo 6 caracteres ou marque enviar convite.", variant: "destructive" });
+      return;
+    }
+    setNuSaving(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("admin-create-user", {
+        body: {
+          email: nuEmail.trim(),
+          password: nuSendInvite ? undefined : nuPassword,
+          send_invite: nuSendInvite,
+          display_name: nuName.trim() || undefined,
+          organization_id: nuOrgId,
+          org_role: nuOrgRole,
+          system_role: nuSystemRole,
+          tab_visibility: nuTabs,
+          approved: nuApproved,
+        },
+      });
+      if (error) throw error;
+      if ((data as any)?.error) throw new Error((data as any).error);
+      toast({
+        title: nuSendInvite ? "Convite enviado" : "Usuário criado",
+        description: nuEmail,
+      });
+      setNuEmail(""); setNuName(""); setNuPassword(""); setNuSendInvite(false);
+      setNuOrgRole("member"); setNuSystemRole("user");
+      setNuTabs(Object.fromEntries(ALL_TABS.map((t) => [t.id, true])));
+      setNuApproved(true);
+      setNewUserOpen(false);
+      await fetchUsers();
+    } catch (e: any) {
+      toast({ title: "Erro", description: e.message, variant: "destructive" });
+    }
+    setNuSaving(false);
+  };
+
 
   // Fetch current push notification time from subscriptions
   useEffect(() => {
