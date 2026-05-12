@@ -1,54 +1,39 @@
-## Problema
+## Diagnóstico
 
-A segunda imagem (layout antigo: switcher de empresa em formato de Select largo, sem ícones de admin) é o bundle anterior que o **Service Worker do PWA** está servindo do cache. Quando o app é aberto, o SW entrega os assets antigos primeiro; depois detecta uma nova versão, mas só aplica na próxima visita — por isso o usuário vê o layout antigo "piscar" antes do novo aparecer.
+O código atual **já aceita PDF** na área de Extrato:
 
-Hoje o `vite.config.ts` usa `VitePWA({ registerType: "autoUpdate", skipWaiting: true, clientsClaim: true })`, mas o `src/main.tsx` **não chama `registerSW`** com handler de update. Resultado: o novo SW assume controle, mas a página já carregou com os assets antigos e nada força o reload.
+- `src/components/TransactionForm.tsx:1928` — `accept=".ofx,.ofc,.csv,.txt,.pdf,application/pdf"`
+- `src/components/TransactionForm.tsx:407-429` — branch dedicado que chama `extractPDFText` + `parsePDFText`
+- `src/lib/bankParser.ts` — parser de PDF via `pdfjs-dist` já implementado (formato Sicoob e similares)
 
-## Solução (instantânea, sem mudar layout)
+Ou seja, o seletor não mostrar PDF do seu lado é **cache antigo do PWA / Service Worker** servindo um bundle anterior à mudança. Mesmo com o auto-update do SW que adicionamos, em alguns cenários (offline, SW antigo já controlando a aba) o usuário precisa de uma atualização forçada da primeira vez.
 
-### 1. `src/main.tsx` — registrar SW com auto-reload
+## Plano
 
-Importar `registerSW` do `virtual:pwa-register` e disparar `window.location.reload()` assim que uma nova versão estiver pronta. Também checar atualização periódica (a cada 60s) enquanto a aba está aberta:
+### 1. Garantir bypass de cache no input do extrato
+Em `TransactionForm.tsx`, adicionar uma key/atributo dinâmico no `<input type="file">` do extrato para descartar qualquer instância antiga em DOM e confirmar que `accept` inclui PDF (já inclui — apenas validar visualmente).
 
-```ts
-import { registerSW } from "virtual:pwa-register";
+### 2. Forçar limpeza de Service Worker antigo
+Em `src/main.tsx`, antes do `registerSW`, fazer uma varredura única:
+- Listar `navigator.serviceWorker.getRegistrations()`
+- Se algum SW estiver controlando a página com versão diferente da atual, chamar `registration.unregister()` + `caches.keys() → caches.delete()` para limpar o cache HTTP antigo
+- Em seguida `location.reload()` (uma única vez, controlado por flag em `sessionStorage` para não entrar em loop)
 
-const updateSW = registerSW({
-  immediate: true,
-  onNeedRefresh() {
-    updateSW(true); // aplica skipWaiting e recarrega
-  },
-  onRegisteredSW(_swUrl, registration) {
-    if (registration) {
-      setInterval(() => registration.update(), 60_000);
-    }
-  },
-});
-```
+Isso resolve definitivamente o caso "input não mostra PDF" para usuários com o app instalado/aberto há tempo.
 
-### 2. `src/vite-env.d.ts` — adicionar referência de tipos do plugin
+### 3. Mensagem visual mais explícita
+No card "Selecionar extrato bancário", reforçar o texto do botão: "Selecionar arquivo (PDF, OFX, CSV)" — deixa claro que PDF é aceito assim que a nova versão carrega.
 
-```ts
-/// <reference types="vite-plugin-pwa/client" />
-```
+### 4. Verificação
+- Abrir preview → conferir que clicando em "Selecionar extrato bancário" o seletor nativo mostra PDFs
+- Subir um extrato Sicoob de exemplo (ou usar um genérico) → confirmar que `parsePDFText` extrai linhas e abre o diálogo de revisão
 
-### 3. `vite.config.ts` — manter `autoUpdate` e garantir limpeza
+## Detalhes técnicos
 
-Já está com `cleanupOutdatedCaches: true`, `skipWaiting: true`, `clientsClaim: true`. Adicionar `navigateFallback: 'index.html'` apenas se necessário (manter como está se já funciona). Sem mais mudanças aqui.
+**Arquivos a editar:**
+- `src/main.tsx` — bloco de limpeza de SW antigo (uma execução por sessão via `sessionStorage.setItem('sw-cleaned','1')`)
+- `src/components/TransactionForm.tsx` linha ~1922-1928 — texto do label e adicionar `key={Date.now()}` opcional no input
 
-## Resultado esperado
+**Fora de escopo:** alterar lógica do parser, suportar novos bancos, ou trocar parser local por IA (caso queira isso, é outra task).
 
-- Usuário que já tinha o app aberto/instalado abre a página → SW antigo entrega o shell em cache → em paralelo busca o novo bundle → assim que novo SW está "waiting", `updateSW(true)` é chamado → página recarrega automaticamente para a versão nova **sem o flash do layout antigo persistir**.
-- Em sessões longas, a checagem a cada 60s garante que novos deploys sejam aplicados sem o usuário precisar refresh manual.
-
-## Fora de escopo
-
-- Mudanças de UI/cores/tabs.
-- Lógica de autenticação, organizações, transações.
-- Skeletons (já implementados na resposta anterior).
-
-## Verificação
-
-1. Build + abrir preview com o app já instalado/cache antigo.
-2. Confirmar que o reload automático acontece **uma vez** e mostra direto o layout novo (Building2 icon compacto + ícones de admin), sem piscar o Select largo antigo.
-3. Console deve mostrar log de SW atualizado; sem loops de reload.
+**Resultado esperado:** após a próxima carga, o seletor de arquivos passa a listar PDFs normalmente e o fluxo de importação funciona ponta-a-ponta.
