@@ -1901,7 +1901,7 @@ const TransactionForm = () => {
               <div className="rounded-xl bg-card border border-border p-4 sm:p-6">
               <h2 className="font-display font-semibold text-lg mb-2">Importar Extrato Bancário</h2>
               <p className="text-sm text-muted-foreground mb-6">
-                Importe arquivos OFX ou CSV do seu banco para registrar as transações automaticamente.
+                Importe arquivos PDF, OFX ou CSV do seu banco para registrar as transações automaticamente.
               </p>
 
               <button
