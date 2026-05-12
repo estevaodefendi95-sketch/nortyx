@@ -775,6 +775,134 @@ const AdminApproval = () => {
           </section>
         </>
       )}
+
+      {/* Dialog: Nova Empresa */}
+      <Dialog open={newOrgOpen} onOpenChange={setNewOrgOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Nova Empresa</DialogTitle>
+            <DialogDescription>Crie uma empresa para vincular usuários.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="space-y-1.5">
+              <Label>Nome</Label>
+              <Input value={newOrgName} onChange={(e) => { setNewOrgName(e.target.value); if (!newOrgSlug) setNewOrgSlug(slugify(e.target.value)); }} placeholder="Minha Empresa" />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Slug</Label>
+              <Input value={newOrgSlug} onChange={(e) => setNewOrgSlug(slugify(e.target.value))} placeholder="minha-empresa" />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Cor principal</Label>
+              <div className="flex items-center gap-2">
+                <input type="color" value={newOrgColor} onChange={(e) => setNewOrgColor(e.target.value)} className="w-10 h-10 rounded border border-border cursor-pointer" />
+                <Input value={newOrgColor} onChange={(e) => setNewOrgColor(e.target.value)} className="w-32" />
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setNewOrgOpen(false)}>Cancelar</Button>
+            <Button onClick={handleCreateOrg} disabled={newOrgSaving || !newOrgName.trim()}>
+              {newOrgSaving && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+              Criar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog: Criar Usuário */}
+      <Dialog open={newUserOpen} onOpenChange={setNewUserOpen}>
+        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Criar Usuário</DialogTitle>
+            <DialogDescription>Provisione um novo usuário e vincule a uma empresa.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label>E-mail</Label>
+                <Input type="email" value={nuEmail} onChange={(e) => setNuEmail(e.target.value)} placeholder="usuario@exemplo.com" />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Nome</Label>
+                <Input value={nuName} onChange={(e) => setNuName(e.target.value)} placeholder="Nome do usuário" />
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between rounded-md border border-border p-2">
+              <Label className="text-sm">Enviar convite por e-mail (sem senha)</Label>
+              <Switch checked={nuSendInvite} onCheckedChange={setNuSendInvite} />
+            </div>
+            {!nuSendInvite && (
+              <div className="space-y-1.5">
+                <Label>Senha provisória</Label>
+                <Input type="text" value={nuPassword} onChange={(e) => setNuPassword(e.target.value)} placeholder="mínimo 6 caracteres" />
+              </div>
+            )}
+
+            <div className="space-y-1.5">
+              <Label>Empresa</Label>
+              <Select value={nuOrgId} onValueChange={setNuOrgId}>
+                <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
+                <SelectContent>
+                  {allOrgs.map((o) => (
+                    <SelectItem key={o.id} value={o.id}>{o.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label>Papel na empresa</Label>
+                <Select value={nuOrgRole} onValueChange={(v: any) => setNuOrgRole(v)}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="member">Membro</SelectItem>
+                    <SelectItem value="admin">Admin da empresa</SelectItem>
+                    <SelectItem value="owner">Owner</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label>Perfil do sistema</Label>
+                <Select value={nuSystemRole} onValueChange={(v: any) => setNuSystemRole(v)}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="user">Editor</SelectItem>
+                    <SelectItem value="viewer">Visualizador</SelectItem>
+                    <SelectItem value="admin">Administrador</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Abas visíveis</Label>
+              <div className="flex flex-wrap gap-3">
+                {ALL_TABS.map((tab) => (
+                  <label key={tab.id} className="flex items-center gap-2 cursor-pointer">
+                    <Checkbox checked={nuTabs[tab.id] !== false} onCheckedChange={(c) => setNuTabs((p) => ({ ...p, [tab.id]: !!c }))} />
+                    <span className="text-sm">{tab.label}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between rounded-md border border-border p-2">
+              <Label className="text-sm">Já aprovado</Label>
+              <Switch checked={nuApproved} onCheckedChange={setNuApproved} />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setNewUserOpen(false)}>Cancelar</Button>
+            <Button onClick={handleCreateUser} disabled={nuSaving}>
+              {nuSaving && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+              {nuSendInvite ? "Enviar convite" : "Criar usuário"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
