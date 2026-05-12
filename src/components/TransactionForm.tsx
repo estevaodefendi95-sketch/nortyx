@@ -2384,6 +2384,153 @@ const TransactionForm = () => {
         </AlertDialogContent>
       </AlertDialog>
 
+      {/* Match approval: cobranças e contas agendadas identificadas */}
+      <AlertDialog open={showMatchApprovalDialog} onOpenChange={(open) => {
+        if (!open) {
+          setShowMatchApprovalDialog(false);
+          setPendingMatchEntries([]);
+          setPendingMatchReschedules([]);
+          setApprovedMatchIds(new Set());
+        }
+      }}>
+        <AlertDialogContent className="max-w-[calc(100%-2rem)] sm:max-w-2xl mx-auto">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Correspondências identificadas no extrato</AlertDialogTitle>
+            <AlertDialogDescription>
+              Encontramos lançamentos do extrato que batem com cobranças pendentes ou contas agendadas. Marque os que devem atualizar o status (cobrança → paga, agendado → pago). Itens desmarcados serão importados como lançamentos novos.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+
+          {(() => {
+            const matched = pendingMatchEntries.filter((e) => e.matchedChargeId || e.matchedTransactionId);
+            const charges = matched.filter((e) => e.matchedChargeId);
+            const scheduled = matched.filter((e) => e.matchedTransactionId);
+            return (
+              <div className="max-h-[55vh] overflow-y-auto space-y-4 my-2">
+                {charges.length > 0 && (
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-xs font-semibold uppercase text-income">Cobranças identificadas ({charges.length})</h3>
+                      <button
+                        type="button"
+                        className="text-xs text-primary hover:underline"
+                        onClick={() => setApprovedMatchIds((prev) => {
+                          const next = new Set(prev);
+                          const allOn = charges.every((e) => next.has(e.id));
+                          if (allOn) charges.forEach((e) => next.delete(e.id));
+                          else charges.forEach((e) => next.add(e.id));
+                          return next;
+                        })}
+                      >
+                        {charges.every((e) => approvedMatchIds.has(e.id)) ? "Desmarcar todos" : "Marcar todos"}
+                      </button>
+                    </div>
+                    {charges.map((e) => {
+                      const checked = approvedMatchIds.has(e.id);
+                      return (
+                        <label key={e.id} className="flex items-start gap-3 p-3 rounded-lg border bg-secondary/30 cursor-pointer hover:bg-secondary/50">
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            onChange={(ev) => setApprovedMatchIds((prev) => {
+                              const next = new Set(prev);
+                              if (ev.target.checked) next.add(e.id);
+                              else next.delete(e.id);
+                              return next;
+                            })}
+                            className="mt-1"
+                          />
+                          <div className="flex-1 text-left text-sm">
+                            <div className="font-medium truncate">{e.empresa}</div>
+                            <div className="text-xs text-muted-foreground">
+                              {formatCurrency(e.valor)} · {isoToBR(e.data)}
+                            </div>
+                            <div className="text-xs mt-1 text-income">
+                              → Cobrança de <span className="font-semibold">{e.matchedChargeClient}</span>
+                            </div>
+                          </div>
+                        </label>
+                      );
+                    })}
+                  </div>
+                )}
+                {scheduled.length > 0 && (
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-xs font-semibold uppercase text-expense">Contas agendadas identificadas ({scheduled.length})</h3>
+                      <button
+                        type="button"
+                        className="text-xs text-primary hover:underline"
+                        onClick={() => setApprovedMatchIds((prev) => {
+                          const next = new Set(prev);
+                          const allOn = scheduled.every((e) => next.has(e.id));
+                          if (allOn) scheduled.forEach((e) => next.delete(e.id));
+                          else scheduled.forEach((e) => next.add(e.id));
+                          return next;
+                        })}
+                      >
+                        {scheduled.every((e) => approvedMatchIds.has(e.id)) ? "Desmarcar todos" : "Marcar todos"}
+                      </button>
+                    </div>
+                    {scheduled.map((e) => {
+                      const checked = approvedMatchIds.has(e.id);
+                      return (
+                        <label key={e.id} className="flex items-start gap-3 p-3 rounded-lg border bg-secondary/30 cursor-pointer hover:bg-secondary/50">
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            onChange={(ev) => setApprovedMatchIds((prev) => {
+                              const next = new Set(prev);
+                              if (ev.target.checked) next.add(e.id);
+                              else next.delete(e.id);
+                              return next;
+                            })}
+                            className="mt-1"
+                          />
+                          <div className="flex-1 text-left text-sm">
+                            <div className="font-medium truncate">{e.empresa}</div>
+                            <div className="text-xs text-muted-foreground">
+                              {formatCurrency(e.valor)} · {isoToBR(e.data)}
+                            </div>
+                            <div className="text-xs mt-1 text-expense">
+                              → Agendado: <span className="font-semibold">{e.matchedTransactionEmpresa}</span> ({e.matchedTransactionDate})
+                            </div>
+                          </div>
+                        </label>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            );
+          })()}
+
+          <AlertDialogFooter className="flex-col sm:flex-row gap-2">
+            <AlertDialogCancel className="mt-0">Cancelar importação</AlertDialogCancel>
+            <Button
+              size="sm"
+              onClick={() => {
+                const cleaned = pendingMatchEntries.map((e) => {
+                  if ((e.matchedChargeId || e.matchedTransactionId) && !approvedMatchIds.has(e.id)) {
+                    const { matchedChargeId, matchedChargeClient, matchedTransactionId, matchedTransactionEmpresa, matchedTransactionDate, matchedFrom, ...rest } = e;
+                    return rest as ParsedBankEntry;
+                  }
+                  return e;
+                });
+                const reschedules = pendingMatchReschedules;
+                setShowMatchApprovalDialog(false);
+                setPendingMatchEntries([]);
+                setPendingMatchReschedules([]);
+                setApprovedMatchIds(new Set());
+                commitImport(cleaned, reschedules);
+              }}
+            >
+              Confirmar ({approvedMatchIds.size} aprovado{approvedMatchIds.size === 1 ? "" : "s"})
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       {/* Reader: boleto/NF → preencher cobrança */}
       <Dialog open={readerOpen} onOpenChange={setReaderOpen}>
         <DialogContent className="max-w-lg">
