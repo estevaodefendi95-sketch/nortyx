@@ -562,7 +562,16 @@ const TransactionForm = () => {
     const [y, m, d] = entry.data.split("-");
     const dataBR = `${d}/${m}/${y}`;
     let saved = false;
-    if (entry.tipo === "entrada") {
+
+    // If matched a scheduled unpaid transaction → mark it paid (no duplicate)
+    if (entry.tipo === "saida" && entry.matchedTransactionId) {
+      try {
+        await updateTransaction(entry.matchedTransactionId, { pago: true, data: dataBR });
+        saved = true;
+      } catch (err) {
+        console.error("Erro ao marcar agendado como pago:", err);
+      }
+    } else if (entry.tipo === "entrada") {
       saved = await addDailyIncome({ data: dataBR, valor: entry.valor });
     } else {
       saved = await addTransaction({ empresa: entry.empresa, valor: entry.valor, data: dataBR, categoria: entry.categoria, subcategoria: entry.subcategoria || null, pago: true, agendado: false, tipo: "saida" });
@@ -574,26 +583,26 @@ const TransactionForm = () => {
     }
 
     updateBankEntry(id, "approved", true);
-    // Save empresa→category mapping for future imports
-    if (entry.tipo === "saida" && entry.empresa) {
+    if (entry.tipo === "saida" && entry.empresa && !entry.matchedTransactionId) {
       addMapping(entry.empresa, entry.categoria);
     }
 
-    // Auto-match: if entrada, try to match billing_charges
-    if (entry.tipo === "entrada") {
-      const { data: matched } = await supabase
-        .from("billing_charges")
-        .select("id, client_id, valor")
-        .in("status", ["pendente", "atrasado"])
-        .gte("valor", entry.valor - 0.01)
-        .lte("valor", entry.valor + 0.01)
-        .limit(1);
-      if (matched && matched.length > 0) {
-        await supabase.from("billing_charges").update({ status: "paga" }).eq("id", matched[0].id);
-        const { data: clientData } = await supabase.from("billing_clients").select("nome").eq("id", matched[0].client_id).single();
-        toast({ title: "Lançamento aprovado", description: `${entry.empresa} — ${formatCurrency(entry.valor)}${clientData ? ` | Cliente ${clientData.nome} marcado como pago` : ""}` });
-        return;
-      }
+    // Match: cobrança identificada → marcar paga pelo id (não por valor)
+    if (entry.tipo === "entrada" && entry.matchedChargeId) {
+      await supabase.from("billing_charges").update({ status: "paga" }).eq("id", entry.matchedChargeId);
+      toast({
+        title: "Lançamento aprovado",
+        description: `${entry.empresa} — ${formatCurrency(entry.valor)} | Cobrança de ${entry.matchedChargeClient || "cliente"} marcada como paga`,
+      });
+      return;
+    }
+
+    if (entry.tipo === "saida" && entry.matchedTransactionId) {
+      toast({
+        title: "Conta agendada quitada",
+        description: `${entry.matchedTransactionEmpresa || entry.empresa} — ${formatCurrency(entry.valor)} marcada como paga.`,
+      });
+      return;
     }
 
     toast({ title: "Lançamento aprovado", description: `${entry.empresa} — ${formatCurrency(entry.valor)}` });
@@ -601,50 +610,58 @@ const TransactionForm = () => {
 
   const approveAllBankEntries = async () => {
     const pending = bankEntries.filter((e) => !e.approved && e.empresa && e.valor > 0);
-    // Deduplicate fornecedores
+    // Deduplicate fornecedores (apenas para itens sem match agendado)
     const uniqueSuppliers = new Map<string, typeof pending[0]>();
     for (const entry of pending) {
-      if (entry.tipo === "saida" && entry.empresa) {
+      if (entry.tipo === "saida" && entry.empresa && !entry.matchedTransactionId) {
         uniqueSuppliers.set(entry.empresa.toLowerCase(), entry);
       }
     }
-    // Save fornecedores first (deduped)
     for (const entry of uniqueSuppliers.values()) {
       await saveFornecedor(entry.empresa, null, null, entry.categoria as CategoryCode);
       addMapping(entry.empresa, entry.categoria);
     }
-    // Then save transactions sequentially
+
     const approvedIds = new Set<number>();
+    let chargesMarked = 0;
+    let scheduledMarked = 0;
     for (const entry of pending) {
       const [y, m, d] = entry.data.split("-");
       const dataBR = `${d}/${m}/${y}`;
       let saved = false;
-      if (entry.tipo === "entrada") {
+
+      if (entry.tipo === "saida" && entry.matchedTransactionId) {
+        try {
+          await updateTransaction(entry.matchedTransactionId, { pago: true, data: dataBR });
+          saved = true;
+          scheduledMarked++;
+        } catch (err) {
+          console.error(err);
+        }
+      } else if (entry.tipo === "entrada") {
         saved = await addDailyIncome({ data: dataBR, valor: entry.valor });
       } else {
         saved = await addTransaction({ empresa: entry.empresa, valor: entry.valor, data: dataBR, categoria: entry.categoria, subcategoria: entry.subcategoria || null, pago: true, agendado: false, tipo: "saida" });
       }
+
       if (saved) {
         approvedIds.add(entry.id);
-        // Auto-match billing charges for entradas
-        if (entry.tipo === "entrada") {
-          const { data: matched } = await supabase
-            .from("billing_charges")
-            .select("id")
-            .in("status", ["pendente", "atrasado"])
-            .gte("valor", entry.valor - 0.01)
-            .lte("valor", entry.valor + 0.01)
-            .limit(1);
-          if (matched && matched.length > 0) {
-            await supabase.from("billing_charges").update({ status: "paga" }).eq("id", matched[0].id);
-          }
+        if (entry.tipo === "entrada" && entry.matchedChargeId) {
+          await supabase.from("billing_charges").update({ status: "paga" }).eq("id", entry.matchedChargeId);
+          chargesMarked++;
         }
       }
     }
     setBankEntries((prev) => prev.map((e) => approvedIds.has(e.id) ? { ...e, approved: true } : e));
+    const extras: string[] = [];
+    if (chargesMarked > 0) extras.push(`${chargesMarked} cobrança(s) quitada(s)`);
+    if (scheduledMarked > 0) extras.push(`${scheduledMarked} agendado(s) marcado(s) como pago`);
     toast({
       title: `${approvedIds.size} lançamentos aprovados`,
-      description: approvedIds.size !== pending.length ? "Alguns itens não foram salvos e permaneceram pendentes." : undefined,
+      description: [
+        approvedIds.size !== pending.length ? "Alguns itens não foram salvos e permaneceram pendentes." : null,
+        extras.join(" · ") || null,
+      ].filter(Boolean).join(" · ") || undefined,
       variant: approvedIds.size === pending.length ? undefined : "destructive",
     });
   };
