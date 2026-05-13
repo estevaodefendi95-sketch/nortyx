@@ -1,39 +1,19 @@
-## Objetivo
+Vou corrigir o problema como um caso de cache/PWA segurando versão antiga no site publicado, sem mexer em regras de negócio.
 
-Corrigir o layout do bloco **"Criar novos"** no topo da página `/admin` (botões **Nova Empresa** e **Criar Usuário**), mantendo tudo no mesmo lugar mas com aparência mais limpa, alinhada ao tema escuro do nortyx.
+1. Ajustar o registro do PWA em `src/main.tsx`
+   - Trocar a limpeza “uma vez por sessão” por uma verificação versionada mais robusta.
+   - Remover caches antigos do app quando uma nova versão for carregada.
+   - Atualizar service workers antigos e recarregar a página somente quando necessário, evitando loop de reload.
 
-## O que muda
+2. Ajustar a configuração do PWA em `vite.config.ts`
+   - Garantir estratégia de atualização imediata para o service worker.
+   - Evitar que navegações HTML fiquem presas em um `index.html` antigo.
+   - Manter suporte ao `sw-push.js` existente para notificações.
 
-Arquivo: `src/pages/AdminApproval.tsx` (apenas as linhas 440–461 do card "Criar novos").
+3. Manter a tela `/admin` alinhada com a versão atual
+   - Confirmar que o bloco de ações administrativas continua mostrando “Nova Empresa” e “Criar Usuário”.
+   - Não alterar backend, permissões ou dados.
 
-### Layout novo
-
-- Remover o cabeçalho redundante "Criar novos" + ícone Plus (o título da página já indica o contexto).
-- Transformar os dois botões em **cards clicáveis** lado a lado, com:
-  - Ícone em círculo com fundo `bg-primary/10` (Building2 / UserPlus em `text-primary`).
-  - Título em `text-sm font-semibold` + descrição em `text-xs text-muted-foreground`.
-  - Borda `border-border`, fundo `bg-card`, hover com `hover:border-primary/50 hover:bg-accent/30 transition-colors`.
-  - Altura uniforme, padding consistente (`p-4`), `rounded-xl`.
-  - Grid responsivo: `grid-cols-1 sm:grid-cols-2 gap-3`.
-- Texto alinhado à esquerda, ícone no topo-esquerda, sem truncar em telas estreitas.
-- Acessibilidade: cada card é um `<button>` com `aria-label` descritivo.
-
-### Exemplo de estrutura
-
-```text
-┌─────────────────────────┐  ┌─────────────────────────┐
-│ ◉  Nova Empresa         │  │ ◉  Criar Usuário        │
-│    Cadastrar uma nova   │  │    Vincular usuário a   │
-│    organização          │  │    uma ou mais empresas │
-└─────────────────────────┘  └─────────────────────────┘
-```
-
-## Fora do escopo
-
-- Lógica dos diálogos (Nova Empresa / Criar Usuário) — sem alterações.
-- Fluxo de seleção múltipla de empresas — já implementado e funcional.
-- Renomear "Paggio" em chaves de localStorage / dados internos (não são visíveis ao usuário).
-
-## Arquivos
-
-- `src/pages/AdminApproval.tsx` — apenas o bloco `<section>` "Criar novos".
+4. Validação
+   - Comparar o bundle publicado/preview pelos textos da tela administrativa.
+   - Orientar o último passo necessário: após merge da correção, clicar em Publish/Update e abrir o site com recarregamento completo; usuários com PWA instalado podem precisar fechar/reabrir o app uma vez para o novo service worker assumir.
