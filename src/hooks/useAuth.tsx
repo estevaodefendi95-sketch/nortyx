@@ -40,7 +40,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     ]);
     setApproved(profileRes.data?.approved ?? false);
     const roles = rolesRes.data?.map((r: any) => r.role) || [];
-    setIsAdmin(roles.includes("admin"));
+    const { data: userData } = await supabase.auth.getUser();
+    const isSuper = userData?.user?.email === "estevaodefendi95@gmail.com";
+    setIsAdmin(roles.includes("admin") || isSuper);
     setIsViewer(roles.includes("viewer"));
   };
 
