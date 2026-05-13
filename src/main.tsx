@@ -3,26 +3,23 @@ import { registerSW } from "virtual:pwa-register";
 import App from "./App.tsx";
 import "./index.css";
 
-// Limpeza única por sessão: remove SW/cache antigos que podem estar
-// servindo um bundle desatualizado (ex.: input sem suporte a PDF).
+// Purga única (versionada) de SW/caches antigos para garantir que usuários
+// recebam o bundle mais recente após uma atualização. Incrementar a chave
+// abaixo força uma nova limpeza em todos os clientes já instalados.
+const SW_PURGE_KEY = "sw-purged-v4";
 (async () => {
   if (typeof window === "undefined") return;
-  if (sessionStorage.getItem("sw-cleaned-v2") === "1") return;
+  if (localStorage.getItem(SW_PURGE_KEY) === "1") return;
   try {
-    const regs = (await navigator.serviceWorker?.getRegistrations?.()) || [];
     const keys = (await caches?.keys?.()) || [];
-    if (regs.length === 0 && keys.length === 0) {
-      sessionStorage.setItem("sw-cleaned-v2", "1");
-      return;
-    }
     await Promise.all(keys.map((k) => caches.delete(k)));
-    sessionStorage.setItem("sw-cleaned-v2", "1");
-    // Apenas força reload se havia cache antigo realmente presente
+    localStorage.setItem(SW_PURGE_KEY, "1");
     if (keys.length > 0) {
+      // Recarrega ignorando cache HTTP para puxar o novo index.html/bundle
       location.reload();
     }
   } catch {
-    sessionStorage.setItem("sw-cleaned-v2", "1");
+    localStorage.setItem(SW_PURGE_KEY, "1");
   }
 })();
 
