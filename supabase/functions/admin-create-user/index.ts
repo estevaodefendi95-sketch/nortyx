@@ -44,6 +44,8 @@ Deno.serve(async (req) => {
       password,
       display_name,
       organization_id,
+      organization_ids,
+      primary_organization_id,
       org_role = "member",
       system_role = "user", // user | admin | viewer
       tab_visibility = {}, // { tab_id: boolean }
@@ -51,9 +53,17 @@ Deno.serve(async (req) => {
       send_invite = false,
     } = body || {};
 
-    if (!email || !organization_id) {
-      return json({ error: "email e organization_id são obrigatórios" }, 400);
+    // Normaliza lista de empresas (suporta legacy organization_id)
+    const orgIds: string[] = Array.isArray(organization_ids) && organization_ids.length > 0
+      ? organization_ids.filter((x: any) => typeof x === "string")
+      : (organization_id ? [organization_id] : []);
+
+    if (!email || orgIds.length === 0) {
+      return json({ error: "email e ao menos uma empresa são obrigatórios" }, 400);
     }
+    const primaryOrgId: string = orgIds.includes(primary_organization_id)
+      ? primary_organization_id
+      : orgIds[0];
     if (!["member", "admin", "owner"].includes(org_role)) {
       return json({ error: "papel inválido" }, 400);
     }
