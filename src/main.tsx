@@ -6,7 +6,7 @@ import "./index.css";
 // Purga única (versionada) de SW/caches antigos para garantir que usuários
 // recebam o bundle mais recente após uma atualização. Incrementar a chave
 // abaixo força uma nova limpeza em todos os clientes já instalados.
-const SW_PURGE_KEY = "sw-purged-v4";
+const SW_PURGE_KEY = "sw-purged-v5";
 (async () => {
   if (typeof window === "undefined") return;
   if (localStorage.getItem(SW_PURGE_KEY) === "1") return;
