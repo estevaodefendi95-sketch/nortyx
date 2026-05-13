@@ -450,7 +450,7 @@ const AdminApproval = () => {
               <div className="text-[11px] text-muted-foreground font-normal">Cadastrar uma nova organização</div>
             </div>
           </Button>
-          <Button onClick={() => { setNuOrgId(allOrgs[0]?.id || ""); setNewUserOpen(true); }} className="gap-2 justify-start h-auto py-3">
+          <Button onClick={() => { const first = allOrgs[0]?.id || ""; setNuOrgIds(first ? [first] : []); setNuPrimaryOrgId(first); setNewUserOpen(true); }} className="gap-2 justify-start h-auto py-3">
             <UserPlus className="w-4 h-4 flex-shrink-0" />
             <div className="text-left">
               <div className="text-sm font-medium">Criar Usuário</div>
