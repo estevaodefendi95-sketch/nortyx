@@ -63,10 +63,12 @@ const OrgSettings = () => {
   useEffect(() => {
     if (!organization) return;
     const load = async () => {
+      if (!user) return;
       const { data } = await supabase
         .from("tab_visibility")
         .select("tab_id, visible")
-        .eq("organization_id", organization.id);
+        .eq("organization_id", organization.id)
+        .eq("user_id", user.id);
 
       const vis: Record<string, boolean> = {};
       ALL_TABS.forEach((t) => (vis[t.id] = true));
@@ -241,28 +243,17 @@ const OrgSettings = () => {
         .eq("id", organization.id);
       if (error) throw error;
 
-      // Save tab visibility
-      for (const tab of ALL_TABS) {
-        const visible = tabVisibility[tab.id] ?? true;
-        const { data: existing } = await supabase
-          .from("tab_visibility")
-          .select("id")
-          .eq("organization_id", organization.id)
-          .eq("tab_id", tab.id)
-          .eq("user_id", user.id)
-          .maybeSingle();
-
-        if (existing) {
-          await supabase.from("tab_visibility").update({ visible }).eq("id", existing.id);
-        } else {
-          await supabase.from("tab_visibility").insert({
-            organization_id: organization.id,
-            tab_id: tab.id,
-            user_id: user.id,
-            visible,
-          });
-        }
-      }
+      // Save tab visibility (one upsert per organization+user+tab)
+      const tabRows = ALL_TABS.map((tab) => ({
+        organization_id: organization.id,
+        user_id: user.id,
+        tab_id: tab.id,
+        visible: tabVisibility[tab.id] ?? true,
+      }));
+      const { error: tabError } = await supabase
+        .from("tab_visibility")
+        .upsert(tabRows, { onConflict: "organization_id,user_id,tab_id" });
+      if (tabError) throw tabError;
 
       // Save dashboard settings (upsert)
       const { error: dashError } = await supabase
