@@ -577,18 +577,31 @@ const AdminApproval = () => {
                       {new Date(user.created_at).toLocaleDateString("pt-BR")}
                     </p>
                   </div>
-                  <Button
-                    size="sm"
-                    onClick={() => handleApprove(user.user_id, user.id)}
-                    disabled={actionLoading === user.id}
-                  >
-                    {actionLoading === user.id ? (
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                    ) : (
-                      <Check className="w-4 h-4 mr-1" />
-                    )}
-                    Aprovar
-                  </Button>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleReject(user.user_id, user.id, user.display_name)}
+                      disabled={actionLoading === user.id}
+                      className="gap-1"
+                    >
+                      <X className="w-4 h-4" />
+                      Reprovar
+                    </Button>
+                    <Button
+                      size="sm"
+                      onClick={() => handleApprove(user.user_id, user.id)}
+                      disabled={actionLoading === user.id}
+                      className="gap-1"
+                    >
+                      {actionLoading === user.id ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <Check className="w-4 h-4" />
+                      )}
+                      Aprovar
+                    </Button>
+                  </div>
                 </div>
               ))
             )}
