@@ -12,6 +12,7 @@ import { Switch } from "@/components/ui/switch";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { useAuth } from "@/hooks/useAuth";
 
 const ALL_TABS = [
   { id: "dados", label: "Dados" },
@@ -76,8 +77,13 @@ const AdminApproval = () => {
 
   const { toast } = useToast();
   const navigate = useNavigate();
+  const { loading: authLoading, user, isAdmin } = useAuth();
+
+  const sessionReady = !authLoading && !!user && isAdmin;
+  const canCreate = sessionReady && !loading;
 
   const openCreateUserDialog = () => {
+    if (!canCreate) return;
     const first = allOrgs[0]?.id || "";
     setNuOrgIds(first ? [first] : []);
     setNuPrimaryOrgId(first);
@@ -445,11 +451,11 @@ const AdminApproval = () => {
             </div>
           </div>
           <div className="grid w-full grid-cols-2 gap-2 pl-11 sm:w-auto sm:flex sm:pl-0">
-            <Button variant="outline" size="sm" onClick={() => setNewOrgOpen(true)} className="w-full gap-2 sm:w-auto">
+            <Button variant="outline" size="sm" onClick={() => setNewOrgOpen(true)} disabled={!canCreate} className="w-full gap-2 sm:w-auto">
               <Building2 className="w-4 h-4" />
               <span>Nova Empresa</span>
             </Button>
-            <Button size="sm" onClick={openCreateUserDialog} className="w-full gap-2 sm:w-auto">
+            <Button size="sm" onClick={openCreateUserDialog} disabled={!canCreate} className="w-full gap-2 sm:w-auto">
               <UserPlus className="w-4 h-4" />
               <span>Criar Usuário</span>
             </Button>
