@@ -1,5 +1,6 @@
 import { useState, useMemo, useRef, useEffect, useCallback } from "react";
 import { useTransactions } from "@/context/TransactionsContext";
+import { useOrganization } from "@/context/OrganizationContext";
 import { formatCurrency, type CategoryCode } from "@/data/cashflow";
 import { supabase } from "@/integrations/supabase/client";
 import { useCategories } from "@/context/CategoriesContext";
@@ -36,6 +37,25 @@ const WEEKDAYS_PT = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
 const DadosView = ({ selectedMonths, selectedYear, isViewer = false }: DadosViewProps) => {
   const isAllSelected = selectedMonths.length === 0;
   const { transactions, dailyIncomes } = useTransactions();
+  const { organization } = useOrganization();
+  const [billingCharges, setBillingCharges] = useState<{ valor: number; data_cobranca: string }[]>([]);
+
+  useEffect(() => {
+    if (!organization?.id) { setBillingCharges([]); return; }
+    const load = async () => {
+      const { data } = await supabase
+        .from("billing_charges")
+        .select("valor, data_cobranca")
+        .eq("organization_id", organization.id);
+      setBillingCharges(((data as any) || []).map((c: any) => ({ valor: Number(c.valor) || 0, data_cobranca: c.data_cobranca })));
+    };
+    load();
+    const channel = supabase
+      .channel(`billing_charges_dados_${organization.id}`)
+      .on("postgres_changes", { event: "*", schema: "public", table: "billing_charges", filter: `organization_id=eq.${organization.id}` }, load)
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [organization?.id]);
   const { settings: dashSettings } = useDashboardSettings();
   const [selectedWeekdays, setSelectedWeekdays] = useState<number[]>([]);
   const { toast } = useToast();
@@ -251,9 +271,11 @@ const DadosView = ({ selectedMonths, selectedYear, isViewer = false }: DadosView
   // Monthly revenue & balance from context
   const { faturamento, despesas, saldo } = useMemo(() => {
     const fat = dailyIncomes.filter((i) => matchMonth(i.data)).reduce((s, i) => s + i.valor, 0);
+    const fatCharges = billingCharges.filter((c) => matchMonth(c.data_cobranca)).reduce((s, c) => s + c.valor, 0);
     const desp = transactions.filter((t) => t.tipo === "saida" && matchMonth(t.data)).reduce((s, t) => s + t.valor, 0);
-    return { faturamento: fat, despesas: desp, saldo: fat - desp };
-  }, [selectedMonths, isAllSelected, transactions, dailyIncomes]);
+    const total = fat + fatCharges;
+    return { faturamento: total, despesas: desp, saldo: total - desp };
+  }, [selectedMonths, isAllSelected, transactions, dailyIncomes, billingCharges]);
 
   // CMV = (Comida + Bebida expenses) / Faturamento
   const cmv = useMemo(() => {
