@@ -227,10 +227,9 @@ const OrgSettings = () => {
         const { error: uploadError } = await supabase.storage
           .from("org-logos")
           .upload(path, logoFile, { upsert: true });
-        if (!uploadError) {
-          const { data: urlData } = supabase.storage.from("org-logos").getPublicUrl(path);
-          logoUrl = urlData.publicUrl;
-        }
+        if (uploadError) throw uploadError;
+        const { data: urlData } = supabase.storage.from("org-logos").getPublicUrl(path);
+        logoUrl = `${urlData.publicUrl}?t=${Date.now()}`;
       }
 
       if (logoPreview === null && organization.logo_url) {
