@@ -77,8 +77,13 @@ const AdminApproval = () => {
 
   const { toast } = useToast();
   const navigate = useNavigate();
+  const { loading: authLoading, user, isAdmin } = useAuth();
+
+  const sessionReady = !authLoading && !!user && isAdmin;
+  const canCreate = sessionReady && !loading;
 
   const openCreateUserDialog = () => {
+    if (!canCreate) return;
     const first = allOrgs[0]?.id || "";
     setNuOrgIds(first ? [first] : []);
     setNuPrimaryOrgId(first);
