@@ -3,6 +3,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 
 const SUPER_USER_EMAIL = "estevaodefendi95@gmail.com";
+const ACTIVE_ORG_KEY = "nortyx_active_org";
+const LEGACY_ACTIVE_ORG_KEY = "paggio_active_org";
 
 export interface Organization {
   id: string;
@@ -103,7 +105,7 @@ export const OrganizationProvider = ({ children }: { children: ReactNode }) => {
       }
 
       // Check localStorage for preferred org
-      const preferredOrgId = localStorage.getItem("paggio_active_org");
+      const preferredOrgId = localStorage.getItem(ACTIVE_ORG_KEY) || localStorage.getItem(LEGACY_ACTIVE_ORG_KEY);
 
       // For super user, allow selecting any org
       if (user.email === SUPER_USER_EMAIL && allOrgs.length > 0) {
@@ -130,7 +132,8 @@ export const OrganizationProvider = ({ children }: { children: ReactNode }) => {
             created_at: new Date().toISOString(),
           });
         }
-        localStorage.setItem("paggio_active_org", selectedOrg.id);
+        localStorage.setItem(ACTIVE_ORG_KEY, selectedOrg.id);
+        localStorage.removeItem(LEGACY_ACTIVE_ORG_KEY);
       } else if (memberships && memberships.length > 0) {
         // Load all organizations the user belongs to
         const orgIds = memberships.map((m) => m.organization_id);
@@ -196,7 +199,8 @@ export const OrganizationProvider = ({ children }: { children: ReactNode }) => {
             role: activeMembership.role as OrgMember["role"],
             created_at: activeMembership.created_at,
           });
-          localStorage.setItem("paggio_active_org", activeMembership.organization_id);
+          localStorage.setItem(ACTIVE_ORG_KEY, activeMembership.organization_id);
+          localStorage.removeItem(LEGACY_ACTIVE_ORG_KEY);
         }
       } else {
         setAvailableOrganizations([]);
@@ -236,7 +240,8 @@ export const OrganizationProvider = ({ children }: { children: ReactNode }) => {
   }, [user, loadOrganization]);
 
   const switchOrganization = useCallback(async (orgId: string) => {
-    localStorage.setItem("paggio_active_org", orgId);
+    localStorage.setItem(ACTIVE_ORG_KEY, orgId);
+    localStorage.removeItem(LEGACY_ACTIVE_ORG_KEY);
     await loadOrganization();
   }, [loadOrganization]);
 
