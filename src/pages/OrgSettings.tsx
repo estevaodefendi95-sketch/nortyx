@@ -25,7 +25,7 @@ const SUPER_EMAIL = "estevaodefendi95@gmail.com";
 
 const OrgSettings = () => {
   const { organization, membership, refreshOrganization } = useOrganization();
-  const { user } = useAuth();
+  const { user, isAdmin } = useAuth();
   const { categories } = useCategories();
   const { toast } = useToast();
   const navigate = useNavigate();
@@ -57,7 +57,7 @@ const OrgSettings = () => {
   const [inviting, setInviting] = useState(false);
 
   const isSuperUser = user?.email === SUPER_EMAIL;
-  const isOwner = membership?.role === "owner" || membership?.role === "admin" || isSuperUser;
+  const isOwner = membership?.role === "owner" || membership?.role === "admin" || isSuperUser || isAdmin;
 
   // Load tab visibility for the org
   useEffect(() => {
