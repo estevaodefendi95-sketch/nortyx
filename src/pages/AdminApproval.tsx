@@ -105,8 +105,8 @@ const AdminApproval = () => {
   };
 
   const handleCreateUser = async () => {
-    if (!nuEmail.trim() || !nuOrgId) {
-      toast({ title: "Preencha email e empresa", variant: "destructive" });
+    if (!nuEmail.trim() || nuOrgIds.length === 0) {
+      toast({ title: "Preencha email e ao menos uma empresa", variant: "destructive" });
       return;
     }
     if (!nuSendInvite && (!nuPassword || nuPassword.length < 6)) {
@@ -115,13 +115,16 @@ const AdminApproval = () => {
     }
     setNuSaving(true);
     try {
+      const primary = nuOrgIds.includes(nuPrimaryOrgId) ? nuPrimaryOrgId : nuOrgIds[0];
       const { data, error } = await supabase.functions.invoke("admin-create-user", {
         body: {
           email: nuEmail.trim(),
           password: nuSendInvite ? undefined : nuPassword,
           send_invite: nuSendInvite,
           display_name: nuName.trim() || undefined,
-          organization_id: nuOrgId,
+          organization_ids: nuOrgIds,
+          primary_organization_id: primary,
+          organization_id: primary, // compat
           org_role: nuOrgRole,
           system_role: nuSystemRole,
           tab_visibility: nuTabs,
@@ -136,6 +139,7 @@ const AdminApproval = () => {
       });
       setNuEmail(""); setNuName(""); setNuPassword(""); setNuSendInvite(false);
       setNuOrgRole("member"); setNuSystemRole("user");
+      setNuOrgIds([]); setNuPrimaryOrgId("");
       setNuTabs(Object.fromEntries(ALL_TABS.map((t) => [t.id, true])));
       setNuApproved(true);
       setNewUserOpen(false);
