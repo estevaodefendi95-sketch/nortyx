@@ -56,8 +56,8 @@ const OrgSettings = () => {
   const [inviteRole, setInviteRole] = useState<"member" | "admin">("member");
   const [inviting, setInviting] = useState(false);
 
-  const isOwner = membership?.role === "owner" || membership?.role === "admin";
   const isSuperUser = user?.email === SUPER_EMAIL;
+  const isOwner = membership?.role === "owner" || membership?.role === "admin" || isSuperUser;
 
   // Load tab visibility for the org
   useEffect(() => {
