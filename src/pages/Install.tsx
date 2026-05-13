@@ -43,7 +43,7 @@ const InstallPage = () => {
         <img src="/pwa-icon-512.png" alt="nortyx" className="w-24 h-24 mx-auto rounded-2xl shadow-lg" />
         <h1 className="text-3xl font-display font-bold">nortyx</h1>
         <p className="text-muted-foreground">
-          Instale o app no seu celular para acessar rapidamente o controle financeiro do restaurante.
+          Instale o nortyx no seu celular para acessar rapidamente seu controle financeiro.
         </p>
 
         {isInstalled ? (
