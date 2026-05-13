@@ -2,7 +2,7 @@ import { useEffect, useCallback, useState } from "react";
 import { useTransactions } from "@/context/TransactionsContext";
 import { supabase } from "@/integrations/supabase/client";
 
-const LAST_NOTIF_KEY = "paggio_last_reminder";
+const LAST_NOTIF_KEY = "nortyx_last_reminder";
 const VAPID_PUBLIC_KEY = "BP9SVkOCyXQ23hyRgLw9_LVTUeZ2cD8eLVDjtsyeDIx_BJxfDz-NSImcdvIlBUVShBAWcg4ZGrooizPgoJ2V05w";
 
 function urlBase64ToUint8Array(base64String: string): Uint8Array {

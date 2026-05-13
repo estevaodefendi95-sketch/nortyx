@@ -6,7 +6,7 @@ import "./index.css";
 // Purga única (versionada) de SW/caches antigos para garantir que usuários
 // recebam o bundle mais recente após uma atualização. Incrementar a chave
 // abaixo força uma nova limpeza em todos os clientes já instalados.
-const SW_PURGE_KEY = "sw-purged-v5";
+const SW_PURGE_KEY = "sw-purged-v6-nortyx";
 (async () => {
   if (typeof window === "undefined") return;
   if (localStorage.getItem(SW_PURGE_KEY) === "1") return;
@@ -26,7 +26,7 @@ const SW_PURGE_KEY = "sw-purged-v5";
 // visita, limpa caches do app, atualiza o <link rel="manifest"> com cache-bust
 // e recarrega para que o navegador (e o prompt de instalação) leiam o novo
 // manifesto. Isso resolve o caso "nome antigo aparece no popup de instalação".
-const MANIFEST_KEY = "pwa-manifest-sig-v1";
+const MANIFEST_KEY = "pwa-manifest-sig-v2-nortyx";
 (async () => {
   if (typeof window === "undefined") return;
   try {

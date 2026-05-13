@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { Bell, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
-const DISMISSED_KEY = "paggio_notif_banner_dismissed";
+const DISMISSED_KEY = "nortyx_notif_banner_dismissed";
 
 export default function NotificationBanner() {
   const [visible, setVisible] = useState(false);
