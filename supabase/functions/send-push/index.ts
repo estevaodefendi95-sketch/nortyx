@@ -16,7 +16,7 @@ serve(async (req) => {
     const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
     const SUPABASE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
-    webpush.setVapidDetails("mailto:admin@paggio.com", VAPID_PUBLIC, VAPID_PRIVATE);
+    webpush.setVapidDetails("mailto:admin@nortyx.app", VAPID_PUBLIC, VAPID_PRIVATE);
 
     const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
