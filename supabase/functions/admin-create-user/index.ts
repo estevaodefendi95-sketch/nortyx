@@ -44,6 +44,8 @@ Deno.serve(async (req) => {
       password,
       display_name,
       organization_id,
+      organization_ids,
+      primary_organization_id,
       org_role = "member",
       system_role = "user", // user | admin | viewer
       tab_visibility = {}, // { tab_id: boolean }
@@ -51,9 +53,17 @@ Deno.serve(async (req) => {
       send_invite = false,
     } = body || {};
 
-    if (!email || !organization_id) {
-      return json({ error: "email e organization_id são obrigatórios" }, 400);
+    // Normaliza lista de empresas (suporta legacy organization_id)
+    const orgIds: string[] = Array.isArray(organization_ids) && organization_ids.length > 0
+      ? organization_ids.filter((x: any) => typeof x === "string")
+      : (organization_id ? [organization_id] : []);
+
+    if (!email || orgIds.length === 0) {
+      return json({ error: "email e ao menos uma empresa são obrigatórios" }, 400);
     }
+    const primaryOrgId: string = orgIds.includes(primary_organization_id)
+      ? primary_organization_id
+      : orgIds[0];
     if (!["member", "admin", "owner"].includes(org_role)) {
       return json({ error: "papel inválido" }, 400);
     }
@@ -107,7 +117,7 @@ Deno.serve(async (req) => {
       .eq("user_id", userId)
       .maybeSingle();
     const profilePayload: any = {
-      organization_id,
+      organization_id: primaryOrgId,
       approved,
     };
     if (display_name) profilePayload.display_name = display_name;
@@ -117,21 +127,23 @@ Deno.serve(async (req) => {
       await admin.from("profiles").insert({ user_id: userId, ...profilePayload });
     }
 
-    // Membership
-    const { data: existingMem } = await admin
-      .from("organization_members")
-      .select("id")
-      .eq("organization_id", organization_id)
-      .eq("user_id", userId)
-      .maybeSingle();
-    if (!existingMem) {
-      await admin.from("organization_members").insert({
-        organization_id,
-        user_id: userId,
-        role: org_role,
-      });
-    } else {
-      await admin.from("organization_members").update({ role: org_role }).eq("id", existingMem.id);
+    // Memberships (uma linha por empresa selecionada)
+    for (const orgId of orgIds) {
+      const { data: existingMem } = await admin
+        .from("organization_members")
+        .select("id")
+        .eq("organization_id", orgId)
+        .eq("user_id", userId)
+        .maybeSingle();
+      if (!existingMem) {
+        await admin.from("organization_members").insert({
+          organization_id: orgId,
+          user_id: userId,
+          role: org_role,
+        });
+      } else {
+        await admin.from("organization_members").update({ role: org_role }).eq("id", existingMem.id);
+      }
     }
 
     // System role (user_roles): admin e viewer ficam armazenados; "user" = sem role
@@ -142,7 +154,7 @@ Deno.serve(async (req) => {
       await admin.from("user_roles").insert({ user_id: userId, role: "viewer" });
     }
 
-    // Tab visibility
+    // Tab visibility (vinculado à empresa principal)
     const tabEntries = Object.entries(tab_visibility || {});
     for (const [tab_id, visible] of tabEntries) {
       const { data: existingTv } = await admin
@@ -152,13 +164,13 @@ Deno.serve(async (req) => {
         .eq("tab_id", tab_id)
         .maybeSingle();
       if (existingTv) {
-        await admin.from("tab_visibility").update({ visible: !!visible, organization_id }).eq("id", existingTv.id);
+        await admin.from("tab_visibility").update({ visible: !!visible, organization_id: primaryOrgId }).eq("id", existingTv.id);
       } else {
         await admin.from("tab_visibility").insert({
           user_id: userId,
           tab_id,
           visible: !!visible,
-          organization_id,
+          organization_id: primaryOrgId,
         });
       }
     }

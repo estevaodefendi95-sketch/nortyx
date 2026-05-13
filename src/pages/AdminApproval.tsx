@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
-import { Check, X, ArrowLeft, Loader2, Shield, Eye, Pencil, Bell, Clock, Send, LayoutGrid, Building2, Star, Plus, UserPlus } from "lucide-react";
+import { Check, X, ArrowLeft, Loader2, Shield, Eye, Pencil, Bell, Clock, Send, LayoutGrid, Building2, Star, Plus, UserPlus, StarOff } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -64,7 +64,8 @@ const AdminApproval = () => {
   const [nuName, setNuName] = useState("");
   const [nuPassword, setNuPassword] = useState("");
   const [nuSendInvite, setNuSendInvite] = useState(false);
-  const [nuOrgId, setNuOrgId] = useState<string>("");
+  const [nuOrgIds, setNuOrgIds] = useState<string[]>([]);
+  const [nuPrimaryOrgId, setNuPrimaryOrgId] = useState<string>("");
   const [nuOrgRole, setNuOrgRole] = useState<"member" | "admin" | "owner">("member");
   const [nuSystemRole, setNuSystemRole] = useState<"user" | "admin" | "viewer">("user");
   const [nuTabs, setNuTabs] = useState<Record<string, boolean>>(() =>
@@ -104,8 +105,8 @@ const AdminApproval = () => {
   };
 
   const handleCreateUser = async () => {
-    if (!nuEmail.trim() || !nuOrgId) {
-      toast({ title: "Preencha email e empresa", variant: "destructive" });
+    if (!nuEmail.trim() || nuOrgIds.length === 0) {
+      toast({ title: "Preencha email e ao menos uma empresa", variant: "destructive" });
       return;
     }
     if (!nuSendInvite && (!nuPassword || nuPassword.length < 6)) {
@@ -114,13 +115,16 @@ const AdminApproval = () => {
     }
     setNuSaving(true);
     try {
+      const primary = nuOrgIds.includes(nuPrimaryOrgId) ? nuPrimaryOrgId : nuOrgIds[0];
       const { data, error } = await supabase.functions.invoke("admin-create-user", {
         body: {
           email: nuEmail.trim(),
           password: nuSendInvite ? undefined : nuPassword,
           send_invite: nuSendInvite,
           display_name: nuName.trim() || undefined,
-          organization_id: nuOrgId,
+          organization_ids: nuOrgIds,
+          primary_organization_id: primary,
+          organization_id: primary, // compat
           org_role: nuOrgRole,
           system_role: nuSystemRole,
           tab_visibility: nuTabs,
@@ -135,6 +139,7 @@ const AdminApproval = () => {
       });
       setNuEmail(""); setNuName(""); setNuPassword(""); setNuSendInvite(false);
       setNuOrgRole("member"); setNuSystemRole("user");
+      setNuOrgIds([]); setNuPrimaryOrgId("");
       setNuTabs(Object.fromEntries(ALL_TABS.map((t) => [t.id, true])));
       setNuApproved(true);
       setNewUserOpen(false);
@@ -445,7 +450,7 @@ const AdminApproval = () => {
               <div className="text-[11px] text-muted-foreground font-normal">Cadastrar uma nova organização</div>
             </div>
           </Button>
-          <Button onClick={() => { setNuOrgId(allOrgs[0]?.id || ""); setNewUserOpen(true); }} className="gap-2 justify-start h-auto py-3">
+          <Button onClick={() => { const first = allOrgs[0]?.id || ""; setNuOrgIds(first ? [first] : []); setNuPrimaryOrgId(first); setNewUserOpen(true); }} className="gap-2 justify-start h-auto py-3">
             <UserPlus className="w-4 h-4 flex-shrink-0" />
             <div className="text-left">
               <div className="text-sm font-medium">Criar Usuário</div>
@@ -857,15 +862,75 @@ const AdminApproval = () => {
             )}
 
             <div className="space-y-1.5">
-              <Label>Empresa</Label>
-              <Select value={nuOrgId} onValueChange={setNuOrgId}>
-                <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
-                <SelectContent>
-                  {allOrgs.map((o) => (
-                    <SelectItem key={o.id} value={o.id}>{o.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <div className="flex items-center justify-between">
+                <Label>Empresas ({nuOrgIds.length})</Label>
+                {allOrgs.length > 0 && (
+                  <button
+                    type="button"
+                    className="text-xs text-primary hover:underline"
+                    onClick={() => {
+                      if (nuOrgIds.length === allOrgs.length) {
+                        setNuOrgIds([]); setNuPrimaryOrgId("");
+                      } else {
+                        const ids = allOrgs.map((o) => o.id);
+                        setNuOrgIds(ids);
+                        if (!ids.includes(nuPrimaryOrgId)) setNuPrimaryOrgId(ids[0] || "");
+                      }
+                    }}
+                  >
+                    {nuOrgIds.length === allOrgs.length ? "Limpar" : "Selecionar todas"}
+                  </button>
+                )}
+              </div>
+              <div className="max-h-56 overflow-y-auto rounded-md border border-border divide-y divide-border">
+                {allOrgs.length === 0 ? (
+                  <p className="p-3 text-xs text-muted-foreground">Nenhuma empresa cadastrada.</p>
+                ) : (
+                  allOrgs.map((o) => {
+                    const checked = nuOrgIds.includes(o.id);
+                    const isPrimary = nuPrimaryOrgId === o.id;
+                    return (
+                      <div key={o.id} className="flex items-center gap-2 px-2.5 py-2 text-sm">
+                        <Checkbox
+                          checked={checked}
+                          onCheckedChange={(c) => {
+                            const next = !!c;
+                            setNuOrgIds((prev) => {
+                              const arr = next ? [...prev, o.id] : prev.filter((x) => x !== o.id);
+                              if (next && !nuPrimaryOrgId) setNuPrimaryOrgId(o.id);
+                              if (!next && nuPrimaryOrgId === o.id) setNuPrimaryOrgId(arr[0] || "");
+                              return arr;
+                            });
+                          }}
+                        />
+                        <span
+                          className="inline-block w-2 h-2 rounded-full flex-shrink-0"
+                          style={{ backgroundColor: o.primary_color || "hsl(var(--muted-foreground))" }}
+                        />
+                        <span className="flex-1 truncate text-foreground">{o.name}</span>
+                        <button
+                          type="button"
+                          disabled={!checked}
+                          onClick={() => setNuPrimaryOrgId(o.id)}
+                          title={isPrimary ? "Empresa principal" : "Definir como principal"}
+                          className="p-0.5 disabled:opacity-30"
+                        >
+                          {isPrimary ? (
+                            <Star className="w-4 h-4 fill-primary text-primary" />
+                          ) : (
+                            <StarOff className="w-4 h-4 text-muted-foreground hover:text-primary" />
+                          )}
+                        </button>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+              {nuOrgIds.length > 1 && (
+                <p className="text-[11px] text-muted-foreground">
+                  ⭐ marca a empresa principal (a que abre por padrão para o usuário).
+                </p>
+              )}
             </div>
 
             <div className="grid grid-cols-2 gap-3">
