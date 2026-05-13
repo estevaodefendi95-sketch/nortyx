@@ -437,28 +437,36 @@ const AdminApproval = () => {
       </div>
 
       {/* Ações administrativas */}
-      <section className="p-4 rounded-lg border border-border bg-card">
-        <div className="flex items-center gap-2 mb-3">
-          <Plus className="w-4 h-4 text-primary" />
-          <h2 className="text-sm font-semibold text-foreground">Criar novos</h2>
-        </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-          <Button variant="outline" onClick={() => setNewOrgOpen(true)} className="gap-2 justify-start h-auto py-3">
-            <Building2 className="w-4 h-4 text-primary flex-shrink-0" />
-            <div className="text-left">
-              <div className="text-sm font-medium">Nova Empresa</div>
-              <div className="text-[11px] text-muted-foreground font-normal">Cadastrar uma nova organização</div>
-            </div>
-          </Button>
-          <Button onClick={() => { const first = allOrgs[0]?.id || ""; setNuOrgIds(first ? [first] : []); setNuPrimaryOrgId(first); setNewUserOpen(true); }} className="gap-2 justify-start h-auto py-3">
-            <UserPlus className="w-4 h-4 flex-shrink-0" />
-            <div className="text-left">
-              <div className="text-sm font-medium">Criar Usuário</div>
-              <div className="text-[11px] opacity-80 font-normal">Vincular usuário a uma empresa</div>
-            </div>
-          </Button>
-        </div>
-      </section>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <button
+          type="button"
+          onClick={() => setNewOrgOpen(true)}
+          aria-label="Cadastrar nova empresa"
+          className="group flex items-start gap-3 p-4 rounded-xl border border-border bg-card text-left hover:border-primary/50 hover:bg-accent/30 transition-colors"
+        >
+          <span className="flex-shrink-0 w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center">
+            <Building2 className="w-4 h-4 text-primary" />
+          </span>
+          <span className="min-w-0">
+            <span className="block text-sm font-semibold text-foreground">Nova Empresa</span>
+            <span className="block text-xs text-muted-foreground mt-0.5">Cadastrar uma nova organização</span>
+          </span>
+        </button>
+        <button
+          type="button"
+          onClick={() => { const first = allOrgs[0]?.id || ""; setNuOrgIds(first ? [first] : []); setNuPrimaryOrgId(first); setNewUserOpen(true); }}
+          aria-label="Criar novo usuário"
+          className="group flex items-start gap-3 p-4 rounded-xl border border-border bg-card text-left hover:border-primary/50 hover:bg-accent/30 transition-colors"
+        >
+          <span className="flex-shrink-0 w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center">
+            <UserPlus className="w-4 h-4 text-primary" />
+          </span>
+          <span className="min-w-0">
+            <span className="block text-sm font-semibold text-foreground">Criar Usuário</span>
+            <span className="block text-xs text-muted-foreground mt-0.5">Vincular usuário a uma ou mais empresas</span>
+          </span>
+        </button>
+      </div>
 
       {/* Push Notification Settings */}
       <section className="p-4 rounded-lg border border-border bg-card space-y-3">
