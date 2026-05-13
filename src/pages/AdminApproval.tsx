@@ -444,14 +444,14 @@ const AdminApproval = () => {
               <h1 className="text-xl font-bold text-foreground">Gerenciar Usuários</h1>
             </div>
           </div>
-          <div className="flex gap-2 pl-12 sm:pl-0">
-            <Button variant="outline" size="sm" onClick={() => setNewOrgOpen(true)} className="gap-2">
+          <div className="grid w-full grid-cols-2 gap-2 pl-11 sm:w-auto sm:flex sm:pl-0">
+            <Button variant="outline" size="sm" onClick={() => setNewOrgOpen(true)} className="w-full gap-2 sm:w-auto">
               <Building2 className="w-4 h-4" />
-              Nova Empresa
+              <span>Nova Empresa</span>
             </Button>
-            <Button size="sm" onClick={openCreateUserDialog} className="gap-2">
+            <Button size="sm" onClick={openCreateUserDialog} className="w-full gap-2 sm:w-auto">
               <UserPlus className="w-4 h-4" />
-              Criar Usuário
+              <span>Criar Usuário</span>
             </Button>
           </div>
         </div>
