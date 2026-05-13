@@ -300,6 +300,23 @@ const AdminApproval = () => {
     setActionLoading(null);
   };
 
+  const handleReject = async (userId: string, profileId: string, name: string | null) => {
+    if (!confirm(`Reprovar e excluir definitivamente o usuário ${name || ""}? Esta ação não pode ser desfeita.`)) return;
+    setActionLoading(profileId);
+    try {
+      const { data, error } = await supabase.functions.invoke("admin-delete-user", {
+        body: { user_id: userId },
+      });
+      if (error) throw error;
+      if ((data as any)?.error) throw new Error((data as any).error);
+      toast({ title: "Usuário reprovado", description: "Cadastro excluído." });
+      setUsers((prev) => prev.filter((u) => u.id !== profileId));
+    } catch (e: any) {
+      toast({ title: "Erro", description: e.message || "Falha ao excluir", variant: "destructive" });
+    }
+    setActionLoading(null);
+  };
+
   const handleRoleChange = async (userId: string, profileId: string, newRole: string) => {
     setActionLoading(profileId);
     // Delete existing non-admin roles for this user (keep admin if changing to admin)
@@ -560,18 +577,31 @@ const AdminApproval = () => {
                       {new Date(user.created_at).toLocaleDateString("pt-BR")}
                     </p>
                   </div>
-                  <Button
-                    size="sm"
-                    onClick={() => handleApprove(user.user_id, user.id)}
-                    disabled={actionLoading === user.id}
-                  >
-                    {actionLoading === user.id ? (
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                    ) : (
-                      <Check className="w-4 h-4 mr-1" />
-                    )}
-                    Aprovar
-                  </Button>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleReject(user.user_id, user.id, user.display_name)}
+                      disabled={actionLoading === user.id}
+                      className="gap-1"
+                    >
+                      <X className="w-4 h-4" />
+                      Reprovar
+                    </Button>
+                    <Button
+                      size="sm"
+                      onClick={() => handleApprove(user.user_id, user.id)}
+                      disabled={actionLoading === user.id}
+                      className="gap-1"
+                    >
+                      {actionLoading === user.id ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <Check className="w-4 h-4" />
+                      )}
+                      Aprovar
+                    </Button>
+                  </div>
                 </div>
               ))
             )}
