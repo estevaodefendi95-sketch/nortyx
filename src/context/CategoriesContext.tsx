@@ -4,7 +4,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useOrganization } from "@/context/OrganizationContext";
 
-const STORAGE_KEY_MAP = "paggio_category_mappings";
+const STORAGE_KEY_MAP = "nortyx_category_mappings";
+const LEGACY_STORAGE_KEY_MAP = "paggio_category_mappings";
 
 // Default color map for built-in categories
 const DEFAULT_COLORS: Record<string, string> = {
@@ -61,7 +62,7 @@ export const CategoriesProvider = ({ children }: { children: ReactNode }) => {
 
   const [mappings, setMappings] = useState<Record<string, CategoryCode>>(() => {
     try {
-      const raw = localStorage.getItem(STORAGE_KEY_MAP);
+      const raw = localStorage.getItem(STORAGE_KEY_MAP) || localStorage.getItem(LEGACY_STORAGE_KEY_MAP);
       if (raw) return JSON.parse(raw);
     } catch {}
     return {};
@@ -243,11 +244,12 @@ export const CategoriesProvider = ({ children }: { children: ReactNode }) => {
     });
 
     try {
-      const raw = localStorage.getItem("paggio_categories");
+      const raw = localStorage.getItem("nortyx_categories") || localStorage.getItem("paggio_categories");
       if (raw) {
         const localCats: CategoryInfo[] = JSON.parse(raw);
         const filtered = localCats.filter((c) => c.code !== code);
-        localStorage.setItem("paggio_categories", JSON.stringify(filtered));
+        localStorage.setItem("nortyx_categories", JSON.stringify(filtered));
+        localStorage.removeItem("paggio_categories");
       }
     } catch {}
   }, []);
