@@ -1,20 +1,27 @@
+## Problema
+
+Ao salvar uma entrada na empresa "Casa", aparece "Erro ao salvar entrada". A causa é uma regra de segurança no banco que valida o `organization_id` usando uma função antiga (`get_user_org_id`) que só retorna a **primeira** empresa do usuário. Quando o usuário está em outra empresa (ex.: "Casa", que não é a primeira), o INSERT é bloqueado.
+
+O mesmo problema afeta várias tabelas multiempresa.
+
 ## Plano
 
-1. **Ajustar a leitura da visibilidade por empresa**
-   - Atualizar `useTabVisibility` para considerar a `organization_id` ativa, não apenas o `user_id`.
-   - Garantir que, ao trocar de empresa, as abas reflitam as configurações daquela empresa.
-   - Manter o estado carregando até existir usuário e organização, evitando voltar temporariamente para todas as abas marcadas.
+1. **Migração de banco** — substituir, em todas as policies (SELECT/INSERT/UPDATE/DELETE) das tabelas abaixo, a checagem `organization_id = get_user_org_id(auth.uid())` por `is_org_member(auth.uid(), organization_id)`. Isso valida o `organization_id` real enviado na linha, em vez de comparar com uma única empresa fixa.
 
-2. **Corrigir o salvamento nas configurações**
-   - Em `OrgSettings`, salvar a visibilidade usando uma chave única por `organization_id + user_id + tab_id`.
-   - Substituir a lógica atual de “procura e atualiza/insere” por uma operação consistente que não conflite com registros de outras empresas.
-   - Exibir erro se alguma aba falhar ao salvar, em vez de mostrar sucesso quando a mudança não foi persistida.
+   Tabelas afetadas:
+   - `daily_incomes` (causa direta do erro atual)
+   - `transactions`
+   - `fornecedores`
+   - `products`
+   - `push_subscriptions`
+   - `notes`
+   - `subcategories`
 
-3. **Ajustar a estrutura do banco para multiempresa**
-   - Alterar a regra única de `tab_visibility`, que hoje ainda é `user_id + tab_id`, para `organization_id + user_id + tab_id`.
-   - Isso impede que a visibilidade de uma empresa sobrescreva ou bloqueie a visibilidade de outra.
-   - Manter compatibilidade migrando/normalizando registros existentes quando necessário.
+2. **Validação**
+   - Trocar para a empresa "Casa" e registrar uma entrada → deve salvar sem erro.
+   - Trocar para outra empresa e registrar entrada/saída/categoria → deve continuar salvando normalmente.
+   - Conferir que listagens continuam mostrando apenas dados da empresa ativa.
 
-4. **Validar o comportamento**
-   - Conferir que desmarcar uma aba em `/settings`, salvar e atualizar a tela mantém a aba desmarcada.
-   - Conferir que a navegação principal usa a mesma configuração persistida da empresa ativa.
+## Escopo
+
+Apenas correção das policies de banco. Nenhuma mudança de UI, nenhuma mudança no cabeçalho ou em cobranças (a parte de "vincular cobranças às entradas do mês" fica para uma próxima etapa, separada).
