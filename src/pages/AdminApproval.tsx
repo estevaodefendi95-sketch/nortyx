@@ -451,11 +451,11 @@ const AdminApproval = () => {
             </div>
           </div>
           <div className="grid w-full grid-cols-2 gap-2 pl-11 sm:w-auto sm:flex sm:pl-0">
-            <Button variant="outline" size="sm" onClick={() => setNewOrgOpen(true)} className="w-full gap-2 sm:w-auto">
+            <Button variant="outline" size="sm" onClick={() => setNewOrgOpen(true)} disabled={!canCreate} className="w-full gap-2 sm:w-auto">
               <Building2 className="w-4 h-4" />
               <span>Nova Empresa</span>
             </Button>
-            <Button size="sm" onClick={openCreateUserDialog} className="w-full gap-2 sm:w-auto">
+            <Button size="sm" onClick={openCreateUserDialog} disabled={!canCreate} className="w-full gap-2 sm:w-auto">
               <UserPlus className="w-4 h-4" />
               <span>Criar Usuário</span>
             </Button>
