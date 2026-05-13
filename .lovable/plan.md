@@ -1,43 +1,55 @@
 ## Objetivo
 
-Garantir que o usuário administrador master (`estevaodefendi95@gmail.com`) tenha acesso completo a todas as empresas e a todos os usuários, sem precisar de papel `admin` na tabela `user_roles` nem de pertencer a uma empresa.
+Permitir que qualquer usuário com perfil de sistema **Administrador** (`user_roles.role = 'admin'`) acesse, no cabeçalho, todas as áreas administrativas (sino de notificações, tema, histórico, painel admin, configurações da empresa e sair) para **qualquer empresa em que ele esteja cadastrado**, não apenas aquelas em que tem papel `owner`/`admin` na organização.
 
 ## Situação atual
 
-- O contexto de organizações já reconhece o super user e lista todas as empresas para troca.
-- Porém o super user é bloqueado em `/admin` e `/admin/history` porque o `AdminRoute` valida apenas `isAdmin` (papel `admin` em `user_roles`).
-- Mesmo entrando na tela, várias consultas usadas em `AdminApproval` falham por RLS para o super user:
-  - `profiles` (SELECT só permitido a admins via `has_role`)
-  - `user_roles` (SELECT só para admins via `has_role`)
-  - `tab_visibility` (SELECT exige `has_role` admin)
-  - `organization_members` (sem SELECT explícito para super user)
-  - Operações de update em `profiles.approved`, insert/delete em `user_roles` e upsert em `tab_visibility` também não cobrem o super user.
+- O sino, tema, sair: já visíveis para todos.
+- Histórico (`/admin/history`) e painel (`/admin`): já visíveis quando `isAdmin` (perfil de sistema). OK.
+- **Engrenagem de Configurações** (`/settings`): só aparece quando `isOrgOwner = membership.role in ('owner','admin')`. Um administrador de sistema que entra em uma empresa apenas como `member` **não vê** a engrenagem nem consegue editar.
+- Mesmo se a engrenagem aparecesse, o RLS atual restringe a edição:
+  - `organizations` UPDATE → somente `owner` da empresa ou super user.
+  - `org_dashboard_settings` INSERT/UPDATE → somente `owner` ou quem tem papel de sistema `admin` **na empresa ativa** (via `get_user_org_id`, que só devolve uma org).
+  - `organization_members` / `organization_invites` → exigem papel `owner`/`admin` na própria empresa.
 
 ## Mudanças
 
-### 1. Frontend — tratar super user como admin
+### 1. Frontend — mostrar engrenagem para admins de sistema
 
-- `src/hooks/useAuth.tsx`: marcar `isAdmin = true` automaticamente quando `user.email === 'estevaodefendi95@gmail.com'`, mesmo sem linha em `user_roles`. Isso libera o `AdminRoute`, os botões e as telas `/admin` e `/admin/history`.
+`src/pages/Index.tsx`: incluir o admin de sistema no gate da engrenagem.
 
-### 2. Backend — políticas RLS para o super user
+```ts
+const isOrgOwner =
+  membership?.role === "owner" ||
+  membership?.role === "admin" ||
+  isAdmin || // perfil de sistema
+  isSuperUser;
+```
 
-Adicionar políticas `USING is_super_user(auth.uid())` (e `WITH CHECK` correspondente) nas tabelas usadas pelas telas administrativas:
+`src/pages/OrgSettings.tsx`: a constante `isOwner` também precisa considerar `isAdmin` (do `useAuth`) para liberar os formulários de edição.
 
-- `profiles`: SELECT (todas), e já existe UPDATE; manter.
-- `user_roles`: SELECT, INSERT, UPDATE, DELETE para super user (necessário para alterar perfil de usuários).
-- `tab_visibility`: SELECT, INSERT, UPDATE, DELETE para super user.
-- `organization_members`: garantir SELECT explícito para super user (a policy `Super user manage members` cobre ALL, mas confirmar que não está mascarada por outras restrictive — caso contrário, adicionar SELECT dedicada).
-- `audit_log`: já coberto.
+### 2. Backend — RLS para admin de sistema em qualquer empresa onde for membro
 
-As edge functions `admin-create-user` e `admin-delete-user` já reconhecem o super user por email, então não precisam mudar.
+Substituir/adicionar políticas usando a combinação `has_role(auth.uid(), 'admin') AND is_org_member(auth.uid(), organization_id)`:
+
+- `organizations`: nova policy UPDATE — admins de sistema podem atualizar qualquer organização da qual sejam membros (logo, nome, cor, etc.).
+- `org_dashboard_settings`: novas policies INSERT/UPDATE com a mesma regra (substituem a dependência de `get_user_org_id`, que só funciona para a empresa "principal").
+- `organization_members`: novas policies INSERT/UPDATE/DELETE permitindo admins de sistema gerenciarem membros das organizações em que pertencem.
+- `organization_invites`: nova policy ALL com a mesma regra.
+- `tab_visibility`: nova policy permitindo admin de sistema gerenciar visibilidade de membros das empresas em que está vinculado.
+
+As policies existentes para `owner` e `super_user` permanecem intactas (são aditivas).
 
 ### 3. Verificação
 
-- Logar como master, acessar `/admin`: deve listar todos os usuários de todas as empresas, permitir aprovar/reprovar, alterar papel, ajustar abas, vincular/desvincular empresas e definir empresa principal.
-- O seletor de empresa no cabeçalho continua mostrando todas as empresas (já implementado).
+- Logar como usuário admin de sistema membro da Empresa A e Empresa B (sem ser owner em nenhuma):
+  - Ver os ícones de histórico, painel admin, configurações no header.
+  - Trocar para Empresa B no seletor → engrenagem continua visível, edição de logo/cor/nome funciona.
+  - Conseguir convidar/remover membros e editar dashboard settings em ambas.
+- Usuário comum (sem `admin`) continua sem ver a engrenagem.
 
 ## Detalhes técnicos
 
-- Não criar role `admin` para o super user no banco — manter o reconhecimento por email para evitar acoplamento.
-- Todas as novas policies usam `is_super_user(auth.uid())`, função SECURITY DEFINER já existente, evitando recursão.
+- Funções já existentes reutilizadas: `has_role`, `is_org_member`, `is_super_user`. Sem novas funções.
 - Nenhuma alteração em `client.ts` ou `types.ts`.
+- Sem mudança no edge function `admin-create-user` / `admin-delete-user`.
