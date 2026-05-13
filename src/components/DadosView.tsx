@@ -271,9 +271,11 @@ const DadosView = ({ selectedMonths, selectedYear, isViewer = false }: DadosView
   // Monthly revenue & balance from context
   const { faturamento, despesas, saldo } = useMemo(() => {
     const fat = dailyIncomes.filter((i) => matchMonth(i.data)).reduce((s, i) => s + i.valor, 0);
+    const fatCharges = billingCharges.filter((c) => matchMonth(c.data_cobranca)).reduce((s, c) => s + c.valor, 0);
     const desp = transactions.filter((t) => t.tipo === "saida" && matchMonth(t.data)).reduce((s, t) => s + t.valor, 0);
-    return { faturamento: fat, despesas: desp, saldo: fat - desp };
-  }, [selectedMonths, isAllSelected, transactions, dailyIncomes]);
+    const total = fat + fatCharges;
+    return { faturamento: total, despesas: desp, saldo: total - desp };
+  }, [selectedMonths, isAllSelected, transactions, dailyIncomes, billingCharges]);
 
   // CMV = (Comida + Bebida expenses) / Faturamento
   const cmv = useMemo(() => {
