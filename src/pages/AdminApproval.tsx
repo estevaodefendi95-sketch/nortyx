@@ -300,6 +300,23 @@ const AdminApproval = () => {
     setActionLoading(null);
   };
 
+  const handleReject = async (userId: string, profileId: string, name: string | null) => {
+    if (!confirm(`Reprovar e excluir definitivamente o usuário ${name || ""}? Esta ação não pode ser desfeita.`)) return;
+    setActionLoading(profileId);
+    try {
+      const { data, error } = await supabase.functions.invoke("admin-delete-user", {
+        body: { user_id: userId },
+      });
+      if (error) throw error;
+      if ((data as any)?.error) throw new Error((data as any).error);
+      toast({ title: "Usuário reprovado", description: "Cadastro excluído." });
+      setUsers((prev) => prev.filter((u) => u.id !== profileId));
+    } catch (e: any) {
+      toast({ title: "Erro", description: e.message || "Falha ao excluir", variant: "destructive" });
+    }
+    setActionLoading(null);
+  };
+
   const handleRoleChange = async (userId: string, profileId: string, newRole: string) => {
     setActionLoading(profileId);
     // Delete existing non-admin roles for this user (keep admin if changing to admin)
