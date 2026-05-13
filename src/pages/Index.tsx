@@ -111,12 +111,16 @@ const Index = () => {
       .filter((i) => matchMonth(i.data))
       .reduce((sum, i) => sum + i.valor, 0);
 
+    const chargesIncome = billingCharges
+      .filter((c) => matchMonth(c.data_cobranca))
+      .reduce((sum, c) => sum + c.valor, 0);
+
     const expenses = transactions
       .filter((t) => t.tipo === "saida" && matchMonth(t.data))
       .reduce((sum, t) => sum + t.valor, 0);
 
-    return { filteredIncome: income, filteredExpenses: expenses };
-  }, [selectedMonths, isAllSelected, transactions, dailyIncomes, selectedYear]);
+    return { filteredIncome: income + chargesIncome, filteredExpenses: expenses };
+  }, [selectedMonths, isAllSelected, transactions, dailyIncomes, billingCharges, selectedYear]);
 
   const saldo = filteredIncome - filteredExpenses;
 
