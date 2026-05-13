@@ -421,7 +421,7 @@ const AdminApproval = () => {
 
   return (
     <div className="min-h-screen bg-background p-4 max-w-2xl mx-auto space-y-6">
-      <div className="flex items-center gap-3 flex-wrap">
+      <div className="flex items-center gap-3">
         <Button variant="ghost" size="icon" onClick={() => navigate("/")}>
           <ArrowLeft className="w-5 h-5" />
         </Button>
@@ -429,15 +429,31 @@ const AdminApproval = () => {
           <Shield className="w-5 h-5 text-primary" />
           <h1 className="text-xl font-bold text-foreground">Gerenciar Usuários</h1>
         </div>
-        <div className="ml-auto flex items-center gap-2">
-          <Button size="sm" variant="outline" onClick={() => setNewOrgOpen(true)} className="gap-1">
-            <Building2 className="w-4 h-4" /> Nova Empresa
+      </div>
+
+      {/* Ações administrativas */}
+      <section className="p-4 rounded-lg border border-border bg-card">
+        <div className="flex items-center gap-2 mb-3">
+          <Plus className="w-4 h-4 text-primary" />
+          <h2 className="text-sm font-semibold text-foreground">Criar novos</h2>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+          <Button variant="outline" onClick={() => setNewOrgOpen(true)} className="gap-2 justify-start h-auto py-3">
+            <Building2 className="w-4 h-4 text-primary flex-shrink-0" />
+            <div className="text-left">
+              <div className="text-sm font-medium">Nova Empresa</div>
+              <div className="text-[11px] text-muted-foreground font-normal">Cadastrar uma nova organização</div>
+            </div>
           </Button>
-          <Button size="sm" onClick={() => { setNuOrgId(allOrgs[0]?.id || ""); setNewUserOpen(true); }} className="gap-1">
-            <UserPlus className="w-4 h-4" /> Criar Usuário
+          <Button onClick={() => { setNuOrgId(allOrgs[0]?.id || ""); setNewUserOpen(true); }} className="gap-2 justify-start h-auto py-3">
+            <UserPlus className="w-4 h-4 flex-shrink-0" />
+            <div className="text-left">
+              <div className="text-sm font-medium">Criar Usuário</div>
+              <div className="text-[11px] opacity-80 font-normal">Vincular usuário a uma empresa</div>
+            </div>
           </Button>
         </div>
-      </div>
+      </section>
 
       {/* Push Notification Settings */}
       <section className="p-4 rounded-lg border border-border bg-card space-y-3">
