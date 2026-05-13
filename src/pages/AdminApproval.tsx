@@ -64,7 +64,8 @@ const AdminApproval = () => {
   const [nuName, setNuName] = useState("");
   const [nuPassword, setNuPassword] = useState("");
   const [nuSendInvite, setNuSendInvite] = useState(false);
-  const [nuOrgId, setNuOrgId] = useState<string>("");
+  const [nuOrgIds, setNuOrgIds] = useState<string[]>([]);
+  const [nuPrimaryOrgId, setNuPrimaryOrgId] = useState<string>("");
   const [nuOrgRole, setNuOrgRole] = useState<"member" | "admin" | "owner">("member");
   const [nuSystemRole, setNuSystemRole] = useState<"user" | "admin" | "viewer">("user");
   const [nuTabs, setNuTabs] = useState<Record<string, boolean>>(() =>
