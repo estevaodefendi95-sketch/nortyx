@@ -862,15 +862,75 @@ const AdminApproval = () => {
             )}
 
             <div className="space-y-1.5">
-              <Label>Empresa</Label>
-              <Select value={nuOrgId} onValueChange={setNuOrgId}>
-                <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
-                <SelectContent>
-                  {allOrgs.map((o) => (
-                    <SelectItem key={o.id} value={o.id}>{o.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <div className="flex items-center justify-between">
+                <Label>Empresas ({nuOrgIds.length})</Label>
+                {allOrgs.length > 0 && (
+                  <button
+                    type="button"
+                    className="text-xs text-primary hover:underline"
+                    onClick={() => {
+                      if (nuOrgIds.length === allOrgs.length) {
+                        setNuOrgIds([]); setNuPrimaryOrgId("");
+                      } else {
+                        const ids = allOrgs.map((o) => o.id);
+                        setNuOrgIds(ids);
+                        if (!ids.includes(nuPrimaryOrgId)) setNuPrimaryOrgId(ids[0] || "");
+                      }
+                    }}
+                  >
+                    {nuOrgIds.length === allOrgs.length ? "Limpar" : "Selecionar todas"}
+                  </button>
+                )}
+              </div>
+              <div className="max-h-56 overflow-y-auto rounded-md border border-border divide-y divide-border">
+                {allOrgs.length === 0 ? (
+                  <p className="p-3 text-xs text-muted-foreground">Nenhuma empresa cadastrada.</p>
+                ) : (
+                  allOrgs.map((o) => {
+                    const checked = nuOrgIds.includes(o.id);
+                    const isPrimary = nuPrimaryOrgId === o.id;
+                    return (
+                      <div key={o.id} className="flex items-center gap-2 px-2.5 py-2 text-sm">
+                        <Checkbox
+                          checked={checked}
+                          onCheckedChange={(c) => {
+                            const next = !!c;
+                            setNuOrgIds((prev) => {
+                              const arr = next ? [...prev, o.id] : prev.filter((x) => x !== o.id);
+                              if (next && !nuPrimaryOrgId) setNuPrimaryOrgId(o.id);
+                              if (!next && nuPrimaryOrgId === o.id) setNuPrimaryOrgId(arr[0] || "");
+                              return arr;
+                            });
+                          }}
+                        />
+                        <span
+                          className="inline-block w-2 h-2 rounded-full flex-shrink-0"
+                          style={{ backgroundColor: o.primary_color || "hsl(var(--muted-foreground))" }}
+                        />
+                        <span className="flex-1 truncate text-foreground">{o.name}</span>
+                        <button
+                          type="button"
+                          disabled={!checked}
+                          onClick={() => setNuPrimaryOrgId(o.id)}
+                          title={isPrimary ? "Empresa principal" : "Definir como principal"}
+                          className="p-0.5 disabled:opacity-30"
+                        >
+                          {isPrimary ? (
+                            <Star className="w-4 h-4 fill-primary text-primary" />
+                          ) : (
+                            <StarOff className="w-4 h-4 text-muted-foreground hover:text-primary" />
+                          )}
+                        </button>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+              {nuOrgIds.length > 1 && (
+                <p className="text-[11px] text-muted-foreground">
+                  ⭐ marca a empresa principal (a que abre por padrão para o usuário).
+                </p>
+              )}
             </div>
 
             <div className="grid grid-cols-2 gap-3">
