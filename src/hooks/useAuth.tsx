@@ -54,13 +54,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setUser(session?.user ?? null);
       if (session?.user) {
         // Use setTimeout to avoid Supabase deadlock
-        setTimeout(() => fetchApprovalAndRole(session.user.id), 0);
+        setLoading(true);
+        setTimeout(() => {
+          fetchApprovalAndRole(session.user.id).finally(() => setLoading(false));
+        }, 0);
       } else {
-      setApproved(null);
+        setApproved(null);
         setIsAdmin(false);
         setIsViewer(false);
+        setLoading(false);
       }
-      setLoading(false);
     });
 
     supabase.auth.getSession().then(({ data: { session } }) => {

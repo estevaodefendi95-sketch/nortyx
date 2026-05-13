@@ -77,6 +77,13 @@ const AdminApproval = () => {
   const { toast } = useToast();
   const navigate = useNavigate();
 
+  const openCreateUserDialog = () => {
+    const first = allOrgs[0]?.id || "";
+    setNuOrgIds(first ? [first] : []);
+    setNuPrimaryOrgId(first);
+    setNewUserOpen(true);
+  };
+
   const slugify = (s: string) =>
     s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")
       .replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 50);
@@ -426,13 +433,27 @@ const AdminApproval = () => {
 
   return (
     <div className="min-h-screen bg-background p-4 max-w-2xl mx-auto space-y-6">
-      <div className="flex items-center gap-3">
-        <Button variant="ghost" size="icon" onClick={() => navigate("/")}>
-          <ArrowLeft className="w-5 h-5" />
-        </Button>
-        <div className="flex items-center gap-2">
-          <Shield className="w-5 h-5 text-primary" />
-          <h1 className="text-xl font-bold text-foreground">Gerenciar Usuários</h1>
+      <div className="sticky top-0 z-20 -mx-4 px-4 py-3 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-center gap-3">
+            <Button variant="ghost" size="icon" onClick={() => navigate("/")}>
+              <ArrowLeft className="w-5 h-5" />
+            </Button>
+            <div className="flex items-center gap-2">
+              <Shield className="w-5 h-5 text-primary" />
+              <h1 className="text-xl font-bold text-foreground">Gerenciar Usuários</h1>
+            </div>
+          </div>
+          <div className="flex gap-2 pl-12 sm:pl-0">
+            <Button variant="outline" size="sm" onClick={() => setNewOrgOpen(true)} className="gap-2">
+              <Building2 className="w-4 h-4" />
+              Nova Empresa
+            </Button>
+            <Button size="sm" onClick={openCreateUserDialog} className="gap-2">
+              <UserPlus className="w-4 h-4" />
+              Criar Usuário
+            </Button>
+          </div>
         </div>
       </div>
 
@@ -454,7 +475,7 @@ const AdminApproval = () => {
         </button>
         <button
           type="button"
-          onClick={() => { const first = allOrgs[0]?.id || ""; setNuOrgIds(first ? [first] : []); setNuPrimaryOrgId(first); setNewUserOpen(true); }}
+          onClick={openCreateUserDialog}
           aria-label="Criar novo usuário"
           className="group flex items-start gap-3 p-4 rounded-xl border border-border bg-card text-left hover:border-primary/50 hover:bg-accent/30 transition-colors"
         >
