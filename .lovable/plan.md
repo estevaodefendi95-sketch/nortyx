@@ -1,48 +1,39 @@
 ## Objetivo
-No diálogo "Criar Usuário" (em `/admin`), permitir vincular o usuário a **várias empresas** de uma vez, em vez de só uma.
 
-## Mudanças no formulário (src/pages/AdminApproval.tsx)
+Corrigir o layout do bloco **"Criar novos"** no topo da página `/admin` (botões **Nova Empresa** e **Criar Usuário**), mantendo tudo no mesmo lugar mas com aparência mais limpa, alinhada ao tema escuro do nortyx.
 
-- Substituir o `Select` único de empresa por uma **lista com checkboxes** das empresas disponíveis (uma por linha, com bolinha colorida + nome).
-- Adicionar uma marcação de **empresa principal** (estrela ⭐) entre as selecionadas — define o `profiles.organization_id` (a empresa "primária" usada no app).
-- Validação: pelo menos 1 empresa marcada; se houver várias selecionadas e nenhuma marcada como principal, usar a primeira da lista automaticamente.
-- O **papel na empresa** (member / admin / owner) permanece um único valor e é aplicado a todas as empresas escolhidas.
-- Estado novo: `nuOrgIds: string[]` e `nuPrimaryOrgId: string` (substitui o atual `nuOrgId`).
-- Caixa de seleção rolável quando houver muitas empresas, com busca opcional simples.
+## O que muda
 
-## Mudanças no backend (supabase/functions/admin-create-user/index.ts)
+Arquivo: `src/pages/AdminApproval.tsx` (apenas as linhas 440–461 do card "Criar novos").
 
-- Aceitar `organization_ids: string[]` (mantendo compatibilidade com o antigo `organization_id` para não quebrar outras chamadas).
-- Aceitar `primary_organization_id: string` (default: primeiro item de `organization_ids`).
-- Criar/atualizar uma linha em `organization_members` para **cada** empresa do array, com o `org_role` informado.
-- Definir `profiles.organization_id` como a `primary_organization_id`.
-- `tab_visibility` fica vinculado à empresa principal (como hoje).
+### Layout novo
 
-## Detalhes técnicos
+- Remover o cabeçalho redundante "Criar novos" + ícone Plus (o título da página já indica o contexto).
+- Transformar os dois botões em **cards clicáveis** lado a lado, com:
+  - Ícone em círculo com fundo `bg-primary/10` (Building2 / UserPlus em `text-primary`).
+  - Título em `text-sm font-semibold` + descrição em `text-xs text-muted-foreground`.
+  - Borda `border-border`, fundo `bg-card`, hover com `hover:border-primary/50 hover:bg-accent/30 transition-colors`.
+  - Altura uniforme, padding consistente (`p-4`), `rounded-xl`.
+  - Grid responsivo: `grid-cols-1 sm:grid-cols-2 gap-3`.
+- Texto alinhado à esquerda, ícone no topo-esquerda, sem truncar em telas estreitas.
+- Acessibilidade: cada card é um `<button>` com `aria-label` descritivo.
+
+### Exemplo de estrutura
 
 ```text
-Form
- ├─ Empresas (checkbox list)
- │    □ ⭐  • Empresa A
- │    ☑ ⭐  • Empresa B   ← principal
- │    ☑     • Empresa C
- ├─ Papel na empresa: [member ▾]   (aplicado a todas)
- ├─ Perfil do sistema: [user ▾]
- └─ Abas visíveis: [□ □ □ □ □]
-```
-
-Payload enviado ao edge function:
-```json
-{
-  "email": "...",
-  "organization_ids": ["uuid-a", "uuid-b"],
-  "primary_organization_id": "uuid-b",
-  "org_role": "member",
-  "system_role": "user",
-  "tab_visibility": { ... }
-}
+┌─────────────────────────┐  ┌─────────────────────────┐
+│ ◉  Nova Empresa         │  │ ◉  Criar Usuário        │
+│    Cadastrar uma nova   │  │    Vincular usuário a   │
+│    organização          │  │    uma ou mais empresas │
+└─────────────────────────┘  └─────────────────────────┘
 ```
 
 ## Fora do escopo
-- Permitir papel diferente por empresa (continua um papel único aplicado a todas).
-- Mudar a UI de edição de empresas dos usuários já existentes (já existe o popover de empresas em cada card).
+
+- Lógica dos diálogos (Nova Empresa / Criar Usuário) — sem alterações.
+- Fluxo de seleção múltipla de empresas — já implementado e funcional.
+- Renomear "Paggio" em chaves de localStorage / dados internos (não são visíveis ao usuário).
+
+## Arquivos
+
+- `src/pages/AdminApproval.tsx` — apenas o bloco `<section>` "Criar novos".
