@@ -117,7 +117,7 @@ Deno.serve(async (req) => {
       .eq("user_id", userId)
       .maybeSingle();
     const profilePayload: any = {
-      organization_id,
+      organization_id: primaryOrgId,
       approved,
     };
     if (display_name) profilePayload.display_name = display_name;
@@ -127,21 +127,23 @@ Deno.serve(async (req) => {
       await admin.from("profiles").insert({ user_id: userId, ...profilePayload });
     }
 
-    // Membership
-    const { data: existingMem } = await admin
-      .from("organization_members")
-      .select("id")
-      .eq("organization_id", organization_id)
-      .eq("user_id", userId)
-      .maybeSingle();
-    if (!existingMem) {
-      await admin.from("organization_members").insert({
-        organization_id,
-        user_id: userId,
-        role: org_role,
-      });
-    } else {
-      await admin.from("organization_members").update({ role: org_role }).eq("id", existingMem.id);
+    // Memberships (uma linha por empresa selecionada)
+    for (const orgId of orgIds) {
+      const { data: existingMem } = await admin
+        .from("organization_members")
+        .select("id")
+        .eq("organization_id", orgId)
+        .eq("user_id", userId)
+        .maybeSingle();
+      if (!existingMem) {
+        await admin.from("organization_members").insert({
+          organization_id: orgId,
+          user_id: userId,
+          role: org_role,
+        });
+      } else {
+        await admin.from("organization_members").update({ role: org_role }).eq("id", existingMem.id);
+      }
     }
 
     // System role (user_roles): admin e viewer ficam armazenados; "user" = sem role
@@ -152,7 +154,7 @@ Deno.serve(async (req) => {
       await admin.from("user_roles").insert({ user_id: userId, role: "viewer" });
     }
 
-    // Tab visibility
+    // Tab visibility (vinculado à empresa principal)
     const tabEntries = Object.entries(tab_visibility || {});
     for (const [tab_id, visible] of tabEntries) {
       const { data: existingTv } = await admin
@@ -162,13 +164,13 @@ Deno.serve(async (req) => {
         .eq("tab_id", tab_id)
         .maybeSingle();
       if (existingTv) {
-        await admin.from("tab_visibility").update({ visible: !!visible, organization_id }).eq("id", existingTv.id);
+        await admin.from("tab_visibility").update({ visible: !!visible, organization_id: primaryOrgId }).eq("id", existingTv.id);
       } else {
         await admin.from("tab_visibility").insert({
           user_id: userId,
           tab_id,
           visible: !!visible,
-          organization_id,
+          organization_id: primaryOrgId,
         });
       }
     }
