@@ -36,6 +36,25 @@ const WEEKDAYS_PT = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
 const DadosView = ({ selectedMonths, selectedYear, isViewer = false }: DadosViewProps) => {
   const isAllSelected = selectedMonths.length === 0;
   const { transactions, dailyIncomes } = useTransactions();
+  const { organization } = useOrganization();
+  const [billingCharges, setBillingCharges] = useState<{ valor: number; data_cobranca: string }[]>([]);
+
+  useEffect(() => {
+    if (!organization?.id) { setBillingCharges([]); return; }
+    const load = async () => {
+      const { data } = await supabase
+        .from("billing_charges")
+        .select("valor, data_cobranca")
+        .eq("organization_id", organization.id);
+      setBillingCharges(((data as any) || []).map((c: any) => ({ valor: Number(c.valor) || 0, data_cobranca: c.data_cobranca })));
+    };
+    load();
+    const channel = supabase
+      .channel(`billing_charges_dados_${organization.id}`)
+      .on("postgres_changes", { event: "*", schema: "public", table: "billing_charges", filter: `organization_id=eq.${organization.id}` }, load)
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [organization?.id]);
   const { settings: dashSettings } = useDashboardSettings();
   const [selectedWeekdays, setSelectedWeekdays] = useState<number[]>([]);
   const { toast } = useToast();
