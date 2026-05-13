@@ -65,7 +65,7 @@ const Index = () => {
     return years.sort((a, b) => b - a);
   }, []);
 
-  const isOrgOwner = membership?.role === "owner" || membership?.role === "admin";
+  const isOrgOwner = membership?.role === "owner" || membership?.role === "admin" || isAdmin || isSuperUser;
 
   const toggleMonth = (month: number) => {
     setSelectedMonths((prev) => {
