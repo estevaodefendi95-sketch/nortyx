@@ -599,15 +599,6 @@ const TransactionForm = () => {
       addMapping(entry.empresa, entry.categoria);
     }
 
-    // Match: cobrança identificada → marcar paga pelo id (não por valor)
-    if (entry.tipo === "entrada" && entry.matchedChargeId) {
-      await supabase.from("billing_charges").update({ status: "paga" }).eq("id", entry.matchedChargeId);
-      toast({
-        title: "Lançamento aprovado",
-        description: `${entry.empresa} — ${formatCurrency(entry.valor)} | Cobrança de ${entry.matchedChargeClient || "cliente"} marcada como paga`,
-      });
-      return;
-    }
 
     if (entry.tipo === "saida" && entry.matchedTransactionId) {
       toast({
