@@ -641,6 +641,13 @@ const TransactionForm = () => {
         } catch (err) {
           console.error(err);
         }
+      } else if (entry.tipo === "entrada" && entry.matchedChargeId) {
+        // Cobrança vinculada → apenas confirmar pagamento, sem duplicar lançamento
+        const { error } = await supabase.from("billing_charges").update({ status: "paga" }).eq("id", entry.matchedChargeId);
+        if (!error) {
+          saved = true;
+          chargesMarked++;
+        }
       } else if (entry.tipo === "entrada") {
         saved = await addDailyIncome({ data: dataBR, valor: entry.valor });
       } else {
@@ -649,10 +656,6 @@ const TransactionForm = () => {
 
       if (saved) {
         approvedIds.add(entry.id);
-        if (entry.tipo === "entrada" && entry.matchedChargeId) {
-          await supabase.from("billing_charges").update({ status: "paga" }).eq("id", entry.matchedChargeId);
-          chargesMarked++;
-        }
       }
     }
     setBankEntries((prev) => prev.map((e) => approvedIds.has(e.id) ? { ...e, approved: true } : e));
