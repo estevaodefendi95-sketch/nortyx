@@ -1,6 +1,8 @@
-import { useMemo } from "react";
+import { useMemo, useEffect, useState } from "react";
 import { formatCurrency } from "@/data/cashflow";
 import { useTransactions } from "@/context/TransactionsContext";
+import { useOrganization } from "@/context/OrganizationContext";
+import { supabase } from "@/integrations/supabase/client";
 import { XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, Area, AreaChart } from "recharts";
 
 const MONTHS_PT = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
@@ -9,8 +11,46 @@ interface EvolutionChartProps {
   selectedYear: number;
 }
 
+interface BillingChargeLite {
+  valor: number;
+  data_cobranca: string;
+}
+
 const EvolutionChart = ({ selectedYear }: EvolutionChartProps) => {
   const { transactions, dailyIncomes } = useTransactions();
+  const { organization } = useOrganization();
+  const [billingCharges, setBillingCharges] = useState<BillingChargeLite[]>([]);
+
+  useEffect(() => {
+    if (!organization?.id) {
+      setBillingCharges([]);
+      return;
+    }
+    const orgId = organization.id;
+    let cancelled = false;
+
+    const load = async () => {
+      const { data } = await supabase
+        .from("billing_charges")
+        .select("valor, data_cobranca")
+        .eq("organization_id", orgId);
+      if (!cancelled && data) {
+        setBillingCharges(data.map((c: any) => ({ valor: Number(c.valor), data_cobranca: c.data_cobranca })));
+      }
+    };
+    load();
+
+    const channel = supabase
+      .channel(`billing_charges_evolution_${orgId}`)
+      .on("postgres_changes", { event: "*", schema: "public", table: "billing_charges", filter: `organization_id=eq.${orgId}` }, load)
+      .subscribe();
+
+    return () => {
+      cancelled = true;
+      supabase.removeChannel(channel);
+    };
+  }, [organization?.id]);
+
   const monthlyData = useMemo(() => {
     const data: { name: string; entradas: number; saidas: number; saldo: number }[] = [];
 
@@ -18,32 +58,37 @@ const EvolutionChart = ({ selectedYear }: EvolutionChartProps) => {
       const monthExpenses = transactions
         .filter((t) => {
           const parts = t.data.split("/").map(Number);
-          const month = parts[1];
-          const year = parts[2];
-          return t.tipo === "saida" && month - 1 === m && year === selectedYear;
+          return t.tipo === "saida" && parts[1] - 1 === m && parts[2] === selectedYear;
         })
         .reduce((sum, t) => sum + t.valor, 0);
 
       const monthIncome = dailyIncomes
         .filter((i) => {
           const parts = i.data.split("/").map(Number);
-          const month = parts[1];
-          const year = parts[2];
-          return month - 1 === m && year === selectedYear;
+          return parts[1] - 1 === m && parts[2] === selectedYear;
         })
         .reduce((sum, i) => sum + i.valor, 0);
 
-      if (monthExpenses > 0 || monthIncome > 0) {
+      const monthBilling = billingCharges
+        .filter((c) => {
+          const parts = c.data_cobranca.split("/").map(Number);
+          return parts[1] - 1 === m && parts[2] === selectedYear;
+        })
+        .reduce((sum, c) => sum + c.valor, 0);
+
+      const totalEntradas = monthIncome + monthBilling;
+
+      if (monthExpenses > 0 || totalEntradas > 0) {
         data.push({
           name: MONTHS_PT[m],
-          entradas: monthIncome,
+          entradas: totalEntradas,
           saidas: monthExpenses,
-          saldo: monthIncome - monthExpenses,
+          saldo: totalEntradas - monthExpenses,
         });
       }
     }
     return data;
-  }, [transactions, dailyIncomes, selectedYear]);
+  }, [transactions, dailyIncomes, billingCharges, selectedYear]);
 
   const CustomTooltip = ({ active, payload, label }: any) => {
     if (!active || !payload) return null;
