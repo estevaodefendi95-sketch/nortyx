@@ -57,6 +57,7 @@ const DadosView = ({ selectedMonths, selectedYear, isViewer = false }: DadosView
     return () => { supabase.removeChannel(channel); };
   }, [organization?.id]);
   const { settings: dashSettings } = useDashboardSettings();
+  const { getCategoryInfo } = useCategories();
   const [selectedWeekdays, setSelectedWeekdays] = useState<number[]>([]);
   const { toast } = useToast();
   const [products, setProducts] = useState<Product[]>([]);
