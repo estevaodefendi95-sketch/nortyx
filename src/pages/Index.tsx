@@ -248,8 +248,8 @@ const Index = () => {
             </div>
 
             {/* Action icons - always top right */}
-            <div className="flex items-center gap-1 flex-shrink-0">
-              {/* Bell notification */}
+            <div className="flex items-center gap-0.5 sm:gap-1 flex-shrink-0">
+              {/* Bell notification - always visible */}
               <Popover>
                 <PopoverTrigger asChild>
                   <button className="relative p-2 rounded-lg hover:bg-secondary transition-colors flex-shrink-0">
@@ -288,73 +288,154 @@ const Index = () => {
                 </PopoverContent>
               </Popover>
 
-              <ThemeToggle />
-
-              {!authLoading && isAdmin && (
+              {/* Desktop: full icon row */}
+              {!isMobile && (
                 <>
+                  <ThemeToggle />
+
+                  {!authLoading && isAdmin && (
+                    <>
+                      <button
+                        onClick={() => navigate("/admin/history")}
+                        className="p-2 rounded-lg hover:bg-secondary transition-colors flex-shrink-0"
+                        title="Histórico de Alterações"
+                      >
+                        <History className="w-5 h-5 text-muted-foreground" />
+                      </button>
+                      <button
+                        onClick={() => navigate("/admin")}
+                        className={`relative p-2 rounded-lg hover:bg-secondary transition-colors flex-shrink-0 ${pendingUsersCount > 0 ? 'border border-primary/30' : ''}`}
+                        title="Gerenciar Usuários"
+                      >
+                        <Shield className="w-5 h-5 text-primary" />
+                        {pendingUsersCount > 0 && (
+                          <span className="absolute -top-1 -right-1 w-3 h-3 rounded-full bg-primary animate-pulse" />
+                        )}
+                      </button>
+                    </>
+                  )}
+
+                  {!bootLoading && isOrgOwner && (
+                    <button
+                      onClick={() => navigate("/settings")}
+                      className="p-2 rounded-lg hover:bg-secondary transition-colors flex-shrink-0"
+                      title="Configurações da Organização"
+                    >
+                      <Settings className="w-5 h-5 text-muted-foreground" />
+                    </button>
+                  )}
+
                   <button
-                    onClick={() => navigate("/admin/history")}
+                    onClick={signOut}
                     className="p-2 rounded-lg hover:bg-secondary transition-colors flex-shrink-0"
-                    title="Histórico de Alterações"
+                    title="Sair"
                   >
-                    <History className="w-5 h-5 text-muted-foreground" />
-                  </button>
-                  <button
-                    onClick={() => navigate("/admin")}
-                    className={`relative p-2 rounded-lg hover:bg-secondary transition-colors flex-shrink-0 ${pendingUsersCount > 0 ? 'border border-primary/30' : ''}`}
-                    title="Gerenciar Usuários"
-                  >
-                    <Shield className="w-5 h-5 text-primary" />
-                    {pendingUsersCount > 0 && (
-                      <span className="absolute -top-1 -right-1 w-3 h-3 rounded-full bg-primary animate-pulse" />
-                    )}
+                    <LogOut className="w-5 h-5 text-muted-foreground" />
                   </button>
                 </>
               )}
 
-              {!bootLoading && isOrgOwner && (
-                <button
-                  onClick={() => navigate("/settings")}
-                  className="p-2 rounded-lg hover:bg-secondary transition-colors flex-shrink-0"
-                  title="Configurações da Organização"
-                >
-                  <Settings className="w-5 h-5 text-muted-foreground" />
-                </button>
+              {/* Mobile: condensed "more" menu */}
+              {isMobile && (
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <button className="relative p-2 rounded-lg hover:bg-secondary transition-colors flex-shrink-0">
+                      <MoreVertical className="w-5 h-5 text-muted-foreground" />
+                      {(isAdmin && pendingUsersCount > 0) && (
+                        <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-primary animate-pulse" />
+                      )}
+                    </button>
+                  </PopoverTrigger>
+                  <PopoverContent align="end" className="w-56 p-1">
+                    <div className="flex items-center justify-between px-2 py-2 border-b border-border mb-1">
+                      <span className="text-xs font-medium text-muted-foreground">Tema</span>
+                      <ThemeToggle />
+                    </div>
+                    {!authLoading && isAdmin && (
+                      <>
+                        <button
+                          onClick={() => navigate("/admin/history")}
+                          className="w-full flex items-center gap-2 px-2 py-2 rounded-md text-sm hover:bg-secondary transition-colors text-left"
+                        >
+                          <History className="w-4 h-4 text-muted-foreground" />
+                          Histórico
+                        </button>
+                        <button
+                          onClick={() => navigate("/admin")}
+                          className="w-full flex items-center gap-2 px-2 py-2 rounded-md text-sm hover:bg-secondary transition-colors text-left"
+                        >
+                          <Shield className="w-4 h-4 text-primary" />
+                          Usuários
+                          {pendingUsersCount > 0 && (
+                            <span className="ml-auto w-2 h-2 rounded-full bg-primary animate-pulse" />
+                          )}
+                        </button>
+                      </>
+                    )}
+                    {!bootLoading && isOrgOwner && (
+                      <button
+                        onClick={() => navigate("/settings")}
+                        className="w-full flex items-center gap-2 px-2 py-2 rounded-md text-sm hover:bg-secondary transition-colors text-left"
+                      >
+                        <Settings className="w-4 h-4 text-muted-foreground" />
+                        Configurações
+                      </button>
+                    )}
+                    <button
+                      onClick={signOut}
+                      className="w-full flex items-center gap-2 px-2 py-2 rounded-md text-sm hover:bg-secondary transition-colors text-left text-destructive"
+                    >
+                      <LogOut className="w-4 h-4" />
+                      Sair
+                    </button>
+                  </PopoverContent>
+                </Popover>
               )}
-
-              <button
-                onClick={signOut}
-                className="p-2 rounded-lg hover:bg-secondary transition-colors flex-shrink-0"
-                title="Sair"
-              >
-                <LogOut className="w-5 h-5 text-muted-foreground" />
-              </button>
             </div>
           </div>
 
-          {/* Summary row - below header on all sizes */}
-          <div className="flex items-center gap-2 sm:gap-4 mt-1.5 flex-wrap min-h-[1.25rem]">
-            {summaryLoading ? (
-              <>
-                <Skeleton className="h-4 w-20" />
-                <Skeleton className="h-4 w-20" />
-                <Skeleton className="h-4 w-28" />
-              </>
-            ) : (
-              <>
-                <span className="text-xs sm:text-sm text-muted-foreground flex items-center gap-1">
-                  <ArrowUpDown className="w-3 h-3 sm:w-3.5 sm:h-3.5 hidden sm:inline" />
-                  <span className="text-income font-medium">{formatCurrency(filteredIncome)}</span>
+          {/* Summary row - cards on mobile, inline on desktop */}
+          {summaryLoading ? (
+            <div className="flex items-center gap-2 mt-2">
+              <Skeleton className="h-12 sm:h-4 flex-1 sm:w-20" />
+              <Skeleton className="h-12 sm:h-4 flex-1 sm:w-20" />
+              <Skeleton className="h-12 sm:h-4 flex-1 sm:w-28" />
+            </div>
+          ) : isMobile ? (
+            <div className="grid grid-cols-3 gap-1.5 mt-2.5">
+              <div className="flex flex-col items-start gap-0.5 px-2 py-1.5 rounded-lg bg-secondary/40 border border-border/40">
+                <span className="flex items-center gap-1 text-[9px] uppercase tracking-wide text-muted-foreground">
+                  <TrendingUp className="w-3 h-3 text-income" /> Entrada
                 </span>
-                <span className="text-xs sm:text-sm text-muted-foreground">
-                  <span className="text-expense font-medium">{formatCurrency(filteredExpenses)}</span>
+                <span className="text-[12px] font-semibold text-income leading-tight truncate w-full">{formatCurrency(filteredIncome)}</span>
+              </div>
+              <div className="flex flex-col items-start gap-0.5 px-2 py-1.5 rounded-lg bg-secondary/40 border border-border/40">
+                <span className="flex items-center gap-1 text-[9px] uppercase tracking-wide text-muted-foreground">
+                  <TrendingDown className="w-3 h-3 text-expense" /> Saída
                 </span>
-                <span className="text-xs sm:text-sm text-muted-foreground">
-                  Saldo: <span className={`font-medium ${saldo >= 0 ? "text-income" : "text-expense"}`}>{formatCurrency(saldo)}</span>
+                <span className="text-[12px] font-semibold text-expense leading-tight truncate w-full">{formatCurrency(filteredExpenses)}</span>
+              </div>
+              <div className={`flex flex-col items-start gap-0.5 px-2 py-1.5 rounded-lg border ${saldo >= 0 ? "bg-income/10 border-income/30" : "bg-expense/10 border-expense/30"}`}>
+                <span className="flex items-center gap-1 text-[9px] uppercase tracking-wide text-muted-foreground">
+                  <Wallet className="w-3 h-3" /> Saldo
                 </span>
-              </>
-            )}
-          </div>
+                <span className={`text-[12px] font-semibold leading-tight truncate w-full ${saldo >= 0 ? "text-income" : "text-expense"}`}>{formatCurrency(saldo)}</span>
+              </div>
+            </div>
+          ) : (
+            <div className="flex items-center gap-4 mt-1.5 flex-wrap min-h-[1.25rem]">
+              <span className="text-sm text-muted-foreground flex items-center gap-1">
+                <ArrowUpDown className="w-3.5 h-3.5" />
+                <span className="text-income font-medium">{formatCurrency(filteredIncome)}</span>
+              </span>
+              <span className="text-sm text-muted-foreground">
+                <span className="text-expense font-medium">{formatCurrency(filteredExpenses)}</span>
+              </span>
+              <span className="text-sm text-muted-foreground">
+                Saldo: <span className={`font-medium ${saldo >= 0 ? "text-income" : "text-expense"}`}>{formatCurrency(saldo)}</span>
+              </span>
+            </div>
+          )}
 
           {/* Desktop tabs */}
           {!isMobile && (
