@@ -527,8 +527,8 @@ const DadosView = ({ selectedMonths, selectedYear, isViewer = false }: DadosView
           </div>
           <div className="mt-2">
             <p className="text-xs text-muted-foreground">
-              {dashSettings.cmv_categories.length > 0
-                ? `Categorias: ${dashSettings.cmv_categories.map((c) => getCategoryInfo(c)?.name || c).join(" + ")}`
+              {validCmvCategories.length > 0
+                ? `Categorias: ${validCmvCategories.map((c) => getCategoryInfo(c)?.name || c).join(" + ")}`
                 : "Nenhuma categoria selecionada"}: {formatCurrency(cmv.gastosCB)}
             </p>
             <p className="text-xs text-muted-foreground">
