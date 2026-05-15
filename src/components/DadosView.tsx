@@ -57,6 +57,7 @@ const DadosView = ({ selectedMonths, selectedYear, isViewer = false }: DadosView
     return () => { supabase.removeChannel(channel); };
   }, [organization?.id]);
   const { settings: dashSettings } = useDashboardSettings();
+  const { getCategoryInfo } = useCategories();
   const [selectedWeekdays, setSelectedWeekdays] = useState<number[]>([]);
   const { toast } = useToast();
   const [products, setProducts] = useState<Product[]>([]);
@@ -523,7 +524,7 @@ const DadosView = ({ selectedMonths, selectedYear, isViewer = false }: DadosView
           <div className="mt-2">
             <p className="text-xs text-muted-foreground">
               {dashSettings.cmv_categories.length > 0
-                ? `Categorias: ${dashSettings.cmv_categories.join(" + ")}`
+                ? `Categorias: ${dashSettings.cmv_categories.map((c) => getCategoryInfo(c)?.name || c).join(" + ")}`
                 : "Nenhuma categoria selecionada"}: {formatCurrency(cmv.gastosCB)}
             </p>
             <p className="text-xs text-muted-foreground">
