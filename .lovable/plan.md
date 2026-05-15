@@ -1,27 +1,49 @@
 ## Problema
 
-Ao salvar uma entrada na empresa "Casa", aparece "Erro ao salvar entrada". A causa é uma regra de segurança no banco que valida o `organization_id` usando uma função antiga (`get_user_org_id`) que só retorna a **primeira** empresa do usuário. Quando o usuário está em outra empresa (ex.: "Casa", que não é a primeira), o INSERT é bloqueado.
+Atualmente, ao recarregar o app ou voltar depois de fechar, o usuário sempre cai na aba **Dados** com o mês atual selecionado — porque `activeTab`, `selectedMonths` e `selectedYear` são `useState` simples em `src/pages/Index.tsx`, sem persistência.
 
-O mesmo problema afeta várias tabelas multiempresa.
+## Objetivo
 
-## Plano
+Manter o usuário exatamente na mesma página/aba e com os mesmos filtros que ele estava usando, mesmo após:
+- Recarregar a página (F5)
+- Fechar e reabrir o app/PWA
+- Navegar entre rotas e voltar
 
-1. **Migração de banco** — substituir, em todas as policies (SELECT/INSERT/UPDATE/DELETE) das tabelas abaixo, a checagem `organization_id = get_user_org_id(auth.uid())` por `is_org_member(auth.uid(), organization_id)`. Isso valida o `organization_id` real enviado na linha, em vez de comparar com uma única empresa fixa.
+## Mudanças
 
-   Tabelas afetadas:
-   - `daily_incomes` (causa direta do erro atual)
-   - `transactions`
-   - `fornecedores`
-   - `products`
-   - `push_subscriptions`
-   - `notes`
-   - `subcategories`
+### 1. Persistir aba ativa e filtros em `src/pages/Index.tsx`
+- Trocar `useState<Tab>("dados")` por um estado inicializado a partir de `localStorage` (chave `nortyx_active_tab`), com fallback `"dados"`.
+- Mesmo tratamento para `selectedMonths` (`nortyx_selected_months`) e `selectedYear` (`nortyx_selected_year`).
+- Adicionar `useEffect` que grava cada um no `localStorage` sempre que mudar.
+- Ao restaurar a aba, validar que ela ainda está em `visibleTabs` (caso o admin tenha desabilitado aquela aba); se não estiver, cair na primeira aba visível.
 
-2. **Validação**
-   - Trocar para a empresa "Casa" e registrar uma entrada → deve salvar sem erro.
-   - Trocar para outra empresa e registrar entrada/saída/categoria → deve continuar salvando normalmente.
-   - Conferir que listagens continuam mostrando apenas dados da empresa ativa.
+### 2. Refletir aba ativa na URL (opcional, recomendado)
+- Usar `?tab=calendar` como query param via `useSearchParams`, sincronizando com `activeTab`.
+- Vantagem: refresh real do navegador mantém a aba mesmo sem `localStorage`, e o usuário pode compartilhar/fixar o link da aba.
+- Mantém `localStorage` como fallback para quando entrar pela raiz `/`.
 
-## Escopo
+### 3. Escopo por organização
+- Como o app é multi-tenant, prefixar as chaves do `localStorage` com o `organization.id` (ex.: `nortyx:${orgId}:active_tab`) para que trocar de organização não traga a aba "errada" da org anterior.
 
-Apenas correção das policies de banco. Nenhuma mudança de UI, nenhuma mudança no cabeçalho ou em cobranças (a parte de "vincular cobranças às entradas do mês" fica para uma próxima etapa, separada).
+### 4. Não tocar em rotas de auth
+- Restauração só vale dentro de `Index` (rotas protegidas). `/auth`, `/onboarding`, `/pending`, `/reset-password` continuam com seus redirecionamentos atuais — esse fluxo de autenticação não deve ser preservado.
+
+## Fora do escopo
+- Não mexer em `RouteTransition`, providers ou no roteador.
+- Não persistir estado interno de subtelas (modais abertos, scroll, etc.) — só aba e filtros globais do header.
+
+## Detalhes técnicos
+
+Arquivo afetado: `src/pages/Index.tsx`.
+
+Padrão de leitura segura:
+```ts
+const STORAGE_PREFIX = `nortyx:${organization?.id ?? "anon"}`;
+const [activeTab, setActiveTab] = useState<Tab>(() => {
+  try {
+    const v = localStorage.getItem(`${STORAGE_PREFIX}:active_tab`);
+    return (v as Tab) || "dados";
+  } catch { return "dados"; }
+});
+```
++ `useEffect` com `localStorage.setItem` quando o valor muda, e validação contra `visibleTabs` quando `tabsLoading` terminar.
