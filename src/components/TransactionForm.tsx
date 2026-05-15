@@ -571,6 +571,18 @@ const TransactionForm = () => {
       } catch (err) {
         console.error("Erro ao marcar agendado como pago:", err);
       }
+    } else if (entry.tipo === "entrada" && entry.matchedChargeId) {
+      // Cobrança vinculada → apenas confirmar pagamento, sem duplicar lançamento
+      const { error } = await supabase.from("billing_charges").update({ status: "paga" }).eq("id", entry.matchedChargeId);
+      if (!error) {
+        saved = true;
+        updateBankEntry(id, "approved", true);
+        toast({
+          title: "Cobrança quitada",
+          description: `${entry.empresa} — ${formatCurrency(entry.valor)} | Cobrança de ${entry.matchedChargeClient || "cliente"} marcada como paga (sem duplicar lançamento)`,
+        });
+        return;
+      }
     } else if (entry.tipo === "entrada") {
       saved = await addDailyIncome({ data: dataBR, valor: entry.valor });
     } else {
@@ -587,15 +599,6 @@ const TransactionForm = () => {
       addMapping(entry.empresa, entry.categoria);
     }
 
-    // Match: cobrança identificada → marcar paga pelo id (não por valor)
-    if (entry.tipo === "entrada" && entry.matchedChargeId) {
-      await supabase.from("billing_charges").update({ status: "paga" }).eq("id", entry.matchedChargeId);
-      toast({
-        title: "Lançamento aprovado",
-        description: `${entry.empresa} — ${formatCurrency(entry.valor)} | Cobrança de ${entry.matchedChargeClient || "cliente"} marcada como paga`,
-      });
-      return;
-    }
 
     if (entry.tipo === "saida" && entry.matchedTransactionId) {
       toast({
@@ -638,6 +641,13 @@ const TransactionForm = () => {
         } catch (err) {
           console.error(err);
         }
+      } else if (entry.tipo === "entrada" && entry.matchedChargeId) {
+        // Cobrança vinculada → apenas confirmar pagamento, sem duplicar lançamento
+        const { error } = await supabase.from("billing_charges").update({ status: "paga" }).eq("id", entry.matchedChargeId);
+        if (!error) {
+          saved = true;
+          chargesMarked++;
+        }
       } else if (entry.tipo === "entrada") {
         saved = await addDailyIncome({ data: dataBR, valor: entry.valor });
       } else {
@@ -646,10 +656,6 @@ const TransactionForm = () => {
 
       if (saved) {
         approvedIds.add(entry.id);
-        if (entry.tipo === "entrada" && entry.matchedChargeId) {
-          await supabase.from("billing_charges").update({ status: "paga" }).eq("id", entry.matchedChargeId);
-          chargesMarked++;
-        }
       }
     }
     setBankEntries((prev) => prev.map((e) => approvedIds.has(e.id) ? { ...e, approved: true } : e));
