@@ -571,6 +571,18 @@ const TransactionForm = () => {
       } catch (err) {
         console.error("Erro ao marcar agendado como pago:", err);
       }
+    } else if (entry.tipo === "entrada" && entry.matchedChargeId) {
+      // Cobrança vinculada → apenas confirmar pagamento, sem duplicar lançamento
+      const { error } = await supabase.from("billing_charges").update({ status: "paga" }).eq("id", entry.matchedChargeId);
+      if (!error) {
+        saved = true;
+        updateBankEntry(id, "approved", true);
+        toast({
+          title: "Cobrança quitada",
+          description: `${entry.empresa} — ${formatCurrency(entry.valor)} | Cobrança de ${entry.matchedChargeClient || "cliente"} marcada como paga (sem duplicar lançamento)`,
+        });
+        return;
+      }
     } else if (entry.tipo === "entrada") {
       saved = await addDailyIncome({ data: dataBR, valor: entry.valor });
     } else {
