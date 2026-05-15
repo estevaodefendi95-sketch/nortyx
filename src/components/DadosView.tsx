@@ -278,13 +278,17 @@ const DadosView = ({ selectedMonths, selectedYear, isViewer = false }: DadosView
     return { faturamento: total, despesas: desp, saldo: total - desp };
   }, [selectedMonths, isAllSelected, transactions, dailyIncomes, billingCharges]);
 
-  // CMV = (Comida + Bebida expenses) / Faturamento
+  // CMV = soma de despesas das categorias selecionadas / Faturamento
+  const validCmvCategories = useMemo(
+    () => dashSettings.cmv_categories.filter((c) => categories.some((cat) => cat.code === c)),
+    [dashSettings.cmv_categories, categories]
+  );
   const cmv = useMemo(() => {
     const gastosCB = transactions
-      .filter((t) => t.tipo === "saida" && dashSettings.cmv_categories.includes(t.categoria) && matchMonth(t.data))
+      .filter((t) => t.tipo === "saida" && validCmvCategories.includes(t.categoria) && matchMonth(t.data))
       .reduce((s, t) => s + t.valor, 0);
     return { gastosCB, percentual: faturamento > 0 ? (gastosCB / faturamento) * 100 : 0 };
-  }, [transactions, faturamento, selectedMonths, isAllSelected, dashSettings.cmv_categories]);
+  }, [transactions, faturamento, selectedMonths, isAllSelected, validCmvCategories]);
 
   // Parse DD/MM/YYYY to Date
   const parseDate = (dateStr: string) => {
