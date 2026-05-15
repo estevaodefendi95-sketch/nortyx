@@ -50,11 +50,56 @@ const Index = () => {
   const summaryLoading = bootLoading || txLoading;
   const pendingBills = useMemo(() => getPendingBills(), [getPendingBills]);
   const [pendingUsersCount, setPendingUsersCount] = useState(0);
-  const [activeTab, setActiveTab] = useState<Tab>("dados");
+  const [searchParams, setSearchParams] = useSearchParams();
+  const storagePrefix = `nortyx:${organization?.id ?? "anon"}`;
+  const readLS = (key: string) => { try { return localStorage.getItem(`${storagePrefix}:${key}`); } catch { return null; } };
+  const writeLS = (key: string, val: string) => { try { localStorage.setItem(`${storagePrefix}:${key}`, val); } catch {} };
+
+  const validTabs: Tab[] = ["dados", "calendar", "categories", "clientes", "lancamento"];
+  const initialTab: Tab = (() => {
+    const fromUrl = searchParams.get("tab");
+    if (fromUrl && validTabs.includes(fromUrl as Tab)) return fromUrl as Tab;
+    const fromLS = readLS("active_tab");
+    if (fromLS && validTabs.includes(fromLS as Tab)) return fromLS as Tab;
+    return "dados";
+  })();
+  const [activeTab, setActiveTab] = useState<Tab>(initialTab);
   const [showMobileChat, setShowMobileChat] = useState(false);
-  const [selectedMonths, setSelectedMonths] = useState<number[]>([new Date().getMonth()]);
-  const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
+  const [selectedMonths, setSelectedMonths] = useState<number[]>(() => {
+    const v = readLS("selected_months");
+    if (v) { try { const arr = JSON.parse(v); if (Array.isArray(arr) && arr.every((n) => typeof n === "number")) return arr; } catch {} }
+    return [new Date().getMonth()];
+  });
+  const [selectedYear, setSelectedYear] = useState<number>(() => {
+    const v = readLS("selected_year");
+    const n = v ? Number(v) : NaN;
+    return Number.isFinite(n) ? n : new Date().getFullYear();
+  });
   const [billingCharges, setBillingCharges] = useState<{ valor: number; data_cobranca: string }[]>([]);
+
+  // Persist active tab + reflect in URL
+  useEffect(() => {
+    writeLS("active_tab", activeTab);
+    if (searchParams.get("tab") !== activeTab) {
+      const next = new URLSearchParams(searchParams);
+      next.set("tab", activeTab);
+      setSearchParams(next, { replace: true });
+    }
+  }, [activeTab, organization?.id]);
+
+  // Persist filters
+  useEffect(() => { writeLS("selected_months", JSON.stringify(selectedMonths)); }, [selectedMonths, organization?.id]);
+  useEffect(() => { writeLS("selected_year", String(selectedYear)); }, [selectedYear, organization?.id]);
+
+  // If restored tab is no longer visible, fall back to first visible
+  useEffect(() => {
+    if (tabsLoading) return;
+    if (!visibleTabs.includes(activeTab)) {
+      const fallback = (visibleTabs[0] as Tab) || "dados";
+      setActiveTab(fallback);
+    }
+  }, [tabsLoading, visibleTabs, activeTab]);
+
 
   useEffect(() => {
     if (!organization?.id) {
