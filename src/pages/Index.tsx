@@ -288,56 +288,8 @@ const Index = () => {
                 </PopoverContent>
               </Popover>
 
-              {/* Desktop: full icon row */}
-              {!isMobile && (
-                <>
-                  <ThemeToggle />
-
-                  {!authLoading && isAdmin && (
-                    <>
-                      <button
-                        onClick={() => navigate("/admin/history")}
-                        className="p-2 rounded-lg hover:bg-secondary transition-colors flex-shrink-0"
-                        title="Histórico de Alterações"
-                      >
-                        <History className="w-5 h-5 text-muted-foreground" />
-                      </button>
-                      <button
-                        onClick={() => navigate("/admin")}
-                        className={`relative p-2 rounded-lg hover:bg-secondary transition-colors flex-shrink-0 ${pendingUsersCount > 0 ? 'border border-primary/30' : ''}`}
-                        title="Gerenciar Usuários"
-                      >
-                        <Shield className="w-5 h-5 text-primary" />
-                        {pendingUsersCount > 0 && (
-                          <span className="absolute -top-1 -right-1 w-3 h-3 rounded-full bg-primary animate-pulse" />
-                        )}
-                      </button>
-                    </>
-                  )}
-
-                  {!bootLoading && isOrgOwner && (
-                    <button
-                      onClick={() => navigate("/settings")}
-                      className="p-2 rounded-lg hover:bg-secondary transition-colors flex-shrink-0"
-                      title="Configurações da Organização"
-                    >
-                      <Settings className="w-5 h-5 text-muted-foreground" />
-                    </button>
-                  )}
-
-                  <button
-                    onClick={signOut}
-                    className="p-2 rounded-lg hover:bg-secondary transition-colors flex-shrink-0"
-                    title="Sair"
-                  >
-                    <LogOut className="w-5 h-5 text-muted-foreground" />
-                  </button>
-                </>
-              )}
-
-              {/* Mobile: condensed "more" menu */}
-              {isMobile && (
-                <Popover>
+              {/* Condensed "more" menu — same format across all viewports */}
+              <Popover>
                   <PopoverTrigger asChild>
                     <button className="relative p-2 rounded-lg hover:bg-secondary transition-colors flex-shrink-0">
                       <MoreVertical className="w-5 h-5 text-muted-foreground" />
