@@ -352,39 +352,26 @@ const Index = () => {
               <Skeleton className="h-12 sm:h-4 flex-1 sm:w-20" />
               <Skeleton className="h-12 sm:h-4 flex-1 sm:w-28" />
             </div>
-          ) : isMobile ? (
-            <div className="grid grid-cols-3 gap-1.5 mt-2.5">
-              <div className="flex flex-col items-start gap-0.5 px-2 py-1.5 rounded-lg bg-secondary/40 border border-border/40">
-                <span className="flex items-center gap-1 text-[9px] uppercase tracking-wide text-muted-foreground">
+          ) : (
+            <div className="grid grid-cols-3 gap-1.5 sm:gap-2 mt-2.5">
+              <div className="flex flex-col items-start gap-0.5 px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg bg-secondary/40 border border-border/40">
+                <span className="flex items-center gap-1 text-[9px] sm:text-[10px] uppercase tracking-wide text-muted-foreground">
                   <TrendingUp className="w-3 h-3 text-income" /> Entrada
                 </span>
-                <span className="text-[12px] font-semibold text-income leading-tight truncate w-full">{formatCurrency(filteredIncome)}</span>
+                <span className="text-[12px] sm:text-sm font-semibold text-income leading-tight truncate w-full">{formatCurrency(filteredIncome)}</span>
               </div>
-              <div className="flex flex-col items-start gap-0.5 px-2 py-1.5 rounded-lg bg-secondary/40 border border-border/40">
-                <span className="flex items-center gap-1 text-[9px] uppercase tracking-wide text-muted-foreground">
+              <div className="flex flex-col items-start gap-0.5 px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg bg-secondary/40 border border-border/40">
+                <span className="flex items-center gap-1 text-[9px] sm:text-[10px] uppercase tracking-wide text-muted-foreground">
                   <TrendingDown className="w-3 h-3 text-expense" /> Saída
                 </span>
-                <span className="text-[12px] font-semibold text-expense leading-tight truncate w-full">{formatCurrency(filteredExpenses)}</span>
+                <span className="text-[12px] sm:text-sm font-semibold text-expense leading-tight truncate w-full">{formatCurrency(filteredExpenses)}</span>
               </div>
-              <div className={`flex flex-col items-start gap-0.5 px-2 py-1.5 rounded-lg border ${saldo >= 0 ? "bg-income/10 border-income/30" : "bg-expense/10 border-expense/30"}`}>
-                <span className="flex items-center gap-1 text-[9px] uppercase tracking-wide text-muted-foreground">
+              <div className={`flex flex-col items-start gap-0.5 px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg border ${saldo >= 0 ? "bg-income/10 border-income/30" : "bg-expense/10 border-expense/30"}`}>
+                <span className="flex items-center gap-1 text-[9px] sm:text-[10px] uppercase tracking-wide text-muted-foreground">
                   <Wallet className="w-3 h-3" /> Saldo
                 </span>
-                <span className={`text-[12px] font-semibold leading-tight truncate w-full ${saldo >= 0 ? "text-income" : "text-expense"}`}>{formatCurrency(saldo)}</span>
+                <span className={`text-[12px] sm:text-sm font-semibold leading-tight truncate w-full ${saldo >= 0 ? "text-income" : "text-expense"}`}>{formatCurrency(saldo)}</span>
               </div>
-            </div>
-          ) : (
-            <div className="flex items-center gap-4 mt-1.5 flex-wrap min-h-[1.25rem]">
-              <span className="text-sm text-muted-foreground flex items-center gap-1">
-                <ArrowUpDown className="w-3.5 h-3.5" />
-                <span className="text-income font-medium">{formatCurrency(filteredIncome)}</span>
-              </span>
-              <span className="text-sm text-muted-foreground">
-                <span className="text-expense font-medium">{formatCurrency(filteredExpenses)}</span>
-              </span>
-              <span className="text-sm text-muted-foreground">
-                Saldo: <span className={`font-medium ${saldo >= 0 ? "text-income" : "text-expense"}`}>{formatCurrency(saldo)}</span>
-              </span>
             </div>
           )}
 
