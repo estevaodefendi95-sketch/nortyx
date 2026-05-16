@@ -342,7 +342,6 @@ const Index = () => {
                     </button>
                   </PopoverContent>
                 </Popover>
-              )}
             </div>
           </div>
 
