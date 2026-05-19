@@ -1008,6 +1008,7 @@ const AdminApproval = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      </div>
     </div>
   );
 };
