@@ -13,6 +13,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogD
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { useAuth } from "@/hooks/useAuth";
+import AppHeader from "@/components/AppHeader";
 
 const ALL_TABS = [
   { id: "dados", label: "Dados" },
@@ -455,30 +456,21 @@ const AdminApproval = () => {
   })();
 
   return (
-    <div className="min-h-screen bg-background p-4 max-w-2xl mx-auto space-y-6">
-      <div className="sticky top-0 z-20 -mx-4 px-4 py-3 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex items-center gap-3">
-            <Button variant="ghost" size="icon" onClick={() => navigate("/")}>
-              <ArrowLeft className="w-5 h-5" />
-            </Button>
-            <div className="flex items-center gap-2">
-              <Shield className="w-5 h-5 text-primary" />
-              <h1 className="text-xl font-bold text-foreground">Gerenciar Usuários</h1>
-            </div>
-          </div>
-          <div className="grid w-full grid-cols-2 gap-2 pl-11 sm:w-auto sm:flex sm:pl-0">
-            <Button variant="outline" size="sm" onClick={() => setNewOrgOpen(true)} disabled={!canCreate} className="w-full gap-2 sm:w-auto">
-              <Building2 className="w-4 h-4" />
-              <span>Nova Empresa</span>
-            </Button>
-            <Button size="sm" onClick={openCreateUserDialog} disabled={!canCreate} className="w-full gap-2 sm:w-auto">
-              <UserPlus className="w-4 h-4" />
-              <span>Criar Usuário</span>
-            </Button>
-          </div>
+    <div className="min-h-screen bg-background">
+      <AppHeader backTo="/" title="Gerenciar Usuários" containerClassName="max-w-2xl">
+        <div className="grid w-full grid-cols-2 gap-2 mt-3 sm:flex sm:justify-end">
+          <Button variant="outline" size="sm" onClick={() => setNewOrgOpen(true)} disabled={!canCreate} className="w-full gap-2 sm:w-auto">
+            <Building2 className="w-4 h-4" />
+            <span>Nova Empresa</span>
+          </Button>
+          <Button size="sm" onClick={openCreateUserDialog} disabled={!canCreate} className="w-full gap-2 sm:w-auto">
+            <UserPlus className="w-4 h-4" />
+            <span>Criar Usuário</span>
+          </Button>
         </div>
-      </div>
+      </AppHeader>
+
+      <div className="p-4 max-w-2xl mx-auto space-y-6">
 
       {/* Push Notification Settings */}
       <section className="p-4 rounded-lg border border-border bg-card space-y-3">
@@ -1017,6 +1009,7 @@ const AdminApproval = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      </div>
     </div>
   );
 };

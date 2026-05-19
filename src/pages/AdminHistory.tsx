@@ -7,6 +7,7 @@ import { History, RotateCcw, ChevronLeft, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { useNavigate } from "react-router-dom";
+import AppHeader from "@/components/AppHeader";
 
 interface AuditEntry {
   id: number;
@@ -151,15 +152,7 @@ const AdminHistory = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      <header className="border-b border-border bg-card/50 backdrop-blur-sm sticky top-0 z-10">
-        <div className="container max-w-4xl mx-auto px-4 py-4 flex items-center gap-3">
-          <button onClick={() => navigate("/")} className="p-2 rounded-lg hover:bg-secondary transition-colors">
-            <ChevronLeft className="w-5 h-5" />
-          </button>
-          <History className="w-5 h-5 text-primary" />
-          <h1 className="text-lg font-display font-bold">Histórico de Alterações</h1>
-        </div>
-      </header>
+      <AppHeader backTo="/" title="Histórico de Alterações" containerClassName="max-w-4xl" />
 
       <main className="container max-w-4xl mx-auto px-4 py-6">
         {loading ? (
