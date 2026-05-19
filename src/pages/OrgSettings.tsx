@@ -291,14 +291,7 @@ const OrgSettings = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      <header className="border-b border-border bg-card/50 backdrop-blur-sm sticky top-0 z-10">
-        <div className="container max-w-3xl mx-auto px-4 py-4 flex items-center gap-3">
-          <Button variant="ghost" size="icon" onClick={() => navigate("/")}>
-            <ArrowLeft className="w-5 h-5" />
-          </Button>
-          <h1 className="text-xl font-bold">Configurações da Organização</h1>
-        </div>
-      </header>
+      <AppHeader backTo="/" title="Configurações da Organização" containerClassName="max-w-3xl" />
 
       <main className="container max-w-3xl mx-auto px-4 py-6 space-y-6">
         {/* Branding */}
