@@ -190,278 +190,122 @@ const Index = () => {
   return (
     <div className={`min-h-screen bg-background ${isMobile ? "pb-16" : ""}`}>
       {/* Header */}
-      <header className="border-b border-border bg-card/50 backdrop-blur-sm sticky top-0 z-10">
-        <div className="container max-w-7xl mx-auto px-3 sm:px-4 py-3 sm:py-4">
-          <div className="flex items-center justify-between gap-2">
-            {/* Logo + Name */}
-            <div className="flex items-center gap-3 min-w-0">
-              {/* Company Logo */}
-              <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-lg border border-border bg-secondary/50 flex items-center justify-center overflow-hidden flex-shrink-0">
-                {companyLogo ? (
-                  <img src={companyLogo} alt="Logo" className="w-full h-full object-cover" />
-                ) : (
-                  <Camera className="w-4 h-4 text-muted-foreground" />
-                )}
-              </div>
-
-              <div className="min-w-0">
-                {bootLoading ? (
-                  <Skeleton className="h-7 w-32" />
-                ) : (
-                  <span className="text-xl sm:text-2xl font-display font-bold truncate text-primary">
-                    {companyName}
-                  </span>
-                )}
-              </div>
-
-              {!bootLoading && (availableOrganizations.length > 1 ||
-                (availableOrganizations.length === 1 && availableOrganizations[0].id !== organization?.id)) && (
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <button
-                      className="p-2 rounded-lg hover:bg-secondary transition-colors flex-shrink-0"
-                      title={organization?.name || "Trocar empresa"}
-                    >
-                      <Building2 className="w-5 h-5 text-muted-foreground" />
-                    </button>
-                  </PopoverTrigger>
-                  <PopoverContent align="start" className="w-64 p-1">
-                    <div className="px-2 py-1.5 text-xs font-medium text-muted-foreground">Selecionar empresa</div>
-                    <div className="max-h-72 overflow-y-auto">
-                      {availableOrganizations.map((org) => {
-                        const active = org.id === organization?.id;
-                        return (
-                          <button
-                            key={org.id}
-                            onClick={() => switchOrganization(org.id)}
-                            className={`w-full flex items-center justify-between gap-2 px-2 py-2 rounded-md text-sm text-left transition-colors ${active ? "bg-primary/10 text-primary" : "hover:bg-secondary"}`}
-                          >
-                            <span className="truncate">{org.name}</span>
-                            {active && <Check className="w-4 h-4 flex-shrink-0" />}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </PopoverContent>
-                </Popover>
-              )}
+      <AppHeader>
+        {/* Summary row */}
+        {summaryLoading ? (
+          <div className="flex items-center gap-2 mt-2">
+            <Skeleton className="h-12 sm:h-4 flex-1 sm:w-20" />
+            <Skeleton className="h-12 sm:h-4 flex-1 sm:w-20" />
+            <Skeleton className="h-12 sm:h-4 flex-1 sm:w-28" />
+          </div>
+        ) : (
+          <div className="grid grid-cols-3 gap-1.5 sm:gap-2 mt-2.5">
+            <div className="flex flex-col items-start gap-0.5 px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg bg-secondary/40 border border-border/40">
+              <span className="flex items-center gap-1 text-[9px] sm:text-[10px] uppercase tracking-wide text-muted-foreground">
+                <TrendingUp className="w-3 h-3 text-income" /> Entrada
+              </span>
+              <span className="text-[12px] sm:text-sm font-semibold text-income leading-tight truncate w-full">{formatCurrency(filteredIncome)}</span>
             </div>
-
-            {/* Action icons - always top right */}
-            <div className="flex items-center gap-0.5 sm:gap-1 flex-shrink-0">
-              {/* Bell notification - always visible */}
-              <Popover>
-                <PopoverTrigger asChild>
-                  <button className="relative p-2 rounded-lg hover:bg-secondary transition-colors flex-shrink-0">
-                    <Bell className="w-5 h-5 text-muted-foreground" />
-                    {pendingBills.length > 0 && (
-                      <span className="absolute -top-0.5 -right-0.5 w-4 h-4 rounded-full bg-warning text-[9px] font-bold text-background flex items-center justify-center">
-                        {pendingBills.length > 9 ? "9+" : pendingBills.length}
-                      </span>
-                    )}
-                  </button>
-                </PopoverTrigger>
-                <PopoverContent className="w-80 p-0" align="end">
-                  <div className="p-3 border-b border-border">
-                    <p className="text-sm font-semibold">Contas Pendentes</p>
-                    {pendingBills.length > 0 && (
-                      <p className="text-xs text-muted-foreground mt-0.5">
-                        Total: <span className="text-warning font-medium">{formatCurrency(pendingBills.reduce((s, t) => s + t.valor, 0))}</span>
-                      </p>
-                    )}
-                  </div>
-                  <div className="max-h-64 overflow-y-auto">
-                    {pendingBills.length === 0 ? (
-                      <p className="text-sm text-muted-foreground text-center py-6">Nenhuma conta pendente 🎉</p>
-                    ) : (
-                      pendingBills.map((t) => (
-                        <div key={t.id} className="flex items-center justify-between px-3 py-2 border-b border-border/30 last:border-0">
-                          <div className="min-w-0">
-                            <p className="text-sm font-medium truncate">{t.empresa}</p>
-                            <p className="text-[11px] text-muted-foreground">{t.data}</p>
-                          </div>
-                          <span className="text-sm font-semibold text-expense ml-2 flex-shrink-0">{formatCurrency(t.valor)}</span>
-                        </div>
-                      ))
-                    )}
-                  </div>
-                </PopoverContent>
-              </Popover>
-
-              {/* Condensed "more" menu — same format across all viewports */}
-              <Popover>
-                  <PopoverTrigger asChild>
-                    <button className="relative p-2 rounded-lg hover:bg-secondary transition-colors flex-shrink-0">
-                      <MoreVertical className="w-5 h-5 text-muted-foreground" />
-                      {(isAdmin && pendingUsersCount > 0) && (
-                        <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-primary animate-pulse" />
-                      )}
-                    </button>
-                  </PopoverTrigger>
-                  <PopoverContent align="end" className="w-56 p-1">
-                    <div className="flex items-center justify-between px-2 py-2 border-b border-border mb-1">
-                      <span className="text-xs font-medium text-muted-foreground">Tema</span>
-                      <ThemeToggle />
-                    </div>
-                    {!authLoading && isAdmin && (
-                      <>
-                        <button
-                          onClick={() => navigate("/admin/history")}
-                          className="w-full flex items-center gap-2 px-2 py-2 rounded-md text-sm hover:bg-secondary transition-colors text-left"
-                        >
-                          <History className="w-4 h-4 text-muted-foreground" />
-                          Histórico
-                        </button>
-                        <button
-                          onClick={() => navigate("/admin")}
-                          className="w-full flex items-center gap-2 px-2 py-2 rounded-md text-sm hover:bg-secondary transition-colors text-left"
-                        >
-                          <Shield className="w-4 h-4 text-primary" />
-                          Usuários
-                          {pendingUsersCount > 0 && (
-                            <span className="ml-auto w-2 h-2 rounded-full bg-primary animate-pulse" />
-                          )}
-                        </button>
-                      </>
-                    )}
-                    {!bootLoading && isOrgOwner && (
-                      <button
-                        onClick={() => navigate("/settings")}
-                        className="w-full flex items-center gap-2 px-2 py-2 rounded-md text-sm hover:bg-secondary transition-colors text-left"
-                      >
-                        <Settings className="w-4 h-4 text-muted-foreground" />
-                        Configurações
-                      </button>
-                    )}
-                    <button
-                      onClick={signOut}
-                      className="w-full flex items-center gap-2 px-2 py-2 rounded-md text-sm hover:bg-secondary transition-colors text-left text-destructive"
-                    >
-                      <LogOut className="w-4 h-4" />
-                      Sair
-                    </button>
-                  </PopoverContent>
-                </Popover>
+            <div className="flex flex-col items-start gap-0.5 px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg bg-secondary/40 border border-border/40">
+              <span className="flex items-center gap-1 text-[9px] sm:text-[10px] uppercase tracking-wide text-muted-foreground">
+                <TrendingDown className="w-3 h-3 text-expense" /> Saída
+              </span>
+              <span className="text-[12px] sm:text-sm font-semibold text-expense leading-tight truncate w-full">{formatCurrency(filteredExpenses)}</span>
+            </div>
+            <div className={`flex flex-col items-start gap-0.5 px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg border ${saldo >= 0 ? "bg-income/10 border-income/30" : "bg-expense/10 border-expense/30"}`}>
+              <span className="flex items-center gap-1 text-[9px] sm:text-[10px] uppercase tracking-wide text-muted-foreground">
+                <Wallet className="w-3 h-3" /> Saldo
+              </span>
+              <span className={`text-[12px] sm:text-sm font-semibold leading-tight truncate w-full ${saldo >= 0 ? "text-income" : "text-expense"}`}>{formatCurrency(saldo)}</span>
             </div>
           </div>
+        )}
 
-          {/* Summary row - cards on mobile, inline on desktop */}
-          {summaryLoading ? (
-            <div className="flex items-center gap-2 mt-2">
-              <Skeleton className="h-12 sm:h-4 flex-1 sm:w-20" />
-              <Skeleton className="h-12 sm:h-4 flex-1 sm:w-20" />
-              <Skeleton className="h-12 sm:h-4 flex-1 sm:w-28" />
-            </div>
+        {/* Desktop tabs */}
+        {!isMobile && (
+          tabsLoading || bootLoading ? (
+            <Skeleton className="h-10 w-full sm:w-80 mt-2" />
           ) : (
-            <div className="grid grid-cols-3 gap-1.5 sm:gap-2 mt-2.5">
-              <div className="flex flex-col items-start gap-0.5 px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg bg-secondary/40 border border-border/40">
-                <span className="flex items-center gap-1 text-[9px] sm:text-[10px] uppercase tracking-wide text-muted-foreground">
-                  <TrendingUp className="w-3 h-3 text-income" /> Entrada
-                </span>
-                <span className="text-[12px] sm:text-sm font-semibold text-income leading-tight truncate w-full">{formatCurrency(filteredIncome)}</span>
-              </div>
-              <div className="flex flex-col items-start gap-0.5 px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg bg-secondary/40 border border-border/40">
-                <span className="flex items-center gap-1 text-[9px] sm:text-[10px] uppercase tracking-wide text-muted-foreground">
-                  <TrendingDown className="w-3 h-3 text-expense" /> Saída
-                </span>
-                <span className="text-[12px] sm:text-sm font-semibold text-expense leading-tight truncate w-full">{formatCurrency(filteredExpenses)}</span>
-              </div>
-              <div className={`flex flex-col items-start gap-0.5 px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg border ${saldo >= 0 ? "bg-income/10 border-income/30" : "bg-expense/10 border-expense/30"}`}>
-                <span className="flex items-center gap-1 text-[9px] sm:text-[10px] uppercase tracking-wide text-muted-foreground">
-                  <Wallet className="w-3 h-3" /> Saldo
-                </span>
-                <span className={`text-[12px] sm:text-sm font-semibold leading-tight truncate w-full ${saldo >= 0 ? "text-income" : "text-expense"}`}>{formatCurrency(saldo)}</span>
-              </div>
-            </div>
-          )}
-
-          {/* Desktop tabs */}
-          {!isMobile && (
-            tabsLoading || bootLoading ? (
-              <Skeleton className="h-10 w-full sm:w-80 mt-2" />
-            ) : (
-            <div className="flex gap-1 bg-secondary/50 rounded-lg p-1 mt-2 w-full sm:w-fit">
-              {tabs.map((tab) => {
-                const Icon = tab.icon;
-                const isActive = activeTab === tab.id;
-                return (
-                  <button
-                    key={tab.id}
-                    onClick={() => setActiveTab(tab.id)}
-                    className={`
-                      flex items-center justify-center gap-1.5 md:gap-2 px-3 md:px-4 py-2 rounded-md text-xs md:text-sm font-medium transition-all flex-1 sm:flex-none
-                      ${isActive
-                        ? "bg-primary text-primary-foreground shadow-sm"
-                        : "text-muted-foreground hover:text-foreground"
-                      }
-                    `}
-                  >
-                    <Icon className="w-4 h-4" />
-                    <span className="hidden md:inline">{tab.label}</span>
-                  </button>
-                );
-              })}
-            </div>
-            )
-          )}
-
-          {/* Year + Month Multi-Select Filter */}
-          <div className="flex items-center gap-1.5 mt-2.5 sm:mt-3 overflow-x-auto pb-1 scrollbar-hide">
-            {/* Year selector - popover */}
-            <Popover>
-              <PopoverTrigger asChild>
-                <button className="px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-md text-xs font-bold transition-all border border-transparent bg-secondary/40 text-muted-foreground whitespace-nowrap flex-shrink-0 hover:bg-secondary/70">
-                  {selectedYear} ▾
-                </button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-2" align="start">
-                <div className="flex flex-col gap-1">
-                  {availableYears.map((year) => (
-                    <button
-                      key={year}
-                      onClick={() => setSelectedYear(year)}
-                      className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${
-                        selectedYear === year
-                          ? "bg-primary text-primary-foreground"
-                          : "text-foreground hover:bg-secondary"
-                      }`}
-                    >
-                      {year}
-                    </button>
-                  ))}
-                </div>
-              </PopoverContent>
-            </Popover>
-            <div className="w-px h-5 bg-border flex-shrink-0 mx-0.5" />
-            <button
-              onClick={selectAll}
-              className={`px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-md text-xs font-medium transition-all border whitespace-nowrap flex-shrink-0 ${
-                isAllSelected
-                  ? "bg-primary text-primary-foreground border-primary"
-                  : "bg-secondary/40 text-muted-foreground border-transparent hover:bg-secondary/70"
-              }`}
-            >
-              Todos
-            </button>
-            {MONTHS_PT.map((label, idx) => {
-              const isActive = selectedMonths.includes(idx);
+          <div className="flex gap-1 bg-secondary/50 rounded-lg p-1 mt-2 w-full sm:w-fit">
+            {tabs.map((tab) => {
+              const Icon = tab.icon;
+              const isActive = activeTab === tab.id;
               return (
                 <button
-                  key={idx}
-                  onClick={() => toggleMonth(idx)}
-                  className={`px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-md text-xs font-medium transition-all border whitespace-nowrap flex-shrink-0 ${
-                    isActive
-                      ? "bg-primary text-primary-foreground border-primary"
-                      : "bg-secondary/40 text-muted-foreground border-transparent hover:bg-secondary/70"
-                  }`}
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id)}
+                  className={`
+                    flex items-center justify-center gap-1.5 md:gap-2 px-3 md:px-4 py-2 rounded-md text-xs md:text-sm font-medium transition-all flex-1 sm:flex-none
+                    ${isActive
+                      ? "bg-primary text-primary-foreground shadow-sm"
+                      : "text-muted-foreground hover:text-foreground"
+                    }
+                  `}
                 >
-                  {label}
+                  <Icon className="w-4 h-4" />
+                  <span className="hidden md:inline">{tab.label}</span>
                 </button>
               );
             })}
           </div>
+          )
+        )}
+
+        {/* Year + Month Multi-Select Filter */}
+        <div className="flex items-center gap-1.5 mt-2.5 sm:mt-3 overflow-x-auto pb-1 scrollbar-hide">
+          <Popover>
+            <PopoverTrigger asChild>
+              <button className="px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-md text-xs font-bold transition-all border border-transparent bg-secondary/40 text-muted-foreground whitespace-nowrap flex-shrink-0 hover:bg-secondary/70">
+                {selectedYear} ▾
+              </button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-2" align="start">
+              <div className="flex flex-col gap-1">
+                {availableYears.map((year) => (
+                  <button
+                    key={year}
+                    onClick={() => setSelectedYear(year)}
+                    className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${
+                      selectedYear === year
+                        ? "bg-primary text-primary-foreground"
+                        : "text-foreground hover:bg-secondary"
+                    }`}
+                  >
+                    {year}
+                  </button>
+                ))}
+              </div>
+            </PopoverContent>
+          </Popover>
+          <div className="w-px h-5 bg-border flex-shrink-0 mx-0.5" />
+          <button
+            onClick={selectAll}
+            className={`px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-md text-xs font-medium transition-all border whitespace-nowrap flex-shrink-0 ${
+              isAllSelected
+                ? "bg-primary text-primary-foreground border-primary"
+                : "bg-secondary/40 text-muted-foreground border-transparent hover:bg-secondary/70"
+            }`}
+          >
+            Todos
+          </button>
+          {MONTHS_PT.map((label, idx) => {
+            const isActive = selectedMonths.includes(idx);
+            return (
+              <button
+                key={idx}
+                onClick={() => toggleMonth(idx)}
+                className={`px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-md text-xs font-medium transition-all border whitespace-nowrap flex-shrink-0 ${
+                  isActive
+                    ? "bg-primary text-primary-foreground border-primary"
+                    : "bg-secondary/40 text-muted-foreground border-transparent hover:bg-secondary/70"
+                }`}
+              >
+                {label}
+              </button>
+            );
+          })}
         </div>
-      </header>
+      </AppHeader>
 
       {/* Content */}
       <main className="container max-w-7xl mx-auto px-3 sm:px-4 py-4 sm:py-6 space-y-4 sm:space-y-6">
