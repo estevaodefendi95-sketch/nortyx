@@ -7,6 +7,7 @@ import { History, RotateCcw, ChevronLeft, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { useNavigate } from "react-router-dom";
+import AppHeader from "@/components/AppHeader";
 
 interface AuditEntry {
   id: number;
