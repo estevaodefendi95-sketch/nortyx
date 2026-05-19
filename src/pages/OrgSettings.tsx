@@ -11,6 +11,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { useToast } from "@/hooks/use-toast";
 import { ArrowLeft, Camera, X, Save, Loader2, UserPlus, Trash2, Mail, Users } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import AppHeader from "@/components/AppHeader";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 const ALL_TABS = [
