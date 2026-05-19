@@ -8,6 +8,7 @@ import TransactionForm from "@/components/TransactionForm";
 import EvolutionChart from "@/components/EvolutionChart";
 import DadosView from "@/components/DadosView";
 import ThemeToggle from "@/components/ThemeToggle";
+import AppHeader from "@/components/AppHeader";
 import { formatCurrency } from "@/data/cashflow";
 import { useTransactions } from "@/context/TransactionsContext";
 import { Input } from "@/components/ui/input";
