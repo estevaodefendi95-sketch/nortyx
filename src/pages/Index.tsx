@@ -9,6 +9,7 @@ import EvolutionChart from "@/components/EvolutionChart";
 import DadosView from "@/components/DadosView";
 import ThemeToggle from "@/components/ThemeToggle";
 import AppHeader from "@/components/AppHeader";
+import ExportReportButton from "@/components/ExportReportButton";
 import { formatCurrency } from "@/data/cashflow";
 import { useTransactions } from "@/context/TransactionsContext";
 import { Input } from "@/components/ui/input";
