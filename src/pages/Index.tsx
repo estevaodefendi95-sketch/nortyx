@@ -306,6 +306,8 @@ const Index = () => {
               </button>
             );
           })}
+          </div>
+          <ExportReportButton selectedMonths={selectedMonths} selectedYear={selectedYear} />
         </div>
       </AppHeader>
 
