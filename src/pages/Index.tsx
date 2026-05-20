@@ -253,7 +253,8 @@ const Index = () => {
         )}
 
         {/* Year + Month Multi-Select Filter */}
-        <div className="flex items-center gap-1.5 mt-2.5 sm:mt-3 overflow-x-auto pb-1 scrollbar-hide">
+        <div className="flex items-center gap-2 mt-2.5 sm:mt-3">
+          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-hide flex-1 min-w-0">
           <Popover>
             <PopoverTrigger asChild>
               <button className="px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-md text-xs font-bold transition-all border border-transparent bg-secondary/40 text-muted-foreground whitespace-nowrap flex-shrink-0 hover:bg-secondary/70">
