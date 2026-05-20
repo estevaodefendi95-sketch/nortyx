@@ -193,6 +193,7 @@ const Index = () => {
     <div className={`min-h-screen bg-background ${isMobile ? "pb-16" : ""}`}>
       {/* Header */}
       <AppHeader>
+        <div className="sm:w-fit">
         {/* Summary row */}
         {summaryLoading ? (
           <div className="flex items-center gap-2 mt-2">
@@ -201,7 +202,7 @@ const Index = () => {
             <Skeleton className="h-12 sm:h-4 flex-1 sm:w-28" />
           </div>
         ) : (
-          <div className="grid grid-cols-3 gap-1.5 sm:gap-2 mt-2.5">
+          <div className="grid grid-cols-3 gap-1.5 sm:gap-2 mt-2.5 w-full">
             <div className="flex flex-col items-start gap-0.5 px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg bg-secondary/40 border border-border/40">
               <span className="flex items-center gap-1 text-[9px] sm:text-[10px] uppercase tracking-wide text-muted-foreground">
                 <TrendingUp className="w-3 h-3 text-income" /> Entrada
@@ -252,6 +253,7 @@ const Index = () => {
           </div>
           )
         )}
+        </div>
 
         {/* Year + Month Multi-Select Filter */}
         <div className="flex items-center gap-2 mt-2.5 sm:mt-3">
