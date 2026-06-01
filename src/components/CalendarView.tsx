@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { chargeDuplicatesIncome } from "@/lib/incomeDedup";
 
 const DAYS_PT = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
 const MONTHS_PT = [
@@ -174,9 +175,12 @@ const CalendarView = ({ initialMonth, selectedYear: propYear, isViewer = false }
   }, [dailyExpenses, txOverrides]);
 
   // Billing charges by day for current month
+  // Remove cobranças que já estão representadas por um daily_income (mesma data+valor),
+  // evitando duplicação no faturamento e nos totais do dia.
   const billingChargesByDay = useMemo(() => {
     const map = new Map<number, BillingChargeWithClient[]>();
     billingCharges.forEach((c) => {
+      if (chargeDuplicatesIncome(c, dailyIncomes)) return;
       const parts = c.data_cobranca.split("/").map(Number);
       const day = parts[0];
       const month = parts[1];
@@ -187,7 +191,7 @@ const CalendarView = ({ initialMonth, selectedYear: propYear, isViewer = false }
       }
     });
     return map;
-  }, [billingCharges, currentMonth, currentYear]);
+  }, [billingCharges, dailyIncomes, currentMonth, currentYear]);
 
   const monthIncomeTotal = useMemo(() => {
     let total = 0;
@@ -235,8 +239,9 @@ const CalendarView = ({ initialMonth, selectedYear: propYear, isViewer = false }
         balance -= (txOverrides.get(t.id)?.valor ?? t.valor);
       }
     });
-    // Add billing charges from previous months
+    // Add billing charges from previous months (dedup vs daily_incomes)
     billingCharges.forEach((c) => {
+      if (chargeDuplicatesIncome(c, dailyIncomes)) return;
       const parts = c.data_cobranca.split("/").map(Number);
       const month = parts[1] - 1;
       const year = parts[2];

@@ -11,6 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { dedupeChargesAgainstIncomes } from "@/lib/incomeDedup";
 
 const MONTHS_PT = [
   "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
@@ -272,7 +273,9 @@ const DadosView = ({ selectedMonths, selectedYear, isViewer = false }: DadosView
   // Monthly revenue & balance from context
   const { faturamento, despesas, saldo } = useMemo(() => {
     const fat = dailyIncomes.filter((i) => matchMonth(i.data)).reduce((s, i) => s + i.valor, 0);
-    const fatCharges = billingCharges.filter((c) => matchMonth(c.data_cobranca)).reduce((s, c) => s + c.valor, 0);
+    // Evitar duplicação: se já existe um daily_income com mesma data+valor, a cobrança não soma novamente
+    const dedupedCharges = dedupeChargesAgainstIncomes(billingCharges, dailyIncomes);
+    const fatCharges = dedupedCharges.filter((c) => matchMonth(c.data_cobranca)).reduce((s, c) => s + c.valor, 0);
     const desp = transactions.filter((t) => t.tipo === "saida" && matchMonth(t.data)).reduce((s, t) => s + t.valor, 0);
     const total = fat + fatCharges;
     return { faturamento: total, despesas: desp, saldo: total - desp };
