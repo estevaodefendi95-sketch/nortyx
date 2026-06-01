@@ -614,14 +614,17 @@ const TransactionForm = () => {
         console.error("Erro ao marcar agendado como pago:", err);
       }
     } else if (entry.tipo === "entrada" && entry.matchedChargeId) {
-      // Cobrança vinculada → apenas confirmar pagamento, sem duplicar lançamento
-      const { error } = await supabase.from("billing_charges").update({ status: "paga" }).eq("id", entry.matchedChargeId);
+      // Cobrança vinculada → marcar paga e ajustar data_cobranca para o dia da entrada (sem duplicar lançamento)
+      const { error } = await supabase
+        .from("billing_charges")
+        .update({ status: "paga", data_cobranca: dataBR })
+        .eq("id", entry.matchedChargeId);
       if (!error) {
         saved = true;
         updateBankEntry(id, "approved", true);
         toast({
           title: "Cobrança quitada",
-          description: `${entry.empresa} — ${formatCurrency(entry.valor)} | Cobrança de ${entry.matchedChargeClient || "cliente"} marcada como paga (sem duplicar lançamento)`,
+          description: `${entry.empresa} — ${formatCurrency(entry.valor)} | Cobrança de ${entry.matchedChargeClient || "cliente"} marcada como paga em ${dataBR} (sem duplicar lançamento)`,
         });
         return;
       }
@@ -684,8 +687,11 @@ const TransactionForm = () => {
           console.error(err);
         }
       } else if (entry.tipo === "entrada" && entry.matchedChargeId) {
-        // Cobrança vinculada → apenas confirmar pagamento, sem duplicar lançamento
-        const { error } = await supabase.from("billing_charges").update({ status: "paga" }).eq("id", entry.matchedChargeId);
+        // Cobrança vinculada → marcar paga e ajustar data_cobranca para o dia da entrada (sem duplicar)
+        const { error } = await supabase
+          .from("billing_charges")
+          .update({ status: "paga", data_cobranca: dataBR })
+          .eq("id", entry.matchedChargeId);
         if (!error) {
           saved = true;
           chargesMarked++;
