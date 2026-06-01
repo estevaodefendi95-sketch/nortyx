@@ -1,60 +1,36 @@
-## Exportação de Relatório Financeiro em PDF
+## Objetivo
 
-### 1. Biblioteca
+No diálogo "Correspondências identificadas no extrato" da aba **Lançamento**, permitir que o usuário **altere manualmente o cliente/cobrança vinculado** a cada entrada — corrigindo um match automático errado ou atribuindo um cliente a uma entrada que não foi auto-vinculada.
 
-Usar **jsPDF** + **jspdf-autotable** (tabelas com quebra de página nativa, sem cortes) e renderizar o gráfico de pizza via **Canvas 2D** em alta resolução (2x DPI), inserido como imagem PNG no PDF. Evita html2canvas (gera fontes embaçadas e quebras imprecisas).
+## Comportamento
 
-```
-bun add jspdf jspdf-autotable
-```
+Para cada entrada do tipo `entrada` listada no diálogo (tanto as que já foram auto-matched quanto as que ficaram sem match):
 
-### 2. Novo arquivo: `src/lib/pdfReport.ts`
+1. Mostrar, ao lado do nome do cliente identificado, um link **"Alterar cliente"** (ou **"Vincular cobrança"** quando não há match).
+2. Ao clicar, abrir um popover/select com as cobranças pendentes/atrasadas da organização, agrupadas por cliente, exibindo:
+   - Nome do cliente
+   - Valor da cobrança
+   - Data de cobrança
+   - Indicador "(mesmo valor)" quando bate com o valor da entrada (sugestão prioritária no topo)
+3. Incluir opção **"Remover vinculação"** para desfazer o match e tratar a entrada como lançamento novo.
+4. Ao selecionar uma cobrança:
+   - Atualizar `matchedChargeId` e `matchedChargeClient` da entrada.
+   - Marcar o checkbox da entrada como aprovado.
+   - Reservar essa cobrança (não pode aparecer como sugestão para outra entrada no mesmo diálogo).
+5. Validação: impedir selecionar uma cobrança já vinculada a outra entrada do diálogo (mostrar badge "já usada").
 
-Função `exportFinancialReport({ organization, periodLabel, expensesByCategory, incomesByClient, transactions })` que:
+## Implementação (escopo único: `src/components/TransactionForm.tsx`)
 
-- Cria documento A4 retrato, margens 48pt, fundo branco.
-- **Header (todas as páginas)**:
-  - Logo do cliente (esquerda, 40pt altura) — de `organization.logo_url`, convertida para dataURL preservando resolução; fallback: iniciais do `companyName` em quadrado cinza claro.
-  - Título "Relatório de Desempenho Financeiro" (direita, 16pt, cinza #1f2937, semibold).
-  - Subtítulo `Período: dd/mm/aaaa a dd/mm/aaaa` (10pt, cinza #6b7280).
-  - Linha divisória fina #e5e7eb sob o header.
-- **Resumo** (cards minimalistas): Entrada, Saída, Saldo do período.
-- **Seção Distribuição de Despesas**:
-  - Pie chart desenhado em canvas 600×600 (donut sutil, cores da paleta do app), inserido em ~300×300pt no PDF.
-  - Legenda lateral: bolinha + categoria + percentual.
-- **Tabela "Gastos por Categoria"** (autoTable): Categoria | Lançamentos (top 3 descrições) | Total | % do total. Header cinza #f3f4f6, divisórias #e5e7eb 0.5pt, padding generoso.
-- **Tabela "Entradas por Cliente"** (autoTable, nova página se faltar espaço): Cliente | Total no Período | Status (Recebido / Parcial / Pendente, cores sutis).
-- **Footer**: número da página "x / y" + data de emissão, 8pt #9ca3af.
+- Carregar uma única vez (junto com `detectMatches`) a lista completa de cobranças pendentes/atrasadas + mapa de clientes, salvar em estado `availableCharges` para reuso no diálogo.
+- Na seção "Cobranças identificadas" do `showMatchApprovalDialog`, adicionar para cada item um botão/Popover com `Command` (shadcn) listando as opções.
+- Adicionar uma nova seção **"Entradas sem cobrança vinculada"** logo abaixo, listando as `entradas` sem `matchedChargeId`, cada uma com o mesmo seletor "Vincular cobrança".
+- Handler `handleChangeChargeLink(entryId, newChargeId | null)` que:
+  - Atualiza `pendingMatchEntries` imutavelmente.
+  - Recalcula `approvedMatchIds` (adiciona se vinculou, remove se desvinculou).
+- Reaproveitar a lógica existente em `commitImport` — nenhuma mudança no fluxo de gravação, já que ela usa `matchedChargeId` final.
 
-Quebras de página: autoTable evita cortar linhas; antes do pie chart, checar espaço e `doc.addPage()` se necessário.
+## Arquivos afetados
 
-### 3. Agregação de dados — `src/hooks/useReportData.ts`
+- `src/components/TransactionForm.tsx` (apenas)
 
-A partir de `transactions`, `dailyIncomes`, `billing_charges`, `clients`, `categories` filtrados por `selectedMonths`/`selectedYear`:
-
-- `expensesByCategory`: `[{ code, label, color, total, count, sampleDescriptions[] }]` ordenado desc.
-- `incomesByClient`: agrupando `billing_charges` por `client_id` → `[{ name, total, status }]`.
-- `periodLabel`: primeiro dia do menor mês ao último dia do maior (ou "Ano todo" se Todos).
-
-### 4. Botão "Exportar Relatório (PDF)"
-
-Em `src/pages/Index.tsx`, na linha do seletor de ano/meses (à direita, fora do scroll horizontal):
-
-- `Button` outline sm com ícone `FileDown`, label "Exportar PDF" em ≥sm.
-- Estado `exporting` desabilita e mostra spinner.
-- `doc.save("relatorio-<empresa>-<periodo>.pdf")`.
-
-### 5. Detalhes técnicos
-
-- Conversão da logo: `fetch → blob → FileReader.readAsDataURL`; medir dimensões com `Image` para preservar proporção.
-- Cores do gráfico: `DEFAULT_COLORS` do CategoriesContext + fallback HSL determinístico.
-- Fontes: Helvetica embutida do jsPDF.
-
-### Arquivos afetados
-
-- `src/lib/pdfReport.ts` (novo)
-- `src/lib/pieChartCanvas.ts` (novo)
-- `src/hooks/useReportData.ts` (novo)
-- `src/components/ExportReportButton.tsx` (novo)
-- `src/pages/Index.tsx` (botão na linha de filtros)
-- `package.json` (jspdf, jspdf-autotable)
+Nenhuma mudança de schema, RLS ou backend.
