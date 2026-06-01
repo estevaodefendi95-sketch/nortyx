@@ -2478,7 +2478,7 @@ const TransactionForm = () => {
                   <PopoverTrigger asChild>
                     <button
                       type="button"
-                      onClick={(ev) => { ev.preventDefault(); ev.stopPropagation(); }}
+                      onClick={(ev) => ev.stopPropagation()}
                       className="text-xs text-primary hover:underline mt-1"
                     >
                       {mode === "change" ? "Alterar cliente" : "Vincular cliente"}
