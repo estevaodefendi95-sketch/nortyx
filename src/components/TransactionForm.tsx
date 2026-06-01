@@ -2620,7 +2620,7 @@ const TransactionForm = () => {
                     {unlinkedEntradas.map((e) => {
                       const eMonth = entryMonthKey(e.data);
                       const monthAvail = availableCharges.filter(
-                        (c) => !usedChargeIds.has(c.id) && chargeMonthKey(c) === eMonth,
+                        (c) => chargeMonthKey(c) === eMonth,
                       ).length;
                       return (
                         <div key={e.id} className="flex items-start gap-3 p-3 rounded-lg border bg-secondary/20">
