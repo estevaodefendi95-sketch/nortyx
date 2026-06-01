@@ -215,6 +215,33 @@ const TransactionForm = () => {
   const [pendingMatchEntries, setPendingMatchEntries] = useState<ParsedBankEntry[]>([]);
   const [pendingMatchReschedules, setPendingMatchReschedules] = useState<Array<{ id: number; empresa: string; valor: number; data: string; categoria: string; subcategoria: string | null }>>([]);
   const [approvedMatchIds, setApprovedMatchIds] = useState<Set<number>>(new Set());
+  const [availableCharges, setAvailableCharges] = useState<Array<{ id: string; valor: number; data_cobranca: string; client_id: string; client_nome: string }>>([]);
+  const [openChargePopoverId, setOpenChargePopoverId] = useState<number | null>(null);
+
+  const handleChangeChargeLink = (entryId: number, newChargeId: string | null) => {
+    setPendingMatchEntries((prev) => prev.map((e) => {
+      if (e.id !== entryId) return e;
+      if (newChargeId === null) {
+        const { matchedChargeId, matchedChargeClient, matchedFrom, ...rest } = e;
+        return rest as ParsedBankEntry;
+      }
+      const ch = availableCharges.find((c) => c.id === newChargeId);
+      if (!ch) return e;
+      return {
+        ...e,
+        matchedChargeId: newChargeId,
+        matchedChargeClient: ch.client_nome,
+        matchedFrom: `Cobrança vinculada manualmente: ${ch.client_nome}`,
+      };
+    }));
+    setApprovedMatchIds((prev) => {
+      const next = new Set(prev);
+      if (newChargeId === null) next.delete(entryId);
+      else next.add(entryId);
+      return next;
+    });
+    setOpenChargePopoverId(null);
+  };
 
   const getDateRange = (entries: ParsedBankEntry[]): { start: string; end: string } => {
     const dates = entries.map((e) => e.data).sort();
