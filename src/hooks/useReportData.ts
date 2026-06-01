@@ -73,7 +73,9 @@ export function useReportData(selectedMonths: number[], selectedYear: number): R
     const totalDaily = filteredDaily.reduce((s, i) => s + i.valor, 0);
 
     const filteredCharges = charges.filter((c) => matchMonth(c.data_cobranca));
-    const chargesIncome = filteredCharges.reduce((s, c) => s + c.valor, 0);
+    // Evitar duplicação: se já existe um daily_income com mesma data+valor, a cobrança não soma novamente
+    const dedupedForTotal = dedupeChargesAgainstIncomes(filteredCharges, filteredDaily);
+    const chargesIncome = dedupedForTotal.reduce((s, c) => s + c.valor, 0);
     const totalIncome = totalDaily + chargesIncome;
 
     // Group by category
