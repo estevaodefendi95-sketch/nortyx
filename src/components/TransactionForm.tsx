@@ -2605,17 +2605,29 @@ const TransactionForm = () => {
                     <h3 className="text-xs font-semibold uppercase text-muted-foreground">
                       Entradas sem cobrança vinculada ({unlinkedEntradas.length})
                     </h3>
-                    {unlinkedEntradas.map((e) => (
-                      <div key={e.id} className="flex items-start gap-3 p-3 rounded-lg border bg-secondary/20">
-                        <div className="flex-1 text-left text-sm min-w-0">
-                          <div className="font-medium truncate">{e.empresa}</div>
-                          <div className="text-xs text-muted-foreground">
-                            {formatCurrency(e.valor)} · {isoToBR(e.data)}
+                    {unlinkedEntradas.map((e) => {
+                      const eMonth = entryMonthKey(e.data);
+                      const monthAvail = availableCharges.filter(
+                        (c) => !usedChargeIds.has(c.id) && chargeMonthKey(c) === eMonth,
+                      ).length;
+                      return (
+                        <div key={e.id} className="flex items-start gap-3 p-3 rounded-lg border bg-secondary/20">
+                          <div className="flex-1 text-left text-sm min-w-0">
+                            <div className="font-medium truncate">{e.empresa}</div>
+                            <div className="text-xs text-muted-foreground">
+                              {formatCurrency(e.valor)} · {isoToBR(e.data)}
+                            </div>
+                            {monthAvail > 0 && (
+                              <div className="text-xs mt-1 text-muted-foreground">
+                                {monthAvail} cobrança{monthAvail > 1 ? "s" : ""} do mês disponíve{monthAvail > 1 ? "is" : "l"}
+                              </div>
+                            )}
+                            {renderChargePicker(e, "link")}
                           </div>
-                          {renderChargePicker(e, "link")}
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
+
                   </div>
                 )}
                 {scheduled.length > 0 && (
