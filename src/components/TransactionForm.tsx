@@ -687,8 +687,11 @@ const TransactionForm = () => {
           console.error(err);
         }
       } else if (entry.tipo === "entrada" && entry.matchedChargeId) {
-        // Cobrança vinculada → apenas confirmar pagamento, sem duplicar lançamento
-        const { error } = await supabase.from("billing_charges").update({ status: "paga" }).eq("id", entry.matchedChargeId);
+        // Cobrança vinculada → marcar paga e ajustar data_cobranca para o dia da entrada (sem duplicar)
+        const { error } = await supabase
+          .from("billing_charges")
+          .update({ status: "paga", data_cobranca: dataBR })
+          .eq("id", entry.matchedChargeId);
         if (!error) {
           saved = true;
           chargesMarked++;
