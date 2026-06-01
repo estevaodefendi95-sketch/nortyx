@@ -2524,19 +2524,17 @@ const TransactionForm = () => {
                                 value={`${c.client_nome} ${c.valor} ${c.data_cobranca}`}
                                 disabled={alreadyUsed}
                                 onSelect={() => !alreadyUsed && handleChangeChargeLink(entry.id, c.id)}
-                                className="flex items-start gap-2"
+                                className="flex flex-col items-stretch gap-1 py-2"
                               >
-                                <div className="flex-1 min-w-0">
-                                  <div className="text-sm font-medium truncate">{c.client_nome}</div>
-                                  <div className="text-xs text-muted-foreground">
-                                    {formatCurrency(c.valor)} · {c.data_cobranca}
-                                  </div>
+                                <div className="flex items-center gap-2 min-w-0">
+                                  <span className="flex-1 text-sm font-medium truncate">{c.client_nome}</span>
+                                  {c.id === entry.matchedChargeId && <Check className="h-3.5 w-3.5 text-primary shrink-0" />}
                                 </div>
-                                <div className="flex flex-col items-end gap-1">
-                                  {sameMonth && <Badge variant="secondary" className="text-[10px]">mesmo mês</Badge>}
-                                  {sameValue && <Badge variant="secondary" className="text-[10px]">mesmo valor</Badge>}
-                                  {alreadyUsed && <Badge variant="outline" className="text-[10px]">já usada</Badge>}
-                                  {c.id === entry.matchedChargeId && <Check className="h-3 w-3 text-primary" />}
+                                <div className="flex items-center gap-1.5 flex-wrap text-xs text-muted-foreground">
+                                  <span>{formatCurrency(c.valor)} · {c.data_cobranca}</span>
+                                  {sameMonth && <Badge variant="secondary" className="text-[10px] px-1.5 py-0">mesmo mês</Badge>}
+                                  {sameValue && <Badge variant="secondary" className="text-[10px] px-1.5 py-0">mesmo valor</Badge>}
+                                  {alreadyUsed && <Badge variant="outline" className="text-[10px] px-1.5 py-0">já usada</Badge>}
                                 </div>
                               </CommandItem>
                             );
