@@ -2524,15 +2524,16 @@ const TransactionForm = () => {
                             </CommandItem>
                           )}
                           {sorted.map((c) => {
-                            const alreadyUsed = usedChargeIds.has(c.id) && c.id !== entry.matchedChargeId;
+                            const usedByOther = pendingMatchEntries.find(
+                              (pe) => pe.matchedChargeId === c.id && pe.id !== entry.id,
+                            );
                             const sameValue = Math.abs(c.valor - entry.valor) < 0.01;
                             const sameMonth = chargeMonthKey(c) === eMonth;
                             return (
                               <CommandItem
                                 key={c.id}
                                 value={`${c.client_nome} ${c.valor} ${c.data_cobranca}`}
-                                disabled={alreadyUsed}
-                                onSelect={() => !alreadyUsed && handleChangeChargeLink(entry.id, c.id)}
+                                onSelect={() => handleChangeChargeLink(entry.id, c.id)}
                                 className="flex flex-col items-stretch gap-1 py-2"
                               >
                                 <div className="flex items-center gap-2 min-w-0">
@@ -2543,7 +2544,11 @@ const TransactionForm = () => {
                                   <span>{formatCurrency(c.valor)} · {c.data_cobranca}</span>
                                   {sameMonth && <Badge variant="secondary" className="text-[10px] px-1.5 py-0">mesmo mês</Badge>}
                                   {sameValue && <Badge variant="secondary" className="text-[10px] px-1.5 py-0">mesmo valor</Badge>}
-                                  {alreadyUsed && <Badge variant="outline" className="text-[10px] px-1.5 py-0">já usada</Badge>}
+                                  {usedByOther && (
+                                    <Badge variant="outline" className="text-[10px] px-1.5 py-0 text-warning border-warning/40">
+                                      transferir de {usedByOther.empresa}
+                                    </Badge>
+                                  )}
                                 </div>
                               </CommandItem>
                             );
