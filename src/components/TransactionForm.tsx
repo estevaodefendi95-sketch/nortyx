@@ -311,6 +311,14 @@ const TransactionForm = () => {
           .in("id", clientIds);
         const clientMap = new Map<string, string>((clients || []).map((c: any) => [c.id, c.nome]));
 
+        setAvailableCharges((charges as any[]).map((c) => ({
+          id: c.id,
+          valor: Number(c.valor),
+          data_cobranca: c.data_cobranca,
+          client_id: c.client_id,
+          client_nome: clientMap.get(c.client_id) || "cliente",
+        })));
+
         const usedCharges = new Set<string>();
         for (const e of entradas) {
           const entryTs = new Date(e.data).getTime();
@@ -334,6 +342,8 @@ const TransactionForm = () => {
             e.matchedFrom = `Cobrança identificada: ${e.matchedChargeClient}`;
           }
         }
+      } else {
+        setAvailableCharges([]);
       }
     }
 
