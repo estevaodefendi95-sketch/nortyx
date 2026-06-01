@@ -40,12 +40,21 @@ export default function ColorPicker({ currentColor, onColorChange, size = "sm" }
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <button
+        <span
+          role="button"
+          tabIndex={0}
           onClick={(e) => {
             e.stopPropagation();
             setOpen(true);
           }}
-          className={`${sizeClass} rounded-full flex-shrink-0 ring-2 ring-transparent hover:ring-primary/50 transition-all cursor-pointer`}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              e.stopPropagation();
+              setOpen(true);
+            }
+          }}
+          className={`${sizeClass} inline-block rounded-full flex-shrink-0 ring-2 ring-transparent hover:ring-primary/50 transition-all cursor-pointer`}
           style={{ backgroundColor: currentColor }}
           title="Alterar cor"
         />
