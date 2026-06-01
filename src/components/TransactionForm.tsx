@@ -2464,10 +2464,25 @@ const TransactionForm = () => {
               pendingMatchEntries.map((e) => e.matchedChargeId).filter(Boolean) as string[]
             );
 
+            const chargeMonthKey = (c: { data_cobranca: string }) => {
+              const s = c.data_cobranca || "";
+              if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s.slice(0, 7);
+              if (/^\d{2}\/\d{2}\/\d{4}$/.test(s)) {
+                const [, mm, yyyy] = s.split("/");
+                return `${yyyy}-${mm}`;
+              }
+              return "";
+            };
+            const entryMonthKey = (iso: string) => (iso || "").slice(0, 7);
+
             const renderChargePicker = (entry: ParsedBankEntry, mode: "change" | "link") => {
               if (availableCharges.length === 0) return null;
               const isOpen = openChargePopoverId === entry.id;
+              const eMonth = entryMonthKey(entry.data);
               const sorted = [...availableCharges].sort((a, b) => {
+                const aMonth = chargeMonthKey(a) === eMonth ? 0 : 1;
+                const bMonth = chargeMonthKey(b) === eMonth ? 0 : 1;
+                if (aMonth !== bMonth) return aMonth - bMonth;
                 const aMatch = Math.abs(a.valor - entry.valor) < 0.01 ? 0 : 1;
                 const bMatch = Math.abs(b.valor - entry.valor) < 0.01 ? 0 : 1;
                 if (aMatch !== bMatch) return aMatch - bMatch;
@@ -2502,6 +2517,7 @@ const TransactionForm = () => {
                           {sorted.map((c) => {
                             const alreadyUsed = usedChargeIds.has(c.id) && c.id !== entry.matchedChargeId;
                             const sameValue = Math.abs(c.valor - entry.valor) < 0.01;
+                            const sameMonth = chargeMonthKey(c) === eMonth;
                             return (
                               <CommandItem
                                 key={c.id}
@@ -2517,6 +2533,7 @@ const TransactionForm = () => {
                                   </div>
                                 </div>
                                 <div className="flex flex-col items-end gap-1">
+                                  {sameMonth && <Badge variant="secondary" className="text-[10px]">mesmo mês</Badge>}
                                   {sameValue && <Badge variant="secondary" className="text-[10px]">mesmo valor</Badge>}
                                   {alreadyUsed && <Badge variant="outline" className="text-[10px]">já usada</Badge>}
                                   {c.id === entry.matchedChargeId && <Check className="h-3 w-3 text-primary" />}
@@ -2531,6 +2548,7 @@ const TransactionForm = () => {
                 </Popover>
               );
             };
+
 
             return (
               <div className="max-h-[55vh] overflow-y-auto space-y-4 my-2">
