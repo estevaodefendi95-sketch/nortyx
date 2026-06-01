@@ -709,6 +709,13 @@ const TransactionForm = () => {
           .update({ status: "paga", data_cobranca: dataBR })
           .eq("id", entry.matchedChargeId);
         if (!error) {
+          // Remove daily_incomes duplicados (mesma data+valor)
+          const duplicates = dailyIncomes.filter(
+            (i) => i.data === dataBR && Math.abs(i.valor - entry.valor) < 0.01,
+          );
+          for (const dup of duplicates) {
+            await deleteDailyIncome(dup.id);
+          }
           saved = true;
           chargesMarked++;
         }
