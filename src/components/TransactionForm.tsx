@@ -290,9 +290,10 @@ const TransactionForm = () => {
     setImportFilter("all");
   };
 
-  const detectMatches = async (entries: ParsedBankEntry[]) => {
+  const detectMatches = async (entries: ParsedBankEntry[]): Promise<Array<{ id: string; valor: number; data_cobranca: string; client_id: string; client_nome: string }>> => {
     const orgId = organization?.id;
-    if (!orgId) return;
+    if (!orgId) return [];
+    let chargesOut: Array<{ id: string; valor: number; data_cobranca: string; client_id: string; client_nome: string }> = [];
 
     // Charges: entradas vs billing_charges pendentes/atrasados
     const entradas = entries.filter((e) => e.tipo === "entrada");
