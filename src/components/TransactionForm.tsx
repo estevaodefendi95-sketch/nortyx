@@ -388,7 +388,9 @@ const TransactionForm = () => {
     await detectMatches(finalEntries);
 
     const matched = finalEntries.filter((e) => e.matchedChargeId || e.matchedTransactionId);
-    if (matched.length > 0) {
+    const unmatchedEntradas = finalEntries.filter((e) => e.tipo === "entrada" && !e.matchedChargeId);
+    const hasLinkableCharges = unmatchedEntradas.length > 0 && availableCharges.length > 0;
+    if (matched.length > 0 || hasLinkableCharges) {
       setPendingMatchEntries(finalEntries);
       setPendingMatchReschedules(scheduledUnpaidToReschedule);
       setApprovedMatchIds(new Set(matched.map((e) => e.id)));
