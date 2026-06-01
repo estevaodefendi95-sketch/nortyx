@@ -629,11 +629,18 @@ const TransactionForm = () => {
         .update({ status: "paga", data_cobranca: dataBR })
         .eq("id", entry.matchedChargeId);
       if (!error) {
+        // Remove qualquer daily_income duplicado (mesma data+valor) — a cobrança paga já representa a entrada
+        const duplicates = dailyIncomes.filter(
+          (i) => i.data === dataBR && Math.abs(i.valor - entry.valor) < 0.01,
+        );
+        for (const dup of duplicates) {
+          await deleteDailyIncome(dup.id);
+        }
         saved = true;
         updateBankEntry(id, "approved", true);
         toast({
           title: "Cobrança quitada",
-          description: `${entry.empresa} — ${formatCurrency(entry.valor)} | Cobrança de ${entry.matchedChargeClient || "cliente"} marcada como paga em ${dataBR} (sem duplicar lançamento)`,
+          description: `${entry.empresa} — ${formatCurrency(entry.valor)} | Cobrança de ${entry.matchedChargeClient || "cliente"} marcada como paga em ${dataBR}${duplicates.length ? ` (${duplicates.length} entrada(s) duplicada(s) removida(s))` : " (sem duplicar lançamento)"}`,
         });
         return;
       }
