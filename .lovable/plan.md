@@ -1,46 +1,45 @@
-## Bug
+## Problema
 
-Quando uma entrada do extrato é vinculada a uma cobrança:
-- A cobrança continua com a `data_cobranca` original (agendada) → conta como faturamento no dia agendado.
-- A entrada real (data em que o dinheiro caiu) deveria substituir essa data, mas hoje só atualizamos `status='paga'`.
+Na aba **Lançamento**, no diálogo "Correspondências identificadas no extrato", os botões **"Vincular cliente"** e **"Alterar cliente"** não fazem nada ao serem clicados — o popover de seleção de cobrança nunca abre.
 
-Resultado: o valor pode aparecer duplicado no dashboard (cobrança no dia agendado + a próxima cobrança recorrente / outro lançamento no dia real), e o faturamento fica registrado no dia errado.
+## Causa raiz
+
+Em `src/components/TransactionForm.tsx` (linha ~2479-2485), o trigger do Popover é um `<button>` com `asChild` que chama `ev.preventDefault()` e `ev.stopPropagation()` no `onClick`:
+
+```tsx
+<PopoverTrigger asChild>
+  <button
+    type="button"
+    onClick={(ev) => { ev.preventDefault(); ev.stopPropagation(); }}
+    ...
+```
+
+O Radix usa `composeEventHandlers`: ele executa primeiro o `onClick` do usuário e, **se `event.defaultPrevented` for `true`**, **não executa** o handler interno que abre o popover. Resultado: o popover nunca abre.
 
 ## Correção
 
-Em **`src/components/TransactionForm.tsx`**, nos dois pontos onde marcamos a cobrança como paga após match:
+Remover o `preventDefault()`. Manter apenas `stopPropagation()` (para o clique não borbulhar para o card pai) e adicionar `type="button"` já está OK.
 
-1. `approveBankEntry` (aprovação individual de um lançamento do extrato, linha ~616)
-2. `approveAllBankEntries` (aprovar tudo, linha ~686)
-
-Trocar:
-
-```ts
-await supabase.from("billing_charges")
-  .update({ status: "paga" })
-  .eq("id", entry.matchedChargeId);
+```tsx
+<PopoverTrigger asChild>
+  <button
+    type="button"
+    onClick={(ev) => ev.stopPropagation()}
+    className="text-xs text-primary hover:underline mt-1"
+  >
+    {mode === "change" ? "Alterar cliente" : "Vincular cliente"}
+  </button>
+</PopoverTrigger>
 ```
-
-por:
-
-```ts
-const [y, m, d] = entry.data.split("-");
-const dataBR = `${d}/${m}/${y}`;
-await supabase.from("billing_charges")
-  .update({ status: "paga", data_cobranca: dataBR })
-  .eq("id", entry.matchedChargeId);
-```
-
-Assim:
-- A cobrança passa a ter como `data_cobranca` o dia real do recebimento (formato BR `DD/MM/YYYY`, igual ao resto do sistema).
-- O faturamento no `DadosView` / `Index` (que soma `billing_charges.valor` por mês de `data_cobranca`) passa a registrar a entrada no dia certo.
-- Continuamos **não** inserindo `daily_income` para a entrada vinculada → sem duplicação.
-
-## Mensagens
-
-Atualizar o toast de "Cobrança quitada" para mencionar a data ajustada, ex.:
-`"Cobrança de {cliente} marcada como paga em {dataBR}"`.
 
 ## Escopo
 
-Apenas `src/components/TransactionForm.tsx`. Sem migração, sem novo componente, sem alteração de RLS.
+- Arquivo único: `src/components/TransactionForm.tsx`, função `renderChargePicker` (uma linha alterada).
+- Sem mudanças de backend, schema, RLS ou novos componentes.
+
+## Verificação
+
+1. Importar um extrato com entradas que tenham cobranças pendentes compatíveis.
+2. No diálogo, clicar em "Vincular cliente" numa entrada sem vínculo → o popover abre com a lista de cobranças pendentes.
+3. Selecionar uma cobrança → entrada migra para a seção "Cobranças identificadas" com vínculo manual.
+4. Clicar em "Alterar cliente" numa entrada já vinculada → popover abre permitindo trocar ou remover o vínculo.
