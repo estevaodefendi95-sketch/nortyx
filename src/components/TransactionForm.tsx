@@ -377,6 +377,7 @@ const TransactionForm = () => {
         }
       }
     }
+    return chargesOut;
   };
 
   const finalizeImport = async (
@@ -387,11 +388,11 @@ const TransactionForm = () => {
     const finalEntries = skipEntryIds.size > 0 ? enriched.filter((e) => !skipEntryIds.has(e.id)) : enriched;
 
     // Detect matches against billing_charges + scheduled unpaid transactions
-    await detectMatches(finalEntries);
+    const chargesList = await detectMatches(finalEntries);
 
     const matched = finalEntries.filter((e) => e.matchedChargeId || e.matchedTransactionId);
     const unmatchedEntradas = finalEntries.filter((e) => e.tipo === "entrada" && !e.matchedChargeId);
-    const hasLinkableCharges = unmatchedEntradas.length > 0 && availableCharges.length > 0;
+    const hasLinkableCharges = unmatchedEntradas.length > 0 && chargesList.length > 0;
     if (matched.length > 0 || hasLinkableCharges) {
       setPendingMatchEntries(finalEntries);
       setPendingMatchReschedules(scheduledUnpaidToReschedule);
