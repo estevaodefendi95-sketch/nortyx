@@ -215,6 +215,33 @@ const TransactionForm = () => {
   const [pendingMatchEntries, setPendingMatchEntries] = useState<ParsedBankEntry[]>([]);
   const [pendingMatchReschedules, setPendingMatchReschedules] = useState<Array<{ id: number; empresa: string; valor: number; data: string; categoria: string; subcategoria: string | null }>>([]);
   const [approvedMatchIds, setApprovedMatchIds] = useState<Set<number>>(new Set());
+  const [availableCharges, setAvailableCharges] = useState<Array<{ id: string; valor: number; data_cobranca: string; client_id: string; client_nome: string }>>([]);
+  const [openChargePopoverId, setOpenChargePopoverId] = useState<number | null>(null);
+
+  const handleChangeChargeLink = (entryId: number, newChargeId: string | null) => {
+    setPendingMatchEntries((prev) => prev.map((e) => {
+      if (e.id !== entryId) return e;
+      if (newChargeId === null) {
+        const { matchedChargeId, matchedChargeClient, matchedFrom, ...rest } = e;
+        return rest as ParsedBankEntry;
+      }
+      const ch = availableCharges.find((c) => c.id === newChargeId);
+      if (!ch) return e;
+      return {
+        ...e,
+        matchedChargeId: newChargeId,
+        matchedChargeClient: ch.client_nome,
+        matchedFrom: `Cobrança vinculada manualmente: ${ch.client_nome}`,
+      };
+    }));
+    setApprovedMatchIds((prev) => {
+      const next = new Set(prev);
+      if (newChargeId === null) next.delete(entryId);
+      else next.add(entryId);
+      return next;
+    });
+    setOpenChargePopoverId(null);
+  };
 
   const getDateRange = (entries: ParsedBankEntry[]): { start: string; end: string } => {
     const dates = entries.map((e) => e.data).sort();
@@ -263,9 +290,10 @@ const TransactionForm = () => {
     setImportFilter("all");
   };
 
-  const detectMatches = async (entries: ParsedBankEntry[]) => {
+  const detectMatches = async (entries: ParsedBankEntry[]): Promise<Array<{ id: string; valor: number; data_cobranca: string; client_id: string; client_nome: string }>> => {
     const orgId = organization?.id;
-    if (!orgId) return;
+    if (!orgId) return [];
+    let chargesOut: Array<{ id: string; valor: number; data_cobranca: string; client_id: string; client_nome: string }> = [];
 
     // Charges: entradas vs billing_charges pendentes/atrasados
     const entradas = entries.filter((e) => e.tipo === "entrada");
@@ -283,6 +311,15 @@ const TransactionForm = () => {
           .select("id, nome")
           .in("id", clientIds);
         const clientMap = new Map<string, string>((clients || []).map((c: any) => [c.id, c.nome]));
+
+        chargesOut = (charges as any[]).map((c) => ({
+          id: c.id,
+          valor: Number(c.valor),
+          data_cobranca: c.data_cobranca,
+          client_id: c.client_id,
+          client_nome: clientMap.get(c.client_id) || "cliente",
+        }));
+        setAvailableCharges(chargesOut);
 
         const usedCharges = new Set<string>();
         for (const e of entradas) {
@@ -307,6 +344,8 @@ const TransactionForm = () => {
             e.matchedFrom = `Cobrança identificada: ${e.matchedChargeClient}`;
           }
         }
+      } else {
+        setAvailableCharges([]);
       }
     }
 
@@ -338,6 +377,7 @@ const TransactionForm = () => {
         }
       }
     }
+    return chargesOut;
   };
 
   const finalizeImport = async (
@@ -348,10 +388,12 @@ const TransactionForm = () => {
     const finalEntries = skipEntryIds.size > 0 ? enriched.filter((e) => !skipEntryIds.has(e.id)) : enriched;
 
     // Detect matches against billing_charges + scheduled unpaid transactions
-    await detectMatches(finalEntries);
+    const chargesList = await detectMatches(finalEntries);
 
     const matched = finalEntries.filter((e) => e.matchedChargeId || e.matchedTransactionId);
-    if (matched.length > 0) {
+    const unmatchedEntradas = finalEntries.filter((e) => e.tipo === "entrada" && !e.matchedChargeId);
+    const hasLinkableCharges = unmatchedEntradas.length > 0 && chargesList.length > 0;
+    if (matched.length > 0 || hasLinkableCharges) {
       setPendingMatchEntries(finalEntries);
       setPendingMatchReschedules(scheduledUnpaidToReschedule);
       setApprovedMatchIds(new Set(matched.map((e) => e.id)));
@@ -2411,6 +2453,79 @@ const TransactionForm = () => {
             const matched = pendingMatchEntries.filter((e) => e.matchedChargeId || e.matchedTransactionId);
             const charges = matched.filter((e) => e.matchedChargeId);
             const scheduled = matched.filter((e) => e.matchedTransactionId);
+            const unlinkedEntradas = pendingMatchEntries.filter((e) => e.tipo === "entrada" && !e.matchedChargeId);
+            const usedChargeIds = new Set(
+              pendingMatchEntries.map((e) => e.matchedChargeId).filter(Boolean) as string[]
+            );
+
+            const renderChargePicker = (entry: ParsedBankEntry, mode: "change" | "link") => {
+              if (availableCharges.length === 0) return null;
+              const isOpen = openChargePopoverId === entry.id;
+              const sorted = [...availableCharges].sort((a, b) => {
+                const aMatch = Math.abs(a.valor - entry.valor) < 0.01 ? 0 : 1;
+                const bMatch = Math.abs(b.valor - entry.valor) < 0.01 ? 0 : 1;
+                if (aMatch !== bMatch) return aMatch - bMatch;
+                return a.client_nome.localeCompare(b.client_nome);
+              });
+              return (
+                <Popover open={isOpen} onOpenChange={(o) => setOpenChargePopoverId(o ? entry.id : null)}>
+                  <PopoverTrigger asChild>
+                    <button
+                      type="button"
+                      onClick={(ev) => { ev.preventDefault(); ev.stopPropagation(); }}
+                      className="text-xs text-primary hover:underline mt-1"
+                    >
+                      {mode === "change" ? "Alterar cliente" : "Vincular cliente"}
+                    </button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-[320px] p-0" align="start">
+                    <Command>
+                      <CommandInput placeholder="Buscar cliente ou valor..." />
+                      <CommandList>
+                        <CommandEmpty>Nenhuma cobrança pendente.</CommandEmpty>
+                        <CommandGroup>
+                          {mode === "change" && (
+                            <CommandItem
+                              value="__remove__"
+                              onSelect={() => handleChangeChargeLink(entry.id, null)}
+                              className="text-destructive"
+                            >
+                              Remover vinculação
+                            </CommandItem>
+                          )}
+                          {sorted.map((c) => {
+                            const alreadyUsed = usedChargeIds.has(c.id) && c.id !== entry.matchedChargeId;
+                            const sameValue = Math.abs(c.valor - entry.valor) < 0.01;
+                            return (
+                              <CommandItem
+                                key={c.id}
+                                value={`${c.client_nome} ${c.valor} ${c.data_cobranca}`}
+                                disabled={alreadyUsed}
+                                onSelect={() => !alreadyUsed && handleChangeChargeLink(entry.id, c.id)}
+                                className="flex items-start gap-2"
+                              >
+                                <div className="flex-1 min-w-0">
+                                  <div className="text-sm font-medium truncate">{c.client_nome}</div>
+                                  <div className="text-xs text-muted-foreground">
+                                    {formatCurrency(c.valor)} · {c.data_cobranca}
+                                  </div>
+                                </div>
+                                <div className="flex flex-col items-end gap-1">
+                                  {sameValue && <Badge variant="secondary" className="text-[10px]">mesmo valor</Badge>}
+                                  {alreadyUsed && <Badge variant="outline" className="text-[10px]">já usada</Badge>}
+                                  {c.id === entry.matchedChargeId && <Check className="h-3 w-3 text-primary" />}
+                                </div>
+                              </CommandItem>
+                            );
+                          })}
+                        </CommandGroup>
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
+              );
+            };
+
             return (
               <div className="max-h-[55vh] overflow-y-auto space-y-4 my-2">
                 {charges.length > 0 && (
@@ -2434,7 +2549,7 @@ const TransactionForm = () => {
                     {charges.map((e) => {
                       const checked = approvedMatchIds.has(e.id);
                       return (
-                        <label key={e.id} className="flex items-start gap-3 p-3 rounded-lg border bg-secondary/30 cursor-pointer hover:bg-secondary/50">
+                        <div key={e.id} className="flex items-start gap-3 p-3 rounded-lg border bg-secondary/30">
                           <input
                             type="checkbox"
                             checked={checked}
@@ -2446,7 +2561,7 @@ const TransactionForm = () => {
                             })}
                             className="mt-1"
                           />
-                          <div className="flex-1 text-left text-sm">
+                          <div className="flex-1 text-left text-sm min-w-0">
                             <div className="font-medium truncate">{e.empresa}</div>
                             <div className="text-xs text-muted-foreground">
                               {formatCurrency(e.valor)} · {isoToBR(e.data)}
@@ -2454,10 +2569,29 @@ const TransactionForm = () => {
                             <div className="text-xs mt-1 text-income">
                               → Cobrança de <span className="font-semibold">{e.matchedChargeClient}</span>
                             </div>
+                            {renderChargePicker(e, "change")}
                           </div>
-                        </label>
+                        </div>
                       );
                     })}
+                  </div>
+                )}
+                {unlinkedEntradas.length > 0 && availableCharges.length > 0 && (
+                  <div className="space-y-2">
+                    <h3 className="text-xs font-semibold uppercase text-muted-foreground">
+                      Entradas sem cobrança vinculada ({unlinkedEntradas.length})
+                    </h3>
+                    {unlinkedEntradas.map((e) => (
+                      <div key={e.id} className="flex items-start gap-3 p-3 rounded-lg border bg-secondary/20">
+                        <div className="flex-1 text-left text-sm min-w-0">
+                          <div className="font-medium truncate">{e.empresa}</div>
+                          <div className="text-xs text-muted-foreground">
+                            {formatCurrency(e.valor)} · {isoToBR(e.data)}
+                          </div>
+                          {renderChargePicker(e, "link")}
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 )}
                 {scheduled.length > 0 && (
