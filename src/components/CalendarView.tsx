@@ -239,8 +239,9 @@ const CalendarView = ({ initialMonth, selectedYear: propYear, isViewer = false }
         balance -= (txOverrides.get(t.id)?.valor ?? t.valor);
       }
     });
-    // Add billing charges from previous months
+    // Add billing charges from previous months (dedup vs daily_incomes)
     billingCharges.forEach((c) => {
+      if (chargeDuplicatesIncome(c, dailyIncomes)) return;
       const parts = c.data_cobranca.split("/").map(Number);
       const month = parts[1] - 1;
       const year = parts[2];
