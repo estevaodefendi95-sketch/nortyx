@@ -1,48 +1,30 @@
 ## Objetivo
 
-No diálogo "Correspondências identificadas no extrato" (aba Lançamento), quando o usuário clica em **"Remover vinculação"** numa cobrança identificada, a cobrança precisa voltar imediatamente para o pool de cobranças disponíveis e poder ser vinculada a outra linha do extrato — priorizando linhas do **mesmo mês** da cobrança.
+Hoje, no picker "Vincular/Alterar cliente", uma cobrança já vinculada a outra entrada aparece desabilitada com o badge "já usada". O usuário quer poder selecioná-la mesmo assim: ao escolher, a cobrança é **transferida** para a nova entrada e a entrada anterior fica sem vínculo (volta para "Entradas sem cobrança vinculada").
 
-## Estado atual
+## Mudanças (`src/components/TransactionForm.tsx`, somente frontend)
 
-Em `src/components/TransactionForm.tsx`:
+### 1. `handleChangeChargeLink` (≈ linha 221) — transferir vínculo
 
-- `handleChangeChargeLink(entryId, null)` (linha 221) já remove `matchedChargeId` da entrada, e `usedChargeIds` é recalculado a cada render a partir de `pendingMatchEntries`. Em teoria a cobrança liberada já fica disponível.
-- Porém, no picker (`renderChargePicker`, linha 2467), a lista de cobranças é ordenada apenas por "mesmo valor" e alfabética. Não há nenhum destaque/filtro por **mês** — fica difícil encontrar a cobrança recém-liberada entre dezenas de cobranças pendentes de outros meses.
-- A entrada que foi desvinculada vai parar na seção "Entradas sem cobrança vinculada", mas só aparece se `availableCharges.length > 0` (ok). Não há indicação visual de que existe cobrança liberada do mesmo mês esperando vínculo.
+Quando `newChargeId` não é nulo, antes de aplicar no entry alvo, percorrer `pendingMatchEntries` e remover `matchedChargeId/matchedChargeClient/matchedFrom` de qualquer outra entry que esteja usando essa mesma cobrança. Também remover essa entry anterior de `approvedMatchIds` (já que perdeu a sugestão).
 
-## Mudanças
+Tudo num único `setPendingMatchEntries` + um único `setApprovedMatchIds` para manter consistência.
 
-Arquivo único: `src/components/TransactionForm.tsx`.
+### 2. Picker (`renderChargePicker`, ≈ linha 2517) — habilitar item "já usada"
 
-### 1. Filtrar/priorizar picker por mês da entrada
+- Remover `disabled={alreadyUsed}` do `CommandItem`.
+- `onSelect` chama `handleChangeChargeLink(entry.id, c.id)` sempre.
+- Substituir o badge "já usada" por "vai desvincular de {nome da entrada atual}" (ou simplesmente "transferir") usando `variant="outline"`, para deixar claro o efeito.
 
-Em `renderChargePicker` (≈ linha 2470), além do critério atual (mesmo valor primeiro), agrupar/priorizar cobranças cuja `data_cobranca` esteja no **mesmo mês/ano** da `entry.data`:
+### 3. Chip "X cobranças do mês disponíveis" (≈ linha 2608)
 
-```text
-ordenação: (mesmoMês desc) → (mesmoValor desc) → (nome)
-```
-
-Adicionar um badge `mesmo mês` análogo ao `mesmo valor` existente (linha 2520), usando o token `secondary`/`outline` do design system. Cobranças de outros meses continuam visíveis no final da lista (não filtradas duras) para não bloquear casos legítimos cruzando meses.
-
-### 2. Garantir que a cobrança liberada apareça destacada
-
-Quando uma cobrança é liberada via "Remover vinculação", ela deve subir ao topo do picker das entradas do mesmo mês. Como `usedChargeIds` já é derivado de `pendingMatchEntries`, basta a nova ordenação acima — sem mudança de estado adicional.
-
-### 3. Aviso leve na seção "Entradas sem cobrança vinculada"
-
-Quando existir alguma entrada sem vínculo **e** existir alguma cobrança disponível do mesmo mês dessa entrada, mostrar abaixo do valor um chip discreto (ex.: "1 cobrança do mês disponível") para guiar o usuário a abrir "Vincular cliente". Texto neutro, sem alterar layout do cartão.
-
-## Escopo
-
-- Apenas frontend, em `src/components/TransactionForm.tsx`.
-- Sem mudanças de schema, RLS, edge functions ou novos componentes.
-- Sem alteração do fluxo de aprovação/finalização — só ordenação e dicas visuais no picker e na lista.
+Atualmente filtra `!usedChargeIds.has(c.id)`. Como agora qualquer cobrança do mês pode ser transferida, mudar para contar **todas** as cobranças do mesmo mês (usadas ou não). Mantém a heurística útil sem desincentivar a transferência.
 
 ## Verificação
 
-1. Importar extrato com 2 entradas no mesmo mês e ≥ 2 cobranças pendentes (uma no mesmo mês das entradas, outra em mês diferente).
-2. Conferir que ambas entradas aparecem com vínculo automático correto.
-3. Em uma das entradas vinculadas, clicar "Alterar cliente" → "Remover vinculação".
-4. Verificar: a entrada migra para "Entradas sem cobrança vinculada" e exibe o chip "cobrança do mês disponível".
-5. Na **outra** entrada, abrir "Alterar cliente": a cobrança recém-liberada aparece no topo com badges "mesmo mês" e/ou "mesmo valor", sem o badge "já usada".
-6. Selecionar a cobrança liberada → vínculo é trocado, picker fecha, seções se reorganizam corretamente.
+Cenário: 2 entradas A e B no mesmo mês, 1 cobrança X sugerida automaticamente para A.
+- Abrir "Vincular cliente" em B → X aparece com badge "transferir" e fica selecionável.
+- Ao escolher X em B: A volta para a lista "Entradas sem cobrança vinculada", B aparece em "Cobranças identificadas" com X, e o checkbox de aprovação de A é desmarcado.
+- Reabrir picker em A e escolher X de volta inverte a transferência.
+
+Sem mudanças em backend, schema, RLS ou aprovação final (a tela de salvar continua usando `matchedChargeId` do estado atual).

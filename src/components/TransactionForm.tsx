@@ -219,7 +219,14 @@ const TransactionForm = () => {
   const [openChargePopoverId, setOpenChargePopoverId] = useState<number | null>(null);
 
   const handleChangeChargeLink = (entryId: number, newChargeId: string | null) => {
+    let displacedEntryId: number | null = null;
     setPendingMatchEntries((prev) => prev.map((e) => {
+      // Desvincular qualquer outra entry que esteja usando essa cobrança (transferência)
+      if (newChargeId !== null && e.id !== entryId && e.matchedChargeId === newChargeId) {
+        displacedEntryId = e.id;
+        const { matchedChargeId, matchedChargeClient, matchedFrom, ...rest } = e;
+        return rest as ParsedBankEntry;
+      }
       if (e.id !== entryId) return e;
       if (newChargeId === null) {
         const { matchedChargeId, matchedChargeClient, matchedFrom, ...rest } = e;
@@ -238,10 +245,12 @@ const TransactionForm = () => {
       const next = new Set(prev);
       if (newChargeId === null) next.delete(entryId);
       else next.add(entryId);
+      if (displacedEntryId !== null) next.delete(displacedEntryId);
       return next;
     });
     setOpenChargePopoverId(null);
   };
+
 
   const getDateRange = (entries: ParsedBankEntry[]): { start: string; end: string } => {
     const dates = entries.map((e) => e.data).sort();
@@ -2515,15 +2524,16 @@ const TransactionForm = () => {
                             </CommandItem>
                           )}
                           {sorted.map((c) => {
-                            const alreadyUsed = usedChargeIds.has(c.id) && c.id !== entry.matchedChargeId;
+                            const usedByOther = pendingMatchEntries.find(
+                              (pe) => pe.matchedChargeId === c.id && pe.id !== entry.id,
+                            );
                             const sameValue = Math.abs(c.valor - entry.valor) < 0.01;
                             const sameMonth = chargeMonthKey(c) === eMonth;
                             return (
                               <CommandItem
                                 key={c.id}
                                 value={`${c.client_nome} ${c.valor} ${c.data_cobranca}`}
-                                disabled={alreadyUsed}
-                                onSelect={() => !alreadyUsed && handleChangeChargeLink(entry.id, c.id)}
+                                onSelect={() => handleChangeChargeLink(entry.id, c.id)}
                                 className="flex flex-col items-stretch gap-1 py-2"
                               >
                                 <div className="flex items-center gap-2 min-w-0">
@@ -2534,7 +2544,11 @@ const TransactionForm = () => {
                                   <span>{formatCurrency(c.valor)} · {c.data_cobranca}</span>
                                   {sameMonth && <Badge variant="secondary" className="text-[10px] px-1.5 py-0">mesmo mês</Badge>}
                                   {sameValue && <Badge variant="secondary" className="text-[10px] px-1.5 py-0">mesmo valor</Badge>}
-                                  {alreadyUsed && <Badge variant="outline" className="text-[10px] px-1.5 py-0">já usada</Badge>}
+                                  {usedByOther && (
+                                    <Badge variant="outline" className="text-[10px] px-1.5 py-0 text-warning border-warning/40">
+                                      transferir de {usedByOther.empresa}
+                                    </Badge>
+                                  )}
                                 </div>
                               </CommandItem>
                             );
@@ -2606,7 +2620,7 @@ const TransactionForm = () => {
                     {unlinkedEntradas.map((e) => {
                       const eMonth = entryMonthKey(e.data);
                       const monthAvail = availableCharges.filter(
-                        (c) => !usedChargeIds.has(c.id) && chargeMonthKey(c) === eMonth,
+                        (c) => chargeMonthKey(c) === eMonth,
                       ).length;
                       return (
                         <div key={e.id} className="flex items-start gap-3 p-3 rounded-lg border bg-secondary/20">
