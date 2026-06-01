@@ -219,7 +219,14 @@ const TransactionForm = () => {
   const [openChargePopoverId, setOpenChargePopoverId] = useState<number | null>(null);
 
   const handleChangeChargeLink = (entryId: number, newChargeId: string | null) => {
+    let displacedEntryId: number | null = null;
     setPendingMatchEntries((prev) => prev.map((e) => {
+      // Desvincular qualquer outra entry que esteja usando essa cobrança (transferência)
+      if (newChargeId !== null && e.id !== entryId && e.matchedChargeId === newChargeId) {
+        displacedEntryId = e.id;
+        const { matchedChargeId, matchedChargeClient, matchedFrom, ...rest } = e;
+        return rest as ParsedBankEntry;
+      }
       if (e.id !== entryId) return e;
       if (newChargeId === null) {
         const { matchedChargeId, matchedChargeClient, matchedFrom, ...rest } = e;
@@ -238,10 +245,12 @@ const TransactionForm = () => {
       const next = new Set(prev);
       if (newChargeId === null) next.delete(entryId);
       else next.add(entryId);
+      if (displacedEntryId !== null) next.delete(displacedEntryId);
       return next;
     });
     setOpenChargePopoverId(null);
   };
+
 
   const getDateRange = (entries: ParsedBankEntry[]): { start: string; end: string } => {
     const dates = entries.map((e) => e.data).sort();
