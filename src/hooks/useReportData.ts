@@ -69,7 +69,7 @@ export function useReportData(selectedMonths: number[], selectedYear: number): R
     const expenses = transactions.filter((t) => t.tipo === "saida" && matchMonth(t.data));
     const totalExpenses = expenses.reduce((s, t) => s + t.valor, 0);
 
-    const filteredDaily = dailyIncomes.filter((i) => matchMonth(i.data));
+    const filteredDaily = dedupeDailyIncomes(dailyIncomes.filter((i) => matchMonth(i.data)));
     const totalDaily = filteredDaily.reduce((s, i) => s + i.valor, 0);
 
     const filteredCharges = charges.filter((c) => matchMonth(c.data_cobranca));
