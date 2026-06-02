@@ -39,3 +39,21 @@ export function dedupeChargesAgainstIncomes<T extends ChargeLike>(
   if (!charges.length || !dailyIncomes.length) return charges;
   return charges.filter((c) => !chargeDuplicatesIncome(c, dailyIncomes));
 }
+
+/**
+ * Remove daily_incomes duplicados entre si (mesma data + valor),
+ * mantendo apenas a primeira ocorrência. Blinda os cálculos de faturamento
+ * contra duplicatas residuais no banco.
+ */
+export function dedupeDailyIncomes<T extends DailyIncomeLike>(list: T[]): T[] {
+  if (!list || list.length < 2) return list;
+  const seen = new Set<string>();
+  const out: T[] = [];
+  for (const i of list) {
+    const key = `${toBR(i.data)}|${Math.round((i.valor || 0) * 100)}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(i);
+  }
+  return out;
+}
