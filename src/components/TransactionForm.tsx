@@ -689,6 +689,8 @@ const TransactionForm = () => {
     const approvedIds = new Set<number>();
     let chargesMarked = 0;
     let scheduledMarked = 0;
+    // Defesa: garantir que cada cobrança seja quitada por no máximo uma entrada deste lote.
+    const seenChargeIds = new Set<string>();
     for (const entry of pending) {
       const [y, m, d] = entry.data.split("-");
       const dataBR = `${d}/${m}/${y}`;
@@ -703,6 +705,11 @@ const TransactionForm = () => {
           console.error(err);
         }
       } else if (entry.tipo === "entrada" && entry.matchedChargeId) {
+        // Se outra entrada do lote já quitou esta cobrança, ignorar esta para não duplicar.
+        if (seenChargeIds.has(entry.matchedChargeId)) {
+          continue;
+        }
+        seenChargeIds.add(entry.matchedChargeId);
         // Cobrança vinculada → marcar paga e ajustar data_cobranca para o dia da entrada (sem duplicar)
         const { error } = await supabase
           .from("billing_charges")

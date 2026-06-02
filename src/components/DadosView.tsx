@@ -11,7 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { dedupeChargesAgainstIncomes } from "@/lib/incomeDedup";
+import { dedupeChargesAgainstIncomes, dedupeDailyIncomes } from "@/lib/incomeDedup";
 
 const MONTHS_PT = [
   "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
@@ -270,16 +270,19 @@ const DadosView = ({ selectedMonths, selectedYear, isViewer = false }: DadosView
       .slice(0, 10);
   }, [filteredProducts]);
 
+  // Dedupe daily_incomes que possam ter mesmo dia+valor (defesa contra duplicatas residuais).
+  const uniqueDailyIncomes = useMemo(() => dedupeDailyIncomes(dailyIncomes), [dailyIncomes]);
+
   // Monthly revenue & balance from context
   const { faturamento, despesas, saldo } = useMemo(() => {
-    const fat = dailyIncomes.filter((i) => matchMonth(i.data)).reduce((s, i) => s + i.valor, 0);
+    const fat = uniqueDailyIncomes.filter((i) => matchMonth(i.data)).reduce((s, i) => s + i.valor, 0);
     // Evitar duplicação: se já existe um daily_income com mesma data+valor, a cobrança não soma novamente
-    const dedupedCharges = dedupeChargesAgainstIncomes(billingCharges, dailyIncomes);
+    const dedupedCharges = dedupeChargesAgainstIncomes(billingCharges, uniqueDailyIncomes);
     const fatCharges = dedupedCharges.filter((c) => matchMonth(c.data_cobranca)).reduce((s, c) => s + c.valor, 0);
     const desp = transactions.filter((t) => t.tipo === "saida" && matchMonth(t.data)).reduce((s, t) => s + t.valor, 0);
     const total = fat + fatCharges;
     return { faturamento: total, despesas: desp, saldo: total - desp };
-  }, [selectedMonths, isAllSelected, transactions, dailyIncomes, billingCharges]);
+  }, [selectedMonths, isAllSelected, transactions, uniqueDailyIncomes, billingCharges]);
 
   // CMV = soma de despesas das categorias selecionadas / Faturamento
   const validCmvCategories = useMemo(
@@ -301,7 +304,7 @@ const DadosView = ({ selectedMonths, selectedYear, isViewer = false }: DadosView
 
   // Daily revenue data filtered by months — keep Monday entries as-is
   const dailyRevenueData = useMemo(() => {
-    return dailyIncomes
+    return uniqueDailyIncomes
       .filter((i) => matchMonth(i.data))
       .map((i) => {
         const date = parseDate(i.data);
@@ -313,7 +316,7 @@ const DadosView = ({ selectedMonths, selectedYear, isViewer = false }: DadosView
         };
       })
       .sort((a, b) => parseDate(a.date).getTime() - parseDate(b.date).getTime());
-  }, [dailyIncomes, selectedMonths, isAllSelected]);
+  }, [uniqueDailyIncomes, selectedMonths, isAllSelected]);
 
   // Filter by weekday
   const filteredDailyData = useMemo(() => {

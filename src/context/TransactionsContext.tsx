@@ -355,8 +355,26 @@ export const TransactionsProvider = ({ children }: { children: ReactNode }) => {
   const addDailyIncome = useCallback(async (d: DailyIncome) => {
     if (!orgId) return false;
 
-    const tempId = Date.now() + Math.random();
     const normalizedIncome = { ...d, data: normalizeDate(d.data) };
+
+    // Idempotência: se já existe um daily_income com mesma data+valor, não duplicar.
+    const existingLocal = incomes.find(
+      (i) => i.data === normalizedIncome.data && Math.abs(i.valor - normalizedIncome.valor) < 0.01,
+    );
+    if (existingLocal) return true;
+
+    // Verificar também no banco (estado local pode estar defasado em multi-aba).
+    const { data: existingRows } = await supabase
+      .from("daily_incomes")
+      .select("id, data, valor")
+      .eq("organization_id", orgId)
+      .eq("data", normalizedIncome.data)
+      .limit(50);
+    if (existingRows && existingRows.some((r: any) => Math.abs(Number(r.valor) - normalizedIncome.valor) < 0.01)) {
+      return true;
+    }
+
+    const tempId = Date.now() + Math.random();
     const optimistic = { ...normalizedIncome, id: tempId };
     setIncomes((prev) => [...prev, optimistic]);
 
@@ -380,7 +398,7 @@ export const TransactionsProvider = ({ children }: { children: ReactNode }) => {
       });
     }
     return true;
-  }, [orgId]);
+  }, [orgId, incomes]);
 
   const reassignCategory = useCallback((fromCode: string, toCode: string) => {
     setTxns((prev) =>
