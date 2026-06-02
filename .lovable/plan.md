@@ -1,46 +1,55 @@
-## Diagnóstico
+# Folha de Pagamento (Mão de Obra)
 
-Hoje existem **dois tipos de duplicação convivendo**:
+Nova seção fixa dentro da aba **Lançamento** para gerenciar funcionários e lançar a folha mensal automaticamente como saída no fluxo de caixa.
 
-1. **Duplicatas reais em `daily_incomes`** (mesma data + valor + organização aparecendo 2x). Encontrei 12 linhas assim (pares em 12/05, 13/05 x2, 15/05, 19/05, 20/05). Como há **duas** linhas de entrada com a mesma data e valor, mesmo o filtro de dedup atual (que esconde a cobrança paga) ainda soma a entrada em dobro.
-2. **Entrada + cobrança paga com mesmo dia/valor**: já é coberto por `dedupeChargesAgainstIncomes`, mas o problema #1 atrapalha o resultado.
+## Funcionalidades
 
-Também identifiquei que o vínculo entrada↔cobrança no diálogo de importação já impede que duas entradas selecionem a mesma cobrança (`handleChangeChargeLink` faz "transferência"), mas falta a mesma garantia ao salvar (caso a UI mude no futuro ou em aprovações em lote).
+1. **Cadastro de funcionários** (fixo, persistido no banco por organização):
+   - Nome
+   - Salário (valor mensal base)
+   - Quinzena (valor pago no dia 15)
+   - Extra (valor adicional variável por mês)
+   - Ações: adicionar, editar, excluir
 
-## O que vou fazer
+2. **Lançamento mensal da folha**:
+   - Seletor de mês/ano (default: mês atual)
+   - Tabela com todos os funcionários e seus valores (salário + quinzena + extra) — extra editável inline por mês
+   - Total da folha do mês exibido no topo
+   - Botão **"Lançar folha do mês"** cria as transações de saída na categoria "Mão de Obra" (ou categoria escolhida) para cada funcionário, com data no último dia do mês (configurável)
+   - Indicador visual se a folha do mês já foi lançada (evita duplicação)
+   - Botão **"Estornar folha do mês"** remove as transações vinculadas
 
-### 1. Limpeza dos dados atuais
-- Apagar de `daily_incomes` toda linha que seja "irmã duplicada" de outra (mesma `organization_id` + `data` + `valor`), mantendo apenas a de menor `id`.
-- Resultado esperado: cair de 12 linhas conflitantes para 6 (uma por grupo). As cobranças pagas continuam representando o dinheiro; o dedup nas views esconde a cobrança e mostra só a entrada — sem dobrar.
+3. **Histórico**: lista os meses já lançados com total e status.
 
-### 2. Prevenção no app (sem mexer em schema)
-- `TransactionsContext.addDailyIncome`: antes de inserir, verificar se já existe um `daily_income` com mesma `data` + `valor` na organização. Se existir, **não inserir** e retornar `true` (idempotente), exibindo a entrada existente.
-- `TransactionForm` (fluxos `approveBankEntry` e `approveAllBankEntries`):
-  - Manter a remoção de duplicados de `daily_incomes` quando aprovar entrada vinculada a cobrança (já existe).
-  - Antes de marcar a cobrança como `paga`, garantir que **nenhuma outra entrada do lote** está vinculada à mesma `matchedChargeId` (defesa extra além do que `handleChangeChargeLink` já faz na UI).
-  - Ao aprovar entrada **não vinculada**, usar a nova checagem de idempotência do contexto (evita criar duplicata se o usuário aprovar duas vezes ou re-importar).
+## Estrutura técnica
 
-### 3. Reforço de exibição
-- Revisar `DadosView`, `CalendarView` e `useReportData` para também **deduplicar `daily_incomes` entre si** (não só contra `billing_charges`) no cálculo de faturamento, blindando contra qualquer duplicata residual.
+### Banco de dados (nova migração)
 
-### 4. Verificação
-- Rodar consulta de auditoria pós-limpeza para confirmar 0 duplicatas em `daily_incomes` e 0 pares "entrada + cobrança paga" somando em dobro.
-- Conferir no preview que o faturamento dos dias 12/05, 13/05, 15/05, 19/05 e 20/05 caiu para o valor correto (sem dobro).
+**Tabela `payroll_employees`**
+- id, organization_id, nome, salario, quinzena, extra_padrao, ativo, created_at
+- RLS: org members CRUD; GRANT para authenticated/service_role
 
-## Detalhes técnicos
+**Tabela `payroll_runs`** (registro de folha lançada por mês)
+- id, organization_id, ano, mes, total, lancado_em, created_at
+- UNIQUE (organization_id, ano, mes)
 
-- **SQL de limpeza** (executado como `insert`/delete via tool):
-  ```sql
-  DELETE FROM public.daily_incomes a
-  USING public.daily_incomes b
-  WHERE a.organization_id = b.organization_id
-    AND a.data = b.data
-    AND a.valor = b.valor
-    AND a.id > b.id;
-  ```
-- **`addDailyIncome` idempotente**: checar no estado local primeiro (rápido) e, se passar, no banco com `.select().eq(...)` antes do `insert`.
-- **Helper novo** em `src/lib/incomeDedup.ts`: `dedupeDailyIncomes(list)` que remove duplicatas exatas (mesma data+valor) mantendo a primeira ocorrência. Usado nas 3 views.
-- **Sem alterações de schema** (nenhuma migração). Sem mexer em `client.ts` ou `types.ts`.
+**Tabela `payroll_run_items`** (snapshot por funcionário do mês lançado + link com transação)
+- id, run_id, employee_id, nome_snapshot, salario, quinzena, extra, total, transaction_id
+- ON DELETE da run remove itens; ao estornar, deleta transações vinculadas
+
+### Frontend
+
+- `src/context/PayrollContext.tsx` — provider com funcionários, runs, CRUD, lançar/estornar folha (insere transações via TransactionsContext)
+- `src/components/PayrollView.tsx` — UI da seção (tabela de funcionários + tabela mensal + botões)
+- Integração em `src/components/TransactionForm.tsx` (aba Lançamento): nova seção colapsável "Folha de Pagamento" no topo, abaixo do formulário atual
+- Realtime em payroll_employees e payroll_runs
+
+### Lançamento das saídas
+- Cada item gera 1 transação de saída: empresa = nome do funcionário, valor = salario+quinzena+extra, categoria configurável (default primeira categoria de saída ou "Mão de Obra" se existir), data = último dia do mês selecionado, `pago = false`, `agendado = true`
+- `transaction_id` salvo em `payroll_run_items` para permitir estorno
+- Idempotência: se já existe `payroll_run` para (org, ano, mes), bloqueia novo lançamento
 
 ## Fora de escopo
-- Não vou adicionar `UNIQUE INDEX` no banco agora porque duas entradas legítimas de mesmo valor no mesmo dia (ex.: duas vendas iguais) poderiam ser bloqueadas. A proteção será só no fluxo de vínculo com cobrança.
+- Cálculo de impostos, INSS, FGTS
+- Holerites/PDFs
+- Adiantamentos parciais fora do ciclo mensal/quinzena
