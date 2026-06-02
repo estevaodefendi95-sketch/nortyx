@@ -4,7 +4,7 @@ import { useTransactions } from "@/context/TransactionsContext";
 import { useCategories } from "@/context/CategoriesContext";
 import { useOrganization } from "@/context/OrganizationContext";
 import type { ExpenseCategoryRow, ClientIncomeRow } from "@/lib/pdfReport";
-import { dedupeChargesAgainstIncomes } from "@/lib/incomeDedup";
+import { dedupeChargesAgainstIncomes, dedupeDailyIncomes } from "@/lib/incomeDedup";
 
 interface BillingClientRow {
   id: string;

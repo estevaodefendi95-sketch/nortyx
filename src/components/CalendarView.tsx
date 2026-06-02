@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { chargeDuplicatesIncome } from "@/lib/incomeDedup";
+import { chargeDuplicatesIncome, dedupeDailyIncomes } from "@/lib/incomeDedup";
 
 const DAYS_PT = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
 const MONTHS_PT = [
@@ -136,10 +136,13 @@ const CalendarView = ({ initialMonth, selectedYear: propYear, isViewer = false }
     return map;
   }, [transactions, currentMonth, currentYear, txOverrides]);
 
+  // Dedupe daily_incomes (mesma data+valor) antes de qualquer agregação.
+  const uniqueDailyIncomes = useMemo(() => dedupeDailyIncomes(dailyIncomes), [dailyIncomes]);
+
   // Income by day
   const dailyIncomeMap = useMemo(() => {
     const map = new Map<number, { id?: number; date: string; valor: number }[]>();
-    dailyIncomes.forEach((i) => {
+    uniqueDailyIncomes.forEach((i) => {
       const parts = i.data.split("/").map(Number);
       const day = parts[0];
       const month = parts[1];
@@ -150,7 +153,7 @@ const CalendarView = ({ initialMonth, selectedYear: propYear, isViewer = false }
       }
     });
     return map;
-  }, [dailyIncomes, currentMonth, currentYear]);
+  }, [uniqueDailyIncomes, currentMonth, currentYear]);
 
   const getDayIncomeTotal = (day: number) => {
     const entries = dailyIncomeMap.get(day);
@@ -180,7 +183,7 @@ const CalendarView = ({ initialMonth, selectedYear: propYear, isViewer = false }
   const billingChargesByDay = useMemo(() => {
     const map = new Map<number, BillingChargeWithClient[]>();
     billingCharges.forEach((c) => {
-      if (chargeDuplicatesIncome(c, dailyIncomes)) return;
+      if (chargeDuplicatesIncome(c, uniqueDailyIncomes)) return;
       const parts = c.data_cobranca.split("/").map(Number);
       const day = parts[0];
       const month = parts[1];
@@ -191,7 +194,7 @@ const CalendarView = ({ initialMonth, selectedYear: propYear, isViewer = false }
       }
     });
     return map;
-  }, [billingCharges, dailyIncomes, currentMonth, currentYear]);
+  }, [billingCharges, uniqueDailyIncomes, currentMonth, currentYear]);
 
   const monthIncomeTotal = useMemo(() => {
     let total = 0;
@@ -221,7 +224,7 @@ const CalendarView = ({ initialMonth, selectedYear: propYear, isViewer = false }
   const previousMonthEndBalance = useMemo(() => {
     let balance = 0;
     // Sum all incomes before current month/year
-    dailyIncomes.forEach((i) => {
+    uniqueDailyIncomes.forEach((i) => {
       const parts = i.data.split("/").map(Number);
       const month = parts[1] - 1;
       const year = parts[2];
@@ -241,7 +244,7 @@ const CalendarView = ({ initialMonth, selectedYear: propYear, isViewer = false }
     });
     // Add billing charges from previous months (dedup vs daily_incomes)
     billingCharges.forEach((c) => {
-      if (chargeDuplicatesIncome(c, dailyIncomes)) return;
+      if (chargeDuplicatesIncome(c, uniqueDailyIncomes)) return;
       const parts = c.data_cobranca.split("/").map(Number);
       const month = parts[1] - 1;
       const year = parts[2];
@@ -250,7 +253,7 @@ const CalendarView = ({ initialMonth, selectedYear: propYear, isViewer = false }
       }
     });
     return balance;
-  }, [currentMonth, currentYear, dailyIncomes, transactions, txOverrides, billingCharges]);
+  }, [currentMonth, currentYear, uniqueDailyIncomes, transactions, txOverrides, billingCharges]);
 
   // Cumulative balance: each day carries forward from the previous day, starting with previous month's balance
   const cumulativeBalance = useMemo(() => {
