@@ -5,6 +5,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import CalendarView from "@/components/CalendarView";
 import CategoriesView from "@/components/CategoriesView";
 import TransactionForm from "@/components/TransactionForm";
+import PayrollView from "@/components/PayrollView";
 import EvolutionChart from "@/components/EvolutionChart";
 import DadosView from "@/components/DadosView";
 import ThemeToggle from "@/components/ThemeToggle";
@@ -338,7 +339,12 @@ const Index = () => {
             )}
             {activeTab === "categories" && <CategoriesView selectedMonths={selectedMonths} selectedYear={selectedYear} isViewer={isViewer} />}
             {activeTab === "clientes" && <ClientsView selectedMonths={selectedMonths} selectedYear={selectedYear} isViewer={isViewer} />}
-            {activeTab === "lancamento" && <TransactionForm />}
+            {activeTab === "lancamento" && (
+              <div className="space-y-4">
+                <PayrollView />
+                <TransactionForm />
+              </div>
+            )}
             {activeTab === "dados" && <DadosView selectedMonths={selectedMonths} selectedYear={selectedYear} isViewer={isViewer} />}
           </div>
         )}

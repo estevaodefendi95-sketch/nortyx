@@ -546,6 +546,119 @@ export type Database = {
         }
         Relationships: []
       }
+      payroll_employees: {
+        Row: {
+          ativo: boolean
+          created_at: string
+          extra_padrao: number
+          id: string
+          nome: string
+          organization_id: string
+          quinzena: number
+          salario: number
+        }
+        Insert: {
+          ativo?: boolean
+          created_at?: string
+          extra_padrao?: number
+          id?: string
+          nome: string
+          organization_id: string
+          quinzena?: number
+          salario?: number
+        }
+        Update: {
+          ativo?: boolean
+          created_at?: string
+          extra_padrao?: number
+          id?: string
+          nome?: string
+          organization_id?: string
+          quinzena?: number
+          salario?: number
+        }
+        Relationships: []
+      }
+      payroll_run_items: {
+        Row: {
+          created_at: string
+          employee_id: string | null
+          extra: number
+          id: string
+          nome_snapshot: string
+          organization_id: string
+          quinzena: number
+          run_id: string
+          salario: number
+          total: number
+          transaction_id: number | null
+        }
+        Insert: {
+          created_at?: string
+          employee_id?: string | null
+          extra?: number
+          id?: string
+          nome_snapshot: string
+          organization_id: string
+          quinzena?: number
+          run_id: string
+          salario?: number
+          total?: number
+          transaction_id?: number | null
+        }
+        Update: {
+          created_at?: string
+          employee_id?: string | null
+          extra?: number
+          id?: string
+          nome_snapshot?: string
+          organization_id?: string
+          quinzena?: number
+          run_id?: string
+          salario?: number
+          total?: number
+          transaction_id?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payroll_run_items_run_id_fkey"
+            columns: ["run_id"]
+            isOneToOne: false
+            referencedRelation: "payroll_runs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      payroll_runs: {
+        Row: {
+          ano: number
+          created_at: string
+          id: string
+          lancado_em: string
+          mes: number
+          organization_id: string
+          total: number
+        }
+        Insert: {
+          ano: number
+          created_at?: string
+          id?: string
+          lancado_em?: string
+          mes: number
+          organization_id: string
+          total?: number
+        }
+        Update: {
+          ano?: number
+          created_at?: string
+          id?: string
+          lancado_em?: string
+          mes?: number
+          organization_id?: string
+          total?: number
+        }
+        Relationships: []
+      }
       products: {
         Row: {
           ano: number
