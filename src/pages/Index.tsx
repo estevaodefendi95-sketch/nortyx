@@ -341,7 +341,7 @@ const Index = () => {
             {activeTab === "clientes" && <ClientsView selectedMonths={selectedMonths} selectedYear={selectedYear} isViewer={isViewer} />}
             {activeTab === "lancamento" && (
               <div className="space-y-4">
-                <PayrollView />
+                {visibleTabs.includes("payroll") && <PayrollView />}
                 <TransactionForm />
               </div>
             )}

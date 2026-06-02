@@ -20,6 +20,7 @@ const ALL_TABS = [
   { id: "categories", label: "Categorias" },
   { id: "clientes", label: "Clientes" },
   { id: "lancamento", label: "Lançamento" },
+  { id: "payroll", label: "Folha de Pagamento" },
 ];
 
 const SUPER_EMAIL = "estevaodefendi95@gmail.com";

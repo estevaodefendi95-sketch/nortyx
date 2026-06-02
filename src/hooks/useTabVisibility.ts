@@ -3,7 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useOrganization } from "@/context/OrganizationContext";
 
-const ALL_TABS = ["dados", "calendar", "categories", "clientes", "lancamento"];
+const ALL_TABS = ["dados", "calendar", "categories", "clientes", "lancamento", "payroll"];
 
 export function useTabVisibility() {
   const { session } = useAuth();
