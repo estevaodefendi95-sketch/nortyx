@@ -33,20 +33,21 @@ serve(async (req) => {
       });
     }
 
+    // GET is allowed for any authenticated user (read-only schedule lookup)
+    if (req.method === "GET") {
+      const { data: utcHour } = await supabase.rpc("get_push_schedule_hour");
+      const brtHour = ((utcHour ?? 21) - 3 + 24) % 24;
+      return new Response(JSON.stringify({ hour_brt: brtHour, hour_utc: utcHour }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // Mutations require admin/super
     const { data: isAdmin } = await supabase.rpc("has_role", { _user_id: user.id, _role: "admin" });
     const { data: isSuper } = await supabase.rpc("is_super_user", { _user_id: user.id });
     if (!isAdmin && !isSuper) {
       return new Response(JSON.stringify({ error: "Forbidden" }), {
         status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    if (req.method === "GET") {
-      // Get current schedule hour
-      const { data: utcHour } = await supabase.rpc("get_push_schedule_hour");
-      const brtHour = ((utcHour ?? 21) - 3 + 24) % 24;
-      return new Response(JSON.stringify({ hour_brt: brtHour, hour_utc: utcHour }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
