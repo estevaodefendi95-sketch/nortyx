@@ -13,5 +13,9 @@ export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABL
     storage: localStorage,
     persistSession: true,
     autoRefreshToken: true,
+    // Detect the OAuth callback (?code=...) in the URL and exchange it for a
+    // session automatically. Required so Google/social logins complete.
+    detectSessionInUrl: true,
+    flowType: "pkce",
   }
 });

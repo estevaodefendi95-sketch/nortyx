@@ -26,9 +26,34 @@ const Auth = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
 
+  // True while we're returning from an OAuth provider (?code=... in the URL)
+  // and the session is still being exchanged. Shows a loader instead of the form.
+  const [oauthReturning, setOauthReturning] = useState(() => {
+    const params = new URLSearchParams(window.location.search);
+    return params.has("code") || params.has("error");
+  });
+
   useEffect(() => {
     if (user) navigate("/", { replace: true });
   }, [user, navigate]);
+
+  // If the OAuth exchange fails (e.g. user denied), stop showing the loader
+  // after a short grace period so the login form returns.
+  useEffect(() => {
+    if (!oauthReturning) return;
+    const params = new URLSearchParams(window.location.search);
+    if (params.has("error")) {
+      toast({
+        title: "Login com Google cancelado",
+        description: "Tente novamente ou use email e senha.",
+        variant: "destructive",
+      });
+      setOauthReturning(false);
+      return;
+    }
+    const t = setTimeout(() => setOauthReturning(false), 8000);
+    return () => clearTimeout(t);
+  }, [oauthReturning, toast]);
 
   useEffect(() => {
     supabase.rpc("get_login_branding").then(({ data }) => {
@@ -134,7 +159,9 @@ const Auth = () => {
       const { error } = await supabase.auth.signInWithOAuth({
         provider: "google",
         options: {
-          redirectTo: `${window.location.origin}/`,
+          // Return to /auth (public route) so the PKCE ?code= isn't stripped by
+          // a protected-route redirect before the session is established.
+          redirectTo: `${window.location.origin}/auth`,
           queryParams: {
             access_type: "offline",
             prompt: "select_account",
@@ -167,6 +194,18 @@ const Auth = () => {
     if (msg.includes("rate limit")) return "Muitas tentativas. Aguarde alguns minutos.";
     return msg;
   };
+
+  // ── OAuth return loader (while exchanging Google code for a session) ─────────
+  if (oauthReturning && !user) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center p-4">
+        <div className="text-center space-y-4 animate-fade-in">
+          <Loader2 className="w-10 h-10 text-primary animate-spin mx-auto" />
+          <p className="text-muted-foreground text-sm">Entrando na sua conta…</p>
+        </div>
+      </div>
+    );
+  }
 
   // ── Signup confirmation screen ──────────────────────────────────────────────
   if (signupDone) {
