@@ -41,10 +41,19 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const { user, loading, approved } = useAuth();
   const { hasOrg, loading: orgLoading } = useOrganization();
 
+  // Mostrar loader enquanto auth OU org carregam
   if (loading || orgLoading) return <FullscreenLoader />;
+
+  // Sem sessão → login
   if (!user) return <Navigate to="/auth" replace />;
+
+  // Bloqueado explicitamente por admin (approved=false após auto-approve tentar)
+  // Só redireciona se approved for explicitamente false (nunca null)
   if (approved === false) return <Navigate to="/pending" replace />;
+
+  // Logado mas sem empresa → onboarding
   if (!hasOrg) return <Navigate to="/onboarding" replace />;
+
   return <>{children}</>;
 };
 
@@ -64,7 +73,9 @@ const OnboardingRoute = () => {
 
   if (loading || orgLoading) return <FullscreenLoader />;
   if (!user) return <Navigate to="/auth" replace />;
+  // Bloqueado explicitamente por admin
   if (approved === false) return <Navigate to="/pending" replace />;
+  // Já tem empresa → dashboard direto
   if (hasOrg) return <Navigate to="/" replace />;
   return <Onboarding />;
 };
