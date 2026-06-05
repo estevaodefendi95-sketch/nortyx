@@ -168,7 +168,10 @@ const Onboarding = () => {
         throw error;
       }
 
-      await refreshOrganization();
+      // ⚠️ NÃO chamar refreshOrganization() aqui!
+      // Se chamado antes de setStep, o OrganizationContext atualiza hasOrg=true,
+      // o OnboardingRoute redireciona para / imediatamente e a tela de sucesso nunca aparece.
+      // O refresh é feito só quando o usuário clica em "Começar".
       setStep(TOTAL_STEPS); // success screen
     } catch (err: any) {
       console.error("Error creating organization:", err);
@@ -184,39 +187,72 @@ const Onboarding = () => {
 
   // ── Success screen ──────────────────────────────────────────────────────────
   if (step === TOTAL_STEPS) {
+    const handleStart = async () => {
+      setLoading(true);
+      try {
+        // Só agora atualizamos o contexto — isso faz OnboardingRoute
+        // detectar hasOrg=true e redirecionar para o dashboard.
+        await refreshOrganization();
+        navigate("/", { replace: true });
+      } catch {
+        // Se falhar, navega mesmo assim — a sessão já tem a org no banco
+        navigate("/", { replace: true });
+      } finally {
+        setLoading(false);
+      }
+    };
+
     return (
       <div className="min-h-screen bg-background flex items-center justify-center p-4">
         <div className="w-full max-w-md text-center space-y-6 animate-fade-in">
-          <div className="mx-auto w-20 h-20 rounded-full bg-primary/15 flex items-center justify-center">
+          {/* Ícone de check animado */}
+          <div className="mx-auto w-20 h-20 rounded-full bg-primary/15 flex items-center justify-center ring-4 ring-primary/10">
             <Check className="w-10 h-10 text-primary" />
           </div>
+
           <div className="space-y-2">
             <h1 className="text-3xl font-display font-bold">Tudo pronto! 🎉</h1>
             <p className="text-muted-foreground">
               <span className="font-semibold text-foreground">{name}</span> foi configurada com sucesso.
             </p>
           </div>
-          <div className="bg-card border border-border rounded-xl p-4 text-left space-y-2">
-            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Configurações salvas</p>
-            <div className="flex items-center gap-2 text-sm">
-              <Check className="w-4 h-4 text-primary flex-shrink-0" />
-              <span>Empresa: <strong>{name}</strong></span>
-            </div>
-            <div className="flex items-center gap-2 text-sm">
-              <Check className="w-4 h-4 text-primary flex-shrink-0" />
-              <span>Tipo: <strong>{BUSINESS_TYPES.find(b => b.id === businessType)?.label}</strong></span>
-            </div>
-            <div className="flex items-center gap-2 text-sm">
-              <Check className="w-4 h-4 text-primary flex-shrink-0" />
-              <span>Equipe: <strong>{TEAM_SIZES.find(t => t.id === teamSize)?.label}</strong></span>
-            </div>
+
+          {/* Resumo do que foi configurado */}
+          <div className="bg-card border border-border rounded-xl p-4 text-left space-y-2.5">
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">
+              Resumo da configuração
+            </p>
+            {[
+              { label: "Empresa", value: name },
+              { label: "Tipo", value: BUSINESS_TYPES.find(b => b.id === businessType)?.label },
+              { label: "Equipe", value: TEAM_SIZES.find(t => t.id === teamSize)?.label },
+            ].map(({ label, value }) => value && (
+              <div key={label} className="flex items-center gap-2 text-sm">
+                <div className="w-5 h-5 rounded-full bg-primary/15 flex items-center justify-center flex-shrink-0">
+                  <Check className="w-3 h-3 text-primary" />
+                </div>
+                <span className="text-muted-foreground">{label}:</span>
+                <span className="font-semibold text-foreground">{value}</span>
+              </div>
+            ))}
           </div>
+
           <Button
             className="w-full h-12 text-base gap-2 font-semibold"
-            onClick={() => navigate("/", { replace: true })}
+            onClick={handleStart}
+            disabled={loading}
           >
-            <Sparkles className="w-4 h-4" />
-            Começar a usar o Nortyx
+            {loading ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" />
+                Carregando…
+              </>
+            ) : (
+              <>
+                <Sparkles className="w-4 h-4" />
+                Começar a usar o Nortyx
+              </>
+            )}
           </Button>
         </div>
       </div>
