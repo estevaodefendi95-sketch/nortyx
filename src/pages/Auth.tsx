@@ -144,9 +144,14 @@ const Auth = () => {
       if (error) throw error;
       // On success the browser redirects to Google, then back to the app.
     } catch (err: any) {
+      const errorMsg = err.message || "Erro ao conectar com Google";
+      const isMissingSecret = errorMsg.includes("missing OAuth secret") || errorMsg.includes("Unsupported provider");
+
       toast({
-        title: "Erro ao entrar com Google",
-        description: err.message || "Tente novamente.",
+        title: isMissingSecret ? "Google não está configurado" : "Erro ao entrar com Google",
+        description: isMissingSecret
+          ? "Google OAuth ainda não está ativado. Use email/senha por enquanto ou entre em contato com o suporte."
+          : "Verifique sua conexão e tente novamente.",
         variant: "destructive",
       });
       setLoading(false);
