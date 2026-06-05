@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from "react";
+import { createContext, useContext, useState, useCallback, useEffect, useRef, type ReactNode } from "react";
 import { DEFAULT_CATEGORIES, type CategoryInfo, type CategoryCode } from "@/data/cashflow";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -56,19 +56,32 @@ export const CategoriesProvider = ({ children }: { children: ReactNode }) => {
   const [dbLoaded, setDbLoaded] = useState(false);
   const [colorOverrides, setColorOverrides] = useState<Record<string, string>>({});
 
-  // Initialize mappings with org-scoped storage
-  const [mappings, setMappings] = useState<Record<string, CategoryCode>>(() => {
-    if (!orgId) return {};
-    try {
-      const raw = localStorage.getItem(getCategoryMappingsStorageKey(orgId)) || localStorage.getItem(PLATFORM_CONFIG.LEGACY_CATEGORY_KEY);
-      if (raw) return JSON.parse(raw);
-    } catch {}
-    return {};
-  });
+  const [mappings, setMappings] = useState<Record<string, CategoryCode>>({});
+  // Tracks whether mappings have been loaded for the current org, so the
+  // persist effect doesn't overwrite storage with an empty object before load.
+  const mappingsLoadedForOrg = useRef<string | null>(null);
 
-  // Persist mappings to org-scoped storage
+  // (Re)load mappings whenever the active organization changes
   useEffect(() => {
-    if (!orgId) return;
+    if (!orgId) {
+      setMappings({});
+      mappingsLoadedForOrg.current = null;
+      return;
+    }
+    try {
+      const raw =
+        localStorage.getItem(getCategoryMappingsStorageKey(orgId)) ||
+        localStorage.getItem(PLATFORM_CONFIG.LEGACY_CATEGORY_KEY);
+      setMappings(raw ? JSON.parse(raw) : {});
+    } catch {
+      setMappings({});
+    }
+    mappingsLoadedForOrg.current = orgId;
+  }, [orgId]);
+
+  // Persist mappings to org-scoped storage (only after load for this org)
+  useEffect(() => {
+    if (!orgId || mappingsLoadedForOrg.current !== orgId) return;
     localStorage.setItem(getCategoryMappingsStorageKey(orgId), JSON.stringify(mappings));
   }, [mappings, orgId]);
 

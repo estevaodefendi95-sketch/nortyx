@@ -5,7 +5,6 @@ import {
   ArrowLeft,
   Bell,
   Building2,
-  Camera,
   Check,
   History,
   LogOut,
@@ -14,6 +13,7 @@ import {
   Shield,
 } from "lucide-react";
 import ThemeToggle from "@/components/ThemeToggle";
+import LogoImage from "@/components/LogoImage";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/hooks/useAuth";
 import { useOrgBranding } from "@/hooks/useOrgBranding";
@@ -73,11 +73,12 @@ const AppHeader = ({ backTo, title, children, containerClassName = "max-w-7xl" }
             )}
 
             <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-lg border border-border bg-secondary/50 flex items-center justify-center overflow-hidden flex-shrink-0">
-              {companyLogo ? (
-                <img src={companyLogo} alt="Logo" className="w-full h-full object-cover" />
-              ) : (
-                <Camera className="w-4 h-4 text-muted-foreground" />
-              )}
+              <LogoImage
+                src={companyLogo}
+                alt={companyName}
+                className="w-full h-full object-cover"
+                fallbackClassName="w-4 h-4"
+              />
             </div>
 
             <div className="min-w-0 flex flex-col leading-tight">
