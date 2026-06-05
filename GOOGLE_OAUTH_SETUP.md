@@ -30,7 +30,7 @@
    - Nome: `Nortyx Web`
    - Em **Authorized redirect URIs**, adicione **exatamente**:
      ```
-     https://danihwjjxrbcuuwebutq.supabase.co/auth/v1/callback
+     https://eqyqeldkmiogpduhwesj.supabase.co/auth/v1/callback
      ```
    - Clique **Create**
 
@@ -42,7 +42,7 @@
 
 ### Passo 2: Colar no Supabase
 
-1. Abra: **https://supabase.com/dashboard/project/danihwjjxrbcuuwebutq/auth/providers**
+1. Abra: **https://supabase.com/dashboard/project/eqyqeldkmiogpduhwesj/auth/providers**
 
 2. Clique no cartão **Google**
 
@@ -89,7 +89,7 @@ Recarregue o app (`F5`) e teste:
 - ❌ URL de redirect não bate com a do Google
 - ✅ Verifica se copiou **exatamente**:
   ```
-  https://danihwjjxrbcuuwebutq.supabase.co/auth/v1/callback
+  https://eqyqeldkmiogpduhwesj.supabase.co/auth/v1/callback
   ```
 
 ### Erro: "invalid_client"
@@ -104,7 +104,7 @@ O arquivo `.env` já tem tudo preparado. Nada a fazer.
 
 Se precisar adicionar outras redes sociais depois (Apple, GitHub, etc), o fluxo é igual:
 1. Cria credencial no provedor
-2. Autoriza redirect URI: `https://danihwjjxrbcuuwebutq.supabase.co/auth/v1/callback`
+2. Autoriza redirect URI: `https://eqyqeldkmiogpduhwesj.supabase.co/auth/v1/callback`
 3. Cola no Supabase → Authentication → Providers
 
 ---
