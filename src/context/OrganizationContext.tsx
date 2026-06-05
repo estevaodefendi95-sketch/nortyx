@@ -210,17 +210,38 @@ export const OrganizationProvider = ({ children }: { children: ReactNode }) => {
       }
     } catch (err) {
       console.error("Error loading organization:", err);
-      setOrganization(null);
-      setMembership(null);
-    } finally {
-      setLoading(false);
+      // IMPORTANT: a transient error (network blip, RLS hiccup) must NOT wipe an
+      // already-loaded organization and bounce the user to onboarding.
+      // Preserve last known good state and bubble up so the caller can retry.
+      throw err;
     }
   }, [user]);
 
+  // Wrap loadOrganization with a small retry so a single failed request
+  // doesn't strand the user on the onboarding screen. Loading stays true
+  // for the whole retry window to avoid flashing the onboarding route.
+  const loadWithRetry = useCallback(async (attempts = 3) => {
+    setLoading(true);
+    try {
+      for (let i = 0; i < attempts; i++) {
+        try {
+          await loadOrganization();
+          return;
+        } catch {
+          if (i < attempts - 1) {
+            await new Promise((r) => setTimeout(r, 500 * (i + 1)));
+          }
+        }
+      }
+    } finally {
+      setLoading(false);
+    }
+  }, [loadOrganization]);
+
   useEffect(() => {
     if (authLoading) return;
-    loadOrganization();
-  }, [user, authLoading, loadOrganization]);
+    loadWithRetry();
+  }, [user, authLoading, loadWithRetry]);
 
   // Refresh when this user's memberships change in the DB
   useEffect(() => {
@@ -231,25 +252,25 @@ export const OrganizationProvider = ({ children }: { children: ReactNode }) => {
         "postgres_changes",
         { event: "*", schema: "public", table: "organization_members", filter: `user_id=eq.${user.id}` },
         () => {
-          loadOrganization();
+          loadWithRetry();
         }
       )
       .subscribe();
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [user, loadOrganization]);
+  }, [user, loadWithRetry]);
 
   const switchOrganization = useCallback(async (orgId: string) => {
     if (!user) return;
     localStorage.setItem(getActiveOrgStorageKey(user.id), orgId);
     localStorage.removeItem(PLATFORM_CONFIG.LEGACY_ORG_KEY);
-    await loadOrganization();
-  }, [loadOrganization, user]);
+    await loadWithRetry();
+  }, [loadWithRetry, user]);
 
   const refreshOrganization = useCallback(async () => {
-    await loadOrganization();
-  }, [loadOrganization]);
+    await loadWithRetry();
+  }, [loadWithRetry]);
 
   return (
     <OrganizationContext.Provider
