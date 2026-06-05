@@ -217,24 +217,36 @@ const Index = () => {
             <Skeleton className="h-12 sm:h-4 flex-1 sm:w-28" />
           </div>
         ) : (
-          <div className="grid grid-cols-3 gap-1.5 sm:gap-2 mt-2.5 w-full">
-            <div className="flex flex-col items-start gap-0.5 px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg bg-secondary/40 border border-border/40">
-              <span className="flex items-center gap-1 text-[9px] sm:text-[10px] uppercase tracking-wide text-muted-foreground">
-                <TrendingUp className="w-3 h-3 text-income" /> Entrada
-              </span>
-              <span className="text-[12px] sm:text-sm font-semibold text-income leading-tight truncate w-full">{formatCurrency(filteredIncome)}</span>
+          <div className="grid grid-cols-3 gap-2 sm:gap-3 mt-3 w-full">
+            {/* Entrada */}
+            <div className="group flex flex-col gap-1.5 p-2.5 sm:p-3 rounded-xl bg-card border border-border/60 shadow-soft-sm hover:shadow-soft-md transition-shadow">
+              <div className="flex items-center gap-1.5">
+                <span className="flex items-center justify-center w-6 h-6 rounded-lg bg-income/15 flex-shrink-0">
+                  <TrendingUp className="w-3.5 h-3.5 text-income" />
+                </span>
+                <span className="text-[10px] sm:text-xs uppercase tracking-wide text-muted-foreground font-medium">Entradas</span>
+              </div>
+              <span className="text-sm sm:text-lg font-bold text-income leading-tight truncate w-full">{formatCurrency(filteredIncome)}</span>
             </div>
-            <div className="flex flex-col items-start gap-0.5 px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg bg-secondary/40 border border-border/40">
-              <span className="flex items-center gap-1 text-[9px] sm:text-[10px] uppercase tracking-wide text-muted-foreground">
-                <TrendingDown className="w-3 h-3 text-expense" /> Saída
-              </span>
-              <span className="text-[12px] sm:text-sm font-semibold text-expense leading-tight truncate w-full">{formatCurrency(filteredExpenses)}</span>
+            {/* Saída */}
+            <div className="group flex flex-col gap-1.5 p-2.5 sm:p-3 rounded-xl bg-card border border-border/60 shadow-soft-sm hover:shadow-soft-md transition-shadow">
+              <div className="flex items-center gap-1.5">
+                <span className="flex items-center justify-center w-6 h-6 rounded-lg bg-expense/15 flex-shrink-0">
+                  <TrendingDown className="w-3.5 h-3.5 text-expense" />
+                </span>
+                <span className="text-[10px] sm:text-xs uppercase tracking-wide text-muted-foreground font-medium">Saídas</span>
+              </div>
+              <span className="text-sm sm:text-lg font-bold text-expense leading-tight truncate w-full">{formatCurrency(filteredExpenses)}</span>
             </div>
-            <div className={`flex flex-col items-start gap-0.5 px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg border ${saldo >= 0 ? "bg-income/10 border-income/30" : "bg-expense/10 border-expense/30"}`}>
-              <span className="flex items-center gap-1 text-[9px] sm:text-[10px] uppercase tracking-wide text-muted-foreground">
-                <Wallet className="w-3 h-3" /> Saldo
-              </span>
-              <span className={`text-[12px] sm:text-sm font-semibold leading-tight truncate w-full ${saldo >= 0 ? "text-income" : "text-expense"}`}>{formatCurrency(saldo)}</span>
+            {/* Saldo */}
+            <div className={`flex flex-col gap-1.5 p-2.5 sm:p-3 rounded-xl border shadow-soft-sm transition-shadow hover:shadow-soft-md ${saldo >= 0 ? "bg-income/5 border-income/30" : "bg-expense/5 border-expense/30"}`}>
+              <div className="flex items-center gap-1.5">
+                <span className={`flex items-center justify-center w-6 h-6 rounded-lg flex-shrink-0 ${saldo >= 0 ? "bg-income/15" : "bg-expense/15"}`}>
+                  <Wallet className={`w-3.5 h-3.5 ${saldo >= 0 ? "text-income" : "text-expense"}`} />
+                </span>
+                <span className="text-[10px] sm:text-xs uppercase tracking-wide text-muted-foreground font-medium">Saldo</span>
+              </div>
+              <span className={`text-sm sm:text-lg font-bold leading-tight truncate w-full ${saldo >= 0 ? "text-income" : "text-expense"}`}>{formatCurrency(saldo)}</span>
             </div>
           </div>
         )}
@@ -366,8 +378,8 @@ const Index = () => {
 
       {/* Mobile Bottom Navigation */}
       {isMobile && (
-        <nav className="fixed bottom-0 left-0 right-0 z-50 bg-card border-t border-border backdrop-blur-sm safe-area-bottom">
-          <div className="flex items-center justify-around h-14">
+        <nav className="fixed bottom-0 left-0 right-0 z-50 bg-card/95 border-t border-border/60 backdrop-blur-md shadow-soft-lg safe-area-bottom">
+          <div className="flex items-center justify-around h-16">
             {mobileTabs.map((tab) => {
               const Icon = tab.icon;
               const isActive = tab.id === "chat" ? showMobileChat : activeTab === tab.id;
@@ -382,12 +394,16 @@ const Index = () => {
                       setActiveTab(tab.id as Tab);
                     }
                   }}
-                  className={`flex flex-col items-center justify-center gap-0.5 flex-1 h-full transition-colors ${
-                    isActive ? "text-primary" : "text-muted-foreground"
-                  }`}
+                  className="flex flex-col items-center justify-center gap-1 flex-1 h-full transition-all active:scale-95"
                 >
-                  <Icon className={`w-5 h-5 ${isActive ? "text-primary" : ""}`} />
-                  <span className="text-[10px] font-medium">{tab.label}</span>
+                  <span className={`flex items-center justify-center w-10 h-7 rounded-full transition-all ${
+                    isActive ? "bg-primary/15" : ""
+                  }`}>
+                    <Icon className={`w-5 h-5 transition-colors ${isActive ? "text-primary" : "text-muted-foreground"}`} />
+                  </span>
+                  <span className={`text-[10px] font-medium transition-colors ${isActive ? "text-primary" : "text-muted-foreground"}`}>
+                    {tab.label}
+                  </span>
                 </button>
               );
             })}
