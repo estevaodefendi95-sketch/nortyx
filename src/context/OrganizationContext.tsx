@@ -73,7 +73,7 @@ export const OrganizationProvider = ({ children }: { children: ReactNode }) => {
 
       // For super user, load all organizations
       let allOrgs: Organization[] = [];
-      if (user.email === SUPER_USER_EMAIL) {
+      if (user.email === PLATFORM_CONFIG.SUPER_USER_EMAIL) {
         const { data: orgs, error: orgsError } = await supabase
           .from("organizations")
           .select("*")
@@ -105,7 +105,7 @@ export const OrganizationProvider = ({ children }: { children: ReactNode }) => {
       const preferredOrgId = localStorage.getItem(getActiveOrgStorageKey(user.id)) || localStorage.getItem(PLATFORM_CONFIG.LEGACY_ORG_KEY);
 
       // For super user, allow selecting any org
-      if (user.email === SUPER_USER_EMAIL && allOrgs.length > 0) {
+      if (user.email === PLATFORM_CONFIG.SUPER_USER_EMAIL && allOrgs.length > 0) {
         const selectedOrg = allOrgs.find((o) => o.id === preferredOrgId) || allOrgs[0];
         setOrganization(selectedOrg);
 
