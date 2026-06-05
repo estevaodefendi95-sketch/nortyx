@@ -30,87 +30,79 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [isAdmin, setIsAdmin] = useState(false);
   const [isViewer, setIsViewer] = useState(false);
 
-  // Prevent double-fetch: onAuthStateChange + getSession can both fire
+  // Guard against double-fetch (onAuthStateChange fires + getSession)
   const fetchingRef = useRef(false);
-  const initializedRef = useRef(false);
+  const fetchedForRef = useRef<string | null>(null);
 
-  const fetchApprovalAndRole = async (userId: string, userEmail?: string) => {
-    if (fetchingRef.current) return;
+  const fetchRoles = async (u: User) => {
+    // Prevent duplicate fetches for the same user
+    if (fetchingRef.current || fetchedForRef.current === u.id) return;
     fetchingRef.current = true;
+    fetchedForRef.current = u.id;
 
     try {
-      // Accept any pending org invites for this user (by email)
+      // Accept any pending org invites
       try {
-        await supabase.rpc("accept_pending_invites" as any, { _user_id: userId });
+        await supabase.rpc("accept_pending_invites" as any, { _user_id: u.id });
       } catch {}
 
-      const [profileRes, rolesRes] = await Promise.all([
-        supabase.from("profiles").select("approved").eq("user_id", userId).single(),
-        supabase.from("user_roles").select("role").eq("user_id", userId),
-      ]);
+      // For a self-service SaaS, everyone who authenticates is approved.
+      // We only check roles (admin / viewer).
+      const { data: rolesData } = await supabase
+        .from("user_roles")
+        .select("role")
+        .eq("user_id", u.id);
 
-      // SaaS self-service: treat every user as approved by default.
-      // Only block if the profile explicitly has approved=false AND it was
-      // set that way by an admin (not just the DB default).
-      // For now we auto-approve — DB migration will fix the default too.
-      const profileApproved = profileRes.data?.approved;
-      setApproved(profileApproved === false ? false : true);
+      const roles = (rolesData ?? []).map((r: any) => r.role as string);
+      const isSuper = u.email === PLATFORM_CONFIG.SUPER_USER_EMAIL;
 
-      // Auto-approve at DB level if still false (race condition after signup)
-      if (profileApproved === false) {
-        supabase
-          .from("profiles")
-          .update({ approved: true })
-          .eq("user_id", userId)
-          .then(() => setApproved(true));
-      }
-
-      const roles = rolesRes.data?.map((r: any) => r.role) || [];
-      const email = userEmail ?? (await supabase.auth.getUser()).data?.user?.email;
-      const isSuper = email === PLATFORM_CONFIG.SUPER_USER_EMAIL;
+      setApproved(true);           // SaaS: auto-approved
       setIsAdmin(roles.includes("admin") || isSuper);
       setIsViewer(roles.includes("viewer") && !roles.includes("admin") && !isSuper);
+    } catch (err) {
+      console.error("[useAuth] fetchRoles error:", err);
+      // Even if roles fail, don't block the user
+      setApproved(true);
     } finally {
       fetchingRef.current = false;
     }
   };
 
   const refreshApproval = async () => {
-    if (user) await fetchApprovalAndRole(user.id, user.email ?? undefined);
+    if (!user) return;
+    fetchedForRef.current = null; // force re-fetch
+    fetchingRef.current = false;
+    await fetchRoles(user);
   };
 
   useEffect(() => {
-    // 1. Subscribe to auth state changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, newSession) => {
-      setSession(newSession);
-      setUser(newSession?.user ?? null);
-
-      if (newSession?.user) {
-        // Only fetch if not already initialized (avoids double-fetch on load)
-        if (!initializedRef.current) {
-          initializedRef.current = true;
-          fetchApprovalAndRole(newSession.user.id, newSession.user.email ?? undefined)
-            .finally(() => setLoading(false));
-        }
+    // ── 1. Check existing session immediately (no flicker) ──────────────────
+    supabase.auth.getSession().then(({ data: { session: s } }) => {
+      if (s?.user) {
+        setSession(s);
+        setUser(s.user);
+        fetchRoles(s.user).finally(() => setLoading(false));
       } else {
-        initializedRef.current = false;
-        fetchingRef.current = false;
-        setApproved(null);
-        setIsAdmin(false);
-        setIsViewer(false);
         setLoading(false);
       }
     });
 
-    // 2. Check for an existing session on mount
-    supabase.auth.getSession().then(({ data: { session: existingSession } }) => {
-      if (existingSession?.user && !initializedRef.current) {
-        initializedRef.current = true;
-        setSession(existingSession);
-        setUser(existingSession.user);
-        fetchApprovalAndRole(existingSession.user.id, existingSession.user.email ?? undefined)
-          .finally(() => setLoading(false));
-      } else if (!existingSession) {
+    // ── 2. Subscribe to future auth changes ──────────────────────────────────
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, s) => {
+      setSession(s);
+      const nextUser = s?.user ?? null;
+      setUser(nextUser);
+
+      if (nextUser) {
+        // fetchRoles is idempotent (guards duplicate calls)
+        fetchRoles(nextUser).finally(() => setLoading(false));
+      } else {
+        // Signed out — reset everything
+        fetchingRef.current = false;
+        fetchedForRef.current = null;
+        setApproved(null);
+        setIsAdmin(false);
+        setIsViewer(false);
         setLoading(false);
       }
     });
@@ -120,20 +112,18 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   const signOut = async () => {
-    // Clear all nortyx-related localStorage data
-    const keysToRemove: string[] = [];
+    // Clear all nortyx-related localStorage data on logout
+    const toRemove: string[] = [];
     for (let i = 0; i < localStorage.length; i++) {
-      const key = localStorage.key(i);
-      if (key && (key.startsWith("nortyx:") || key.startsWith("nortyx_") || key.startsWith("paggio_"))) {
-        keysToRemove.push(key);
+      const k = localStorage.key(i);
+      if (k && (k.startsWith("nortyx:") || k.startsWith("nortyx_") || k.startsWith("paggio_"))) {
+        toRemove.push(k);
       }
     }
-    keysToRemove.forEach(key => {
-      try { localStorage.removeItem(key); } catch {}
-    });
+    toRemove.forEach(k => { try { localStorage.removeItem(k); } catch {} });
 
-    initializedRef.current = false;
     fetchingRef.current = false;
+    fetchedForRef.current = null;
     await supabase.auth.signOut();
   };
 
