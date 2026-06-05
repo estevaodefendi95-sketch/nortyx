@@ -57,18 +57,18 @@ const AppHeader = ({ backTo, title, children, containerClassName = "max-w-7xl" }
       (availableOrganizations.length === 1 && availableOrganizations[0].id !== organization?.id));
 
   return (
-    <header className="border-b border-border bg-card/50 backdrop-blur-sm sticky top-0 z-10">
-      <div className={`container ${containerClassName} mx-auto px-3 sm:px-4 py-3 sm:py-4`}>
+    <header className="border-b border-border/20 bg-card/70 backdrop-blur-md shadow-soft-sm sticky top-0 z-10">
+      <div className={`container ${containerClassName} mx-auto px-lg sm:px-lg py-md sm:py-lg`}>
         <div className="flex items-center justify-between gap-2">
           {/* Logo + Name */}
           <div className="flex items-center gap-3 min-w-0">
             {backTo && (
               <button
                 onClick={() => navigate(backTo)}
-                className="p-2 -ml-2 rounded-lg hover:bg-secondary transition-colors flex-shrink-0"
+                className="p-md -ml-md rounded-md hover:bg-secondary/80 active:scale-95 transition-all duration-200 flex-shrink-0"
                 title="Voltar"
               >
-                <ArrowLeft className="w-5 h-5 text-muted-foreground" />
+                <ArrowLeft className="w-5 h-5 text-muted-foreground hover:text-foreground transition-colors" />
               </button>
             )}
 
@@ -97,10 +97,10 @@ const AppHeader = ({ backTo, title, children, containerClassName = "max-w-7xl" }
               <Popover>
                 <PopoverTrigger asChild>
                   <button
-                    className="p-2 rounded-lg hover:bg-secondary transition-colors flex-shrink-0"
+                    className="p-md rounded-md hover:bg-secondary/80 active:scale-95 transition-all duration-200 flex-shrink-0"
                     title={organization?.name || "Trocar empresa"}
                   >
-                    <Building2 className="w-5 h-5 text-muted-foreground" />
+                    <Building2 className="w-5 h-5 text-muted-foreground hover:text-foreground transition-colors" />
                   </button>
                 </PopoverTrigger>
                 <PopoverContent align="start" className="w-64 p-1">
@@ -130,11 +130,11 @@ const AppHeader = ({ backTo, title, children, containerClassName = "max-w-7xl" }
           </div>
 
           {/* Action icons */}
-          <div className="flex items-center gap-0.5 sm:gap-1 flex-shrink-0">
+          <div className="flex items-center gap-xs sm:gap-sm flex-shrink-0">
             <Popover>
               <PopoverTrigger asChild>
-                <button className="relative p-2 rounded-lg hover:bg-secondary transition-colors flex-shrink-0">
-                  <Bell className="w-5 h-5 text-muted-foreground" />
+                <button className="relative p-md rounded-md hover:bg-secondary/80 active:scale-95 transition-all duration-200 flex-shrink-0">
+                  <Bell className="w-5 h-5 text-muted-foreground hover:text-foreground transition-colors" />
                   {pendingBills.length > 0 && (
                     <span className="absolute -top-0.5 -right-0.5 w-4 h-4 rounded-full bg-warning text-[9px] font-bold text-background flex items-center justify-center">
                       {pendingBills.length > 9 ? "9+" : pendingBills.length}
@@ -181,8 +181,8 @@ const AppHeader = ({ backTo, title, children, containerClassName = "max-w-7xl" }
 
             <Popover>
               <PopoverTrigger asChild>
-                <button className="relative p-2 rounded-lg hover:bg-secondary transition-colors flex-shrink-0">
-                  <MoreVertical className="w-5 h-5 text-muted-foreground" />
+                <button className="relative p-md rounded-md hover:bg-secondary/80 active:scale-95 transition-all duration-200 flex-shrink-0">
+                  <MoreVertical className="w-5 h-5 text-muted-foreground hover:text-foreground transition-colors" />
                 </button>
               </PopoverTrigger>
               <PopoverContent align="end" className="w-56 p-1">

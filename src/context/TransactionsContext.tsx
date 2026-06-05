@@ -153,10 +153,8 @@ export const TransactionsProvider = ({ children }: { children: ReactNode }) => {
       .channel(`transactions-realtime-${orgId}`)
       .on(
         "postgres_changes",
-        { event: "*", schema: "public", table: "transactions" },
+        { event: "*", schema: "public", table: "transactions", filter: `organization_id=eq.${orgId}` },
         (payload) => {
-          const payloadOrgId = (payload.new as any)?.organization_id ?? (payload.old as any)?.organization_id;
-          if (payloadOrgId !== orgId) return;
 
           if (payload.eventType === "INSERT") {
             setTxns((prev) => {
@@ -178,10 +176,8 @@ export const TransactionsProvider = ({ children }: { children: ReactNode }) => {
       .channel(`daily-incomes-realtime-${orgId}`)
       .on(
         "postgres_changes",
-        { event: "*", schema: "public", table: "daily_incomes" },
+        { event: "*", schema: "public", table: "daily_incomes", filter: `organization_id=eq.${orgId}` },
         (payload) => {
-          const payloadOrgId = (payload.new as any)?.organization_id ?? (payload.old as any)?.organization_id;
-          if (payloadOrgId !== orgId) return;
 
           if (payload.eventType === "INSERT") {
             setIncomes((prev) => {

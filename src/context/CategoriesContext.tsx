@@ -3,9 +3,7 @@ import { DEFAULT_CATEGORIES, type CategoryInfo, type CategoryCode } from "@/data
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useOrganization } from "@/context/OrganizationContext";
-
-const STORAGE_KEY_MAP = "nortyx_category_mappings";
-const LEGACY_STORAGE_KEY_MAP = "paggio_category_mappings";
+import { PLATFORM_CONFIG, getCategoryMappingsStorageKey, getColorOverridesStorageKey } from "@/config/constants";
 
 // Default color map for built-in categories
 const DEFAULT_COLORS: Record<string, string> = {
@@ -50,27 +48,47 @@ export const useCategories = () => {
   return ctx;
 };
 
-// Runtime color overrides (code → color)
-const colorOverrides: Record<string, string> = {};
-
 export const CategoriesProvider = ({ children }: { children: ReactNode }) => {
   const { user, loading: authLoading } = useAuth();
   const { organization } = useOrganization();
   const orgId = organization?.id;
   const [cats, setCats] = useState<CategoryInfo[]>([]);
   const [dbLoaded, setDbLoaded] = useState(false);
+  const [colorOverrides, setColorOverrides] = useState<Record<string, string>>({});
 
+  // Initialize mappings with org-scoped storage
   const [mappings, setMappings] = useState<Record<string, CategoryCode>>(() => {
+    if (!orgId) return {};
     try {
-      const raw = localStorage.getItem(STORAGE_KEY_MAP) || localStorage.getItem(LEGACY_STORAGE_KEY_MAP);
+      const raw = localStorage.getItem(getCategoryMappingsStorageKey(orgId)) || localStorage.getItem(PLATFORM_CONFIG.LEGACY_CATEGORY_KEY);
       if (raw) return JSON.parse(raw);
     } catch {}
     return {};
   });
 
+  // Persist mappings to org-scoped storage
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEY_MAP, JSON.stringify(mappings));
-  }, [mappings]);
+    if (!orgId) return;
+    localStorage.setItem(getCategoryMappingsStorageKey(orgId), JSON.stringify(mappings));
+  }, [mappings, orgId]);
+
+  // Load and persist color overrides to org-scoped storage
+  useEffect(() => {
+    if (!orgId) {
+      setColorOverrides({});
+      return;
+    }
+    try {
+      const raw = localStorage.getItem(getColorOverridesStorageKey(orgId));
+      if (raw) setColorOverrides(JSON.parse(raw));
+    } catch {}
+  }, [orgId]);
+
+  // Save color overrides to storage when they change
+  useEffect(() => {
+    if (!orgId) return;
+    localStorage.setItem(getColorOverridesStorageKey(orgId), JSON.stringify(colorOverrides));
+  }, [colorOverrides, orgId]);
 
   // Load categories from DB and migrate any orphaned categories from transactions
   useEffect(() => {
@@ -114,9 +132,11 @@ export const CategoriesProvider = ({ children }: { children: ReactNode }) => {
         name: row.name,
         colorVar: `db-${row.code}`,
       }));
+      const newColorOverrides: Record<string, string> = {};
       rows.forEach((row: any) => {
-        colorOverrides[row.code] = row.color;
+        newColorOverrides[row.code] = row.color;
       });
+      setColorOverrides(newColorOverrides);
       setCats(dbCats);
 
       // Source of truth is the DB only — orphan codes in transactions
@@ -129,34 +149,38 @@ export const CategoriesProvider = ({ children }: { children: ReactNode }) => {
     loadCategories();
   }, [user, authLoading, orgId]);
 
-  // Realtime sync
+  // Realtime sync (filtered by organization)
   useEffect(() => {
+    if (!orgId) return;
+
     const channel = supabase
-      .channel("categories-realtime")
+      .channel(`categories-${orgId}`)
       .on(
         "postgres_changes",
-        { event: "*", schema: "public", table: "categories" },
+        { event: "*", schema: "public", table: "categories", filter: `organization_id=eq.${orgId}` },
         (payload) => {
           if (payload.eventType === "INSERT") {
             const row = payload.new as any;
-            colorOverrides[row.code] = row.color;
+            setColorOverrides((prev) => ({ ...prev, [row.code]: row.color }));
             setCats((prev) => {
               if (prev.some((c) => c.code === row.code)) return prev;
               return [...prev, { code: row.code, name: row.name, colorVar: `db-${row.code}` }];
             });
           } else if (payload.eventType === "UPDATE") {
             const row = payload.new as any;
-            colorOverrides[row.code] = row.color;
+            setColorOverrides((prev) => ({ ...prev, [row.code]: row.color }));
             setCats((prev) =>
               prev.map((c) =>
                 c.code === row.code ? { ...c, name: row.name, colorVar: `db-${row.code}` } : c
               )
             );
-            // Force re-render by triggering state change
-            setCats((prev) => [...prev]);
           } else if (payload.eventType === "DELETE") {
             const row = payload.old as any;
-            delete colorOverrides[row.code];
+            setColorOverrides((prev) => {
+              const next = { ...prev };
+              delete next[row.code];
+              return next;
+            });
             setCats((prev) => prev.filter((c) => c.code !== row.code));
           }
         }
@@ -166,13 +190,13 @@ export const CategoriesProvider = ({ children }: { children: ReactNode }) => {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, []);
+  }, [orgId]);
 
   const addCategory = useCallback((name: string): CategoryInfo => {
     const code = name.substring(0, 3).toUpperCase().replace(/\s/g, "") + Date.now().toString(36).slice(-3);
     const colorIdx = cats.length % EXTRA_COLORS.length;
     const color = EXTRA_COLORS[colorIdx];
-    colorOverrides[code] = color;
+    setColorOverrides((prev) => ({ ...prev, [code]: color }));
     const newCat: CategoryInfo = { code, name, colorVar: `db-${code}` };
     setCats((prev) => [...prev, newCat]);
 
@@ -185,7 +209,7 @@ export const CategoriesProvider = ({ children }: { children: ReactNode }) => {
   }, [cats, orgId]);
 
   const updateCategoryColor = useCallback(async (code: CategoryCode, color: string) => {
-    colorOverrides[code] = color;
+    setColorOverrides((prev) => ({ ...prev, [code]: color }));
     // Force re-render
     setCats((prev) => [...prev]);
 
@@ -233,7 +257,11 @@ export const CategoriesProvider = ({ children }: { children: ReactNode }) => {
       return;
     }
 
-    delete colorOverrides[code];
+    setColorOverrides((prev) => {
+      const next = { ...prev };
+      delete next[code];
+      return next;
+    });
     setCats((prev) => prev.filter((c) => c.code !== code));
 
     setMappings((prev) => {

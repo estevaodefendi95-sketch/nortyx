@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { PLATFORM_CONFIG } from "@/config/constants";
 import type { User, Session } from "@supabase/supabase-js";
 
 interface AuthContextType {
@@ -41,7 +42,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setApproved(profileRes.data?.approved ?? false);
     const roles = rolesRes.data?.map((r: any) => r.role) || [];
     const { data: userData } = await supabase.auth.getUser();
-    const isSuper = userData?.user?.email === "estevaodefendi95@gmail.com";
+    const isSuper = userData?.user?.email === PLATFORM_CONFIG.SUPER_USER_EMAIL;
     setIsAdmin(roles.includes("admin") || isSuper);
     setIsViewer(roles.includes("viewer"));
   };
@@ -55,11 +56,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setSession(session);
       setUser(session?.user ?? null);
       if (session?.user) {
-        // Use setTimeout to avoid Supabase deadlock
         setLoading(true);
-        setTimeout(() => {
-          fetchApprovalAndRole(session.user.id).finally(() => setLoading(false));
-        }, 0);
+        fetchApprovalAndRole(session.user.id).finally(() => setLoading(false));
       } else {
         setApproved(null);
         setIsAdmin(false);
@@ -82,6 +80,22 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   const signOut = async () => {
+    // Clear all org-related localStorage data to prevent data leakage
+    const keysToRemove: string[] = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && (key.startsWith('nortyx:') || key.startsWith('nortyx_') || key.startsWith('paggio_'))) {
+        keysToRemove.push(key);
+      }
+    }
+    keysToRemove.forEach(key => {
+      try {
+        localStorage.removeItem(key);
+      } catch (err) {
+        console.warn(`Failed to remove localStorage key: ${key}`, err);
+      }
+    });
+
     await supabase.auth.signOut();
   };
 

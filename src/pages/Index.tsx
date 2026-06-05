@@ -55,8 +55,22 @@ const Index = () => {
   const [pendingUsersCount, setPendingUsersCount] = useState(0);
   const [searchParams, setSearchParams] = useSearchParams();
   const storagePrefix = `nortyx:${organization?.id ?? "anon"}`;
-  const readLS = (key: string) => { try { return localStorage.getItem(`${storagePrefix}:${key}`); } catch { return null; } };
-  const writeLS = (key: string, val: string) => { try { localStorage.setItem(`${storagePrefix}:${key}`, val); } catch {} };
+  const readLS = (key: string) => {
+    try {
+      return localStorage.getItem(`${storagePrefix}:${key}`);
+    } catch (err) {
+      console.warn(`[Index] localStorage read failed for ${key}:`, err);
+      return null;
+    }
+  };
+  const writeLS = (key: string, val: string) => {
+    try {
+      localStorage.setItem(`${storagePrefix}:${key}`, val);
+    } catch (err) {
+      console.warn(`[Index] localStorage write failed for ${key}:`, err);
+      // Quota exceeded or other error - continue without persisting
+    }
+  };
 
   const validTabs: Tab[] = ["dados", "calendar", "categories", "clientes", "lancamento"];
   const initialTab: Tab = (() => {

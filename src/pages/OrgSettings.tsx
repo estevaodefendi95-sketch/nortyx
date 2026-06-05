@@ -139,11 +139,23 @@ const OrgSettings = () => {
 
   const handleInvite = async () => {
     if (!organization || !inviteEmail.trim()) return;
+
+    const trimmedEmail = inviteEmail.trim();
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(trimmedEmail)) {
+      toast({
+        title: "Email inválido",
+        description: "Por favor, digite um endereço de email válido.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setInviting(true);
     try {
       const { data, error } = await supabase.functions.invoke("add-org-member", {
         body: {
-          email: inviteEmail.trim(),
+          email: trimmedEmail,
           organization_id: organization.id,
           role: inviteRole,
         },

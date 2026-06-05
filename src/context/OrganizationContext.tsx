@@ -1,10 +1,7 @@
 import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
-
-const SUPER_USER_EMAIL = "estevaodefendi95@gmail.com";
-const ACTIVE_ORG_KEY = "nortyx_active_org";
-const LEGACY_ACTIVE_ORG_KEY = "paggio_active_org";
+import { PLATFORM_CONFIG, getActiveOrgStorageKey } from "@/config/constants";
 
 export interface Organization {
   id: string;
@@ -50,7 +47,7 @@ export const OrganizationProvider = ({ children }: { children: ReactNode }) => {
   const [availableOrganizations, setAvailableOrganizations] = useState<Organization[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const isSuperUser = user?.email === SUPER_USER_EMAIL;
+  const isSuperUser = user?.email === PLATFORM_CONFIG.SUPER_USER_EMAIL;
 
   const loadOrganization = useCallback(async () => {
     if (!user) {
@@ -104,8 +101,8 @@ export const OrganizationProvider = ({ children }: { children: ReactNode }) => {
         return;
       }
 
-      // Check localStorage for preferred org
-      const preferredOrgId = localStorage.getItem(ACTIVE_ORG_KEY) || localStorage.getItem(LEGACY_ACTIVE_ORG_KEY);
+      // Check localStorage for preferred org (organization-scoped + user-scoped)
+      const preferredOrgId = localStorage.getItem(getActiveOrgStorageKey(user.id)) || localStorage.getItem(PLATFORM_CONFIG.LEGACY_ORG_KEY);
 
       // For super user, allow selecting any org
       if (user.email === SUPER_USER_EMAIL && allOrgs.length > 0) {
@@ -132,8 +129,8 @@ export const OrganizationProvider = ({ children }: { children: ReactNode }) => {
             created_at: new Date().toISOString(),
           });
         }
-        localStorage.setItem(ACTIVE_ORG_KEY, selectedOrg.id);
-        localStorage.removeItem(LEGACY_ACTIVE_ORG_KEY);
+        localStorage.setItem(getActiveOrgStorageKey(user.id), selectedOrg.id);
+        localStorage.removeItem(PLATFORM_CONFIG.LEGACY_ORG_KEY);
       } else if (memberships && memberships.length > 0) {
         // Load all organizations the user belongs to
         const orgIds = memberships.map((m) => m.organization_id);
@@ -182,8 +179,12 @@ export const OrganizationProvider = ({ children }: { children: ReactNode }) => {
         setAvailableOrganizations(userOrgs);
         console.log("[OrgContext] availableOrganizations:", userOrgs.length, userOrgs.map((o) => o.name));
 
+        // Validate preferred org still exists, fallback to first available
+        const isPreferredOrgValid = userOrgs.some((o) => o.id === preferredOrgId);
+        const validPreferredOrgId = isPreferredOrgValid ? preferredOrgId : undefined;
+
         const activeMembership =
-          memberships.find((m) => m.organization_id === preferredOrgId) || memberships[0];
+          memberships.find((m) => m.organization_id === validPreferredOrgId) || memberships[0];
         const activeOrg =
           userOrgs.find((o) => o.id === activeMembership.organization_id) || null;
 
@@ -199,8 +200,8 @@ export const OrganizationProvider = ({ children }: { children: ReactNode }) => {
             role: activeMembership.role as OrgMember["role"],
             created_at: activeMembership.created_at,
           });
-          localStorage.setItem(ACTIVE_ORG_KEY, activeMembership.organization_id);
-          localStorage.removeItem(LEGACY_ACTIVE_ORG_KEY);
+          localStorage.setItem(getActiveOrgStorageKey(user.id), activeMembership.organization_id);
+          localStorage.removeItem(PLATFORM_CONFIG.LEGACY_ORG_KEY);
         }
       } else {
         setAvailableOrganizations([]);
@@ -240,10 +241,11 @@ export const OrganizationProvider = ({ children }: { children: ReactNode }) => {
   }, [user, loadOrganization]);
 
   const switchOrganization = useCallback(async (orgId: string) => {
-    localStorage.setItem(ACTIVE_ORG_KEY, orgId);
-    localStorage.removeItem(LEGACY_ACTIVE_ORG_KEY);
+    if (!user) return;
+    localStorage.setItem(getActiveOrgStorageKey(user.id), orgId);
+    localStorage.removeItem(PLATFORM_CONFIG.LEGACY_ORG_KEY);
     await loadOrganization();
-  }, [loadOrganization]);
+  }, [loadOrganization, user]);
 
   const refreshOrganization = useCallback(async () => {
     await loadOrganization();
