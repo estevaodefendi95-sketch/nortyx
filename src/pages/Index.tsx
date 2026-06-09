@@ -94,6 +94,11 @@ const Index = () => {
   });
   const [billingCharges, setBillingCharges] = useState<{ valor: number; data_cobranca: string }[]>([]);
 
+  // Page title
+  useEffect(() => {
+    document.title = companyName ? `${companyName} — Painel` : "Nortyx";
+  }, [companyName]);
+
   // Persist active tab + reflect in URL
   useEffect(() => {
     writeLS("active_tab", activeTab);

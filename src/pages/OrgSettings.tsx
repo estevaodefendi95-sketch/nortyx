@@ -61,6 +61,13 @@ const OrgSettings = () => {
   const isSuperUser = user?.email === SUPER_EMAIL;
   const isOwner = membership?.role === "owner" || membership?.role === "admin" || isSuperUser || isAdmin;
 
+  // Page title
+  useEffect(() => {
+    document.title = organization?.name
+      ? `${organization.name} — Configurações`
+      : "Configurações — Nortyx";
+  }, [organization?.name]);
+
   // Load tab visibility for the org
   useEffect(() => {
     if (!organization) return;

@@ -36,6 +36,11 @@
 
     --radius: 0.75rem;
 
+    /* White-label brand color — set at runtime by useWhiteLabel().
+       Raw hex for Recharts / inline styles: var(--brand-primary)
+       shadcn components use hsl(var(--primary)) instead.         */
+    --brand-primary: #3B82F6;
+
     --income: 152 60% 38%;
     --expense: 0 65% 50%;
     --warning: 38 92% 50%;
@@ -91,6 +96,8 @@
     --ring: 152 60% 48%;
 
     --radius: 0.75rem;
+
+    --brand-primary: #3B82F6;
 
     --income: 152 60% 48%;
     --expense: 0 65% 55%;

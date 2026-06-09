@@ -2,6 +2,19 @@ import { createRoot } from "react-dom/client";
 import { registerSW } from "virtual:pwa-register";
 import App from "./App.tsx";
 import "./index.css";
+import { ErrorBoundary } from "./lib/errorBoundary.tsx";
+
+// Fail fast if required env vars are missing (catches misconfigured deploys immediately)
+const REQUIRED_ENV = ["VITE_SUPABASE_URL", "VITE_SUPABASE_PUBLISHABLE_KEY"] as const;
+for (const key of REQUIRED_ENV) {
+  if (!import.meta.env[key]) {
+    document.body.innerHTML = `<div style="font-family:monospace;padding:2rem;color:#ef4444">
+      <strong>Configuração inválida:</strong> variável de ambiente <code>${key}</code> não definida.<br/>
+      Verifique o arquivo <code>.env</code> ou as variáveis de ambiente no Vercel.
+    </div>`;
+    throw new Error(`Missing required env var: ${key}`);
+  }
+}
 
 // Purga única (versionada) de SW/caches antigos para garantir que usuários
 // recebam o bundle mais recente após uma atualização. Incrementar a chave
@@ -75,4 +88,8 @@ const updateSW = registerSW({
   },
 });
 
-createRoot(document.getElementById("root")!).render(<App />);
+createRoot(document.getElementById("root")!).render(
+  <ErrorBoundary>
+    <App />
+  </ErrorBoundary>
+);

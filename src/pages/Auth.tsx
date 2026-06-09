@@ -7,9 +7,26 @@ import { useToast } from "@/hooks/use-toast";
 import { Eye, EyeOff, Mail, Lock, User, Loader2, ArrowRight, CheckCircle2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
-import { hexToHSL } from "@/utils/color";
+import { applyBrandVars, clearBrandVars } from "@/hooks/useWhiteLabel";
 
 type AuthMode = "login" | "signup" | "reset";
+
+/**
+ * If the hostname is a subdomain of a known platform domain (e.g.
+ * "acme.nortyx.dev"), return the subdomain slug so we can load that
+ * company's branding on the login page.
+ */
+function detectSubdomainSlug(): string | null {
+  try {
+    const { hostname } = window.location;
+    // Skip localhost and raw IP addresses
+    if (hostname === "localhost" || /^\d+\.\d+\.\d+\.\d+$/.test(hostname)) return null;
+    const parts = hostname.split(".");
+    // e.g. ["acme", "nortyx", "dev"] → slug = "acme"
+    if (parts.length >= 3) return parts[0];
+  } catch { /* ignore */ }
+  return null;
+}
 
 const Auth = () => {
   const [mode, setMode] = useState<AuthMode>("login");
@@ -34,6 +51,10 @@ const Auth = () => {
   });
 
   useEffect(() => {
+    document.title = branding?.name ? `${branding.name} — Login` : "Nortyx — Login";
+  }, [branding?.app_name]);
+
+  useEffect(() => {
     if (user) navigate("/", { replace: true });
   }, [user, navigate]);
 
@@ -56,22 +77,33 @@ const Auth = () => {
   }, [oauthReturning, toast]);
 
   useEffect(() => {
+    // 1. Try to detect a company from ?org=slug or subdomain
+    const params = new URLSearchParams(window.location.search);
+    const orgSlug = params.get("org") ?? detectSubdomainSlug();
+
+    if (orgSlug) {
+      supabase
+        .from("organizations")
+        .select("name, logo_url, primary_color")
+        .eq("slug", orgSlug)
+        .maybeSingle()
+        .then(({ data }) => {
+          if (data) setBranding({ name: data.name, logo_url: data.logo_url ?? null, primary_color: data.primary_color });
+        });
+      return;
+    }
+
+    // 2. Fall back to platform-level branding
     supabase.rpc("get_login_branding").then(({ data }) => {
       if (data && data.length > 0) setBranding(data[0]);
     });
   }, []);
 
-  // Apply primary color from branding
+  // Apply all brand CSS variables whenever branding changes.
   useEffect(() => {
     if (!branding?.primary_color) return;
-    const hsl = hexToHSL(branding.primary_color);
-    if (!hsl) return;
-    document.documentElement.style.setProperty("--primary", hsl);
-    document.documentElement.style.setProperty("--ring", hsl);
-    return () => {
-      document.documentElement.style.removeProperty("--primary");
-      document.documentElement.style.removeProperty("--ring");
-    };
+    applyBrandVars(branding.primary_color);
+    return () => clearBrandVars();
   }, [branding?.primary_color]);
 
   const switchMode = (next: AuthMode) => {

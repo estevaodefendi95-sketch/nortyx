@@ -11,6 +11,8 @@ import { OrganizationProvider, useOrganization } from "@/context/OrganizationCon
 import { ThemeProvider } from "next-themes";
 import { AuthProvider, useAuth } from "@/hooks/useAuth";
 import { RouteTransition, FullscreenLoader, SuspenseOverlay } from "@/components/RouteTransition";
+import ImpersonationBanner from "@/components/ImpersonationBanner";
+import { isEmailSuperAdmin } from "@/lib/superAdmin";
 
 // Lazy-load pages so route transitions show a clean loading state
 // instead of flashing the previous page's content.
@@ -25,6 +27,12 @@ const Onboarding = lazy(() => import("./pages/Onboarding"));
 const OrgSettings = lazy(() => import("./pages/OrgSettings"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 const Unsubscribe = lazy(() => import("./pages/Unsubscribe"));
+
+// Master (Super Admin) pages — separate lazy bundle
+const MasterDashboard = lazy(() => import("./pages/master/Dashboard"));
+const MasterCompanies = lazy(() => import("./pages/master/Companies"));
+const MasterCompanyDetail = lazy(() => import("./pages/master/CompanyDetail"));
+const MasterPlans = lazy(() => import("./pages/master/Plans"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -58,6 +66,14 @@ const AdminRoute = ({ children }: { children: React.ReactNode }) => {
   return <>{children}</>;
 };
 
+const SuperAdminRoute = ({ children }: { children: React.ReactNode }) => {
+  const { user, loading } = useAuth();
+  if (loading) return <FullscreenLoader />;
+  if (!user) return <Navigate to="/auth" replace />;
+  if (!isEmailSuperAdmin(user.email)) return <Navigate to="/" replace />;
+  return <>{children}</>;
+};
+
 const OnboardingRoute = () => {
   const { user, loading } = useAuth();
   const { hasOrg, loading: orgLoading } = useOrganization();
@@ -85,6 +101,11 @@ const AppRoutes = () => {
           <Route path="/admin/history" element={<AdminRoute><AdminHistory /></AdminRoute>} />
           <Route path="/settings" element={<ProtectedRoute><OrgSettings /></ProtectedRoute>} />
           <Route path="/" element={<ProtectedRoute><Index /></ProtectedRoute>} />
+          {/* Master / Super Admin routes */}
+          <Route path="/master" element={<SuperAdminRoute><MasterDashboard /></SuperAdminRoute>} />
+          <Route path="/master/empresas" element={<SuperAdminRoute><MasterCompanies /></SuperAdminRoute>} />
+          <Route path="/master/empresas/:id" element={<SuperAdminRoute><MasterCompanyDetail /></SuperAdminRoute>} />
+          <Route path="/master/planos" element={<SuperAdminRoute><MasterPlans /></SuperAdminRoute>} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </RouteTransition>
@@ -104,6 +125,7 @@ const App = () => (
                   <TooltipProvider>
                     <Toaster />
                     <Sonner />
+                    <ImpersonationBanner />
                     <AppRoutes />
                   </TooltipProvider>
                 </TransactionsProvider>

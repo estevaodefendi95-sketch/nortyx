@@ -11,6 +11,7 @@ import {
   MoreVertical,
   Settings,
   Shield,
+  LayoutDashboard,
 } from "lucide-react";
 import ThemeToggle from "@/components/ThemeToggle";
 import LogoImage from "@/components/LogoImage";
@@ -191,6 +192,15 @@ const AppHeader = ({ backTo, title, children, containerClassName = "max-w-7xl" }
                   <span className="text-xs font-medium text-muted-foreground">Tema</span>
                   <ThemeToggle />
                 </div>
+                {!authLoading && isSuperUser && (
+                  <button
+                    onClick={() => navigate("/master")}
+                    className="w-full flex items-center gap-2 px-2 py-2 rounded-md text-sm hover:bg-secondary transition-colors text-left text-primary"
+                  >
+                    <LayoutDashboard className="w-4 h-4" />
+                    Master Panel
+                  </button>
+                )}
                 {!authLoading && isAdmin && (
                   <>
                     <button

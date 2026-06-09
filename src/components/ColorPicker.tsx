@@ -1,122 +1,54 @@
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Input } from "@/components/ui/input";
 
-const PRESET_COLORS = [
-  "hsl(0, 75%, 50%)",    // Red
-  "hsl(15, 80%, 45%)",   // Dark orange
-  "hsl(25, 95%, 53%)",   // Orange
-  "hsl(38, 92%, 50%)",   // Amber
-  "hsl(50, 80%, 48%)",   // Yellow
-  "hsl(60, 70%, 45%)",   // Lime
-  "hsl(90, 60%, 40%)",   // Green dark
-  "hsl(120, 50%, 45%)",  // Green
-  "hsl(152, 60%, 48%)",  // Emerald
-  "hsl(180, 60%, 45%)",  // Teal
-  "hsl(190, 70%, 45%)",  // Cyan
-  "hsl(200, 80%, 50%)",  // Sky blue
-  "hsl(215, 60%, 50%)",  // Blue
-  "hsl(240, 50%, 55%)",  // Indigo
-  "hsl(260, 60%, 55%)",  // Purple
-  "hsl(280, 60%, 55%)",  // Violet
-  "hsl(310, 55%, 50%)",  // Fuchsia
-  "hsl(330, 70%, 55%)",  // Pink
-  "hsl(340, 70%, 50%)",  // Rose
-  "hsl(0, 0%, 60%)",     // Gray
+// ── Color presets (HSL) ───────────────────────────────────────────────────────
+const PRESET_COLORS_HSL = [
+  "hsl(0, 75%, 50%)",    "hsl(15, 80%, 45%)",  "hsl(25, 95%, 53%)",
+  "hsl(38, 92%, 50%)",   "hsl(50, 80%, 48%)",  "hsl(60, 70%, 45%)",
+  "hsl(90, 60%, 40%)",   "hsl(120, 50%, 45%)", "hsl(152, 60%, 48%)",
+  "hsl(180, 60%, 45%)",  "hsl(190, 70%, 45%)", "hsl(200, 80%, 50%)",
+  "hsl(215, 60%, 50%)",  "hsl(240, 50%, 55%)", "hsl(260, 60%, 55%)",
+  "hsl(280, 60%, 55%)",  "hsl(310, 55%, 50%)", "hsl(330, 70%, 55%)",
+  "hsl(340, 70%, 50%)",  "hsl(0, 0%, 60%)",
 ];
 
-interface ColorPickerProps {
+// ── Prop types ────────────────────────────────────────────────────────────────
+// Two modes: HSL (legacy) or Hex (new white-label editor).
+type HslProps = {
   currentColor: string;
-  onColorChange: (color: string) => void;
+  onColorChange: (hsl: string) => void;
+  value?: never;
+  onChange?: never;
   size?: "sm" | "md";
-}
+};
 
-export default function ColorPicker({ currentColor, onColorChange, size = "sm" }: ColorPickerProps) {
-  const [open, setOpen] = useState(false);
-  const [customColor, setCustomColor] = useState("");
+type HexProps = {
+  value: string;           // hex  e.g. "#3B82F6"
+  onChange: (hex: string) => void;
+  currentColor?: never;
+  onColorChange?: never;
+  size?: "sm" | "md";
+};
 
-  const sizeClass = size === "sm" ? "w-3 h-3" : "w-4 h-4";
+type ColorPickerProps = HslProps | HexProps;
 
-  return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
-        <span
-          role="button"
-          tabIndex={0}
-          onClick={(e) => {
-            e.stopPropagation();
-            setOpen(true);
-          }}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" || e.key === " ") {
-              e.preventDefault();
-              e.stopPropagation();
-              setOpen(true);
-            }
-          }}
-          className={`${sizeClass} inline-block rounded-full flex-shrink-0 ring-2 ring-transparent hover:ring-primary/50 transition-all cursor-pointer`}
-          style={{ backgroundColor: currentColor }}
-          title="Alterar cor"
-        />
-      </PopoverTrigger>
-      <PopoverContent
-        className="w-56 p-3"
-        align="start"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <p className="text-xs font-medium text-muted-foreground mb-2">Escolha uma cor</p>
-        <div className="grid grid-cols-5 gap-2 mb-3">
-          {PRESET_COLORS.map((color) => (
-            <button
-              key={color}
-              onClick={() => {
-                onColorChange(color);
-                setOpen(false);
-              }}
-              className={`w-8 h-8 rounded-lg transition-all border-2 hover:scale-110 ${
-                currentColor === color ? "border-foreground scale-110" : "border-transparent"
-              }`}
-              style={{ backgroundColor: color }}
-            />
-          ))}
-        </div>
-        <div className="flex gap-2">
-          <Input
-            type="color"
-            value={hslToHex(currentColor)}
-            onChange={(e) => {
-              const hex = e.target.value;
-              const hsl = hexToHsl(hex);
-              onColorChange(hsl);
-            }}
-            className="w-10 h-8 p-0.5 cursor-pointer"
-          />
-          <p className="text-[10px] text-muted-foreground self-center">Cor personalizada</p>
-        </div>
-      </PopoverContent>
-    </Popover>
-  );
-}
-
-// Helper: Convert HSL string to hex for the native color input
+// ── Conversion helpers ────────────────────────────────────────────────────────
 function hslToHex(hsl: string): string {
-  const match = hsl.match(/hsl\((\d+),\s*(\d+)%?,\s*(\d+)%?\)/);
+  const match = hsl.match(/hsl\(\s*(\d+),\s*(\d+)%?,\s*(\d+)%?\s*\)/);
   if (!match) return "#808080";
   const h = parseInt(match[1]) / 360;
   const s = parseInt(match[2]) / 100;
   const l = parseInt(match[3]) / 100;
   const hue2rgb = (p: number, q: number, t: number) => {
-    if (t < 0) t += 1;
-    if (t > 1) t -= 1;
+    if (t < 0) t += 1; if (t > 1) t -= 1;
     if (t < 1 / 6) return p + (q - p) * 6 * t;
     if (t < 1 / 2) return q;
     if (t < 2 / 3) return p + (q - p) * (2 / 3 - t) * 6;
     return p;
   };
   let r, g, b;
-  if (s === 0) {
-    r = g = b = l;
-  } else {
+  if (s === 0) { r = g = b = l; } else {
     const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
     const p = 2 * l - q;
     r = hue2rgb(p, q, h + 1 / 3);
@@ -127,11 +59,12 @@ function hslToHex(hsl: string): string {
   return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
 }
 
-// Helper: Convert hex to HSL string
 function hexToHsl(hex: string): string {
-  const r = parseInt(hex.slice(1, 3), 16) / 255;
-  const g = parseInt(hex.slice(3, 5), 16) / 255;
-  const b = parseInt(hex.slice(5, 7), 16) / 255;
+  const cleaned = hex.replace(/^#/, "");
+  if (cleaned.length !== 6) return "hsl(215, 60%, 50%)";
+  const r = parseInt(cleaned.slice(0, 2), 16) / 255;
+  const g = parseInt(cleaned.slice(2, 4), 16) / 255;
+  const b = parseInt(cleaned.slice(4, 6), 16) / 255;
   const max = Math.max(r, g, b), min = Math.min(r, g, b);
   let h = 0, s = 0;
   const l = (max + min) / 2;
@@ -145,4 +78,120 @@ function hexToHsl(hex: string): string {
     }
   }
   return `hsl(${Math.round(h * 360)}, ${Math.round(s * 100)}%, ${Math.round(l * 100)}%)`;
+}
+
+function isValidHex(v: string) {
+  return /^#[0-9a-fA-F]{6}$/.test(v);
+}
+
+// ── Component ─────────────────────────────────────────────────────────────────
+export default function ColorPicker(props: ColorPickerProps) {
+  const isHexMode = props.value !== undefined;
+  const { size = "sm" } = props;
+
+  // Normalise to hex internally regardless of mode.
+  const hexValue = isHexMode
+    ? props.value
+    : hslToHex(props.currentColor ?? "hsl(215,60%,50%)");
+
+  const [open, setOpen] = useState(false);
+  // Local hex text input state — only tracks while the user is typing
+  const [hexInput, setHexInput] = useState(hexValue);
+  const hexInputRef = useRef<HTMLInputElement>(null);
+
+  // Keep local input in sync when parent value changes
+  useEffect(() => {
+    setHexInput(hexValue);
+  }, [hexValue]);
+
+  const emit = (hex: string) => {
+    if (isHexMode) {
+      props.onChange(hex);
+    } else {
+      props.onColorChange(hexToHsl(hex));
+    }
+  };
+
+  const handlePreset = (hsl: string) => {
+    emit(hslToHex(hsl));
+    setOpen(false);
+  };
+
+  const handleNativeColor = (e: React.ChangeEvent<HTMLInputElement>) => {
+    emit(e.target.value);
+  };
+
+  const handleHexInput = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const v = e.target.value;
+    setHexInput(v);
+    if (isValidHex(v)) emit(v);
+  };
+
+  const handleHexBlur = () => {
+    // Reset to last known-good hex if the input is invalid
+    if (!isValidHex(hexInput)) setHexInput(hexValue);
+  };
+
+  const swatchSize = size === "sm" ? "w-3 h-3" : "w-4 h-4";
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <span
+          role="button"
+          tabIndex={0}
+          onClick={(e) => { e.stopPropagation(); setOpen(true); }}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") { e.preventDefault(); e.stopPropagation(); setOpen(true); }
+          }}
+          className={`${swatchSize} inline-block rounded-full flex-shrink-0 ring-2 ring-transparent hover:ring-primary/50 transition-all cursor-pointer`}
+          style={{ backgroundColor: hexValue }}
+          title="Alterar cor"
+        />
+      </PopoverTrigger>
+
+      <PopoverContent className="w-64 p-3" align="start" onClick={(e) => e.stopPropagation()}>
+        <p className="text-xs font-medium text-muted-foreground mb-2">Escolha uma cor</p>
+
+        {/* Preset swatches */}
+        <div className="grid grid-cols-5 gap-1.5 mb-3">
+          {PRESET_COLORS_HSL.map((hsl) => {
+            const hex = hslToHex(hsl);
+            return (
+              <button
+                key={hsl}
+                onClick={() => handlePreset(hsl)}
+                className={`w-8 h-8 rounded-lg transition-all border-2 hover:scale-110 ${
+                  hexValue.toLowerCase() === hex.toLowerCase()
+                    ? "border-foreground scale-110"
+                    : "border-transparent"
+                }`}
+                style={{ backgroundColor: hex }}
+              />
+            );
+          })}
+        </div>
+
+        {/* Hex text input + native color picker */}
+        <div className="flex items-center gap-2 mt-1">
+          <input
+            type="color"
+            value={hexValue}
+            onChange={handleNativeColor}
+            className="w-9 h-9 rounded cursor-pointer border border-border p-0.5 flex-shrink-0"
+            title="Cor personalizada"
+          />
+          <Input
+            ref={hexInputRef}
+            value={hexInput}
+            onChange={handleHexInput}
+            onBlur={handleHexBlur}
+            placeholder="#3B82F6"
+            className="h-9 font-mono text-xs"
+            maxLength={7}
+          />
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
 }

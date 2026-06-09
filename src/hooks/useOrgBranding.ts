@@ -1,28 +1,16 @@
-import { useEffect } from "react";
-import { useOrganization } from "@/context/OrganizationContext";
-import { hexToHSL } from "@/utils/color";
+/**
+ * Thin compatibility wrapper — delegates to useWhiteLabel.
+ * New code should import useWhiteLabel directly.
+ */
+import { useWhiteLabel } from "@/hooks/useWhiteLabel";
 
 export function useOrgBranding() {
-  const { organization } = useOrganization();
-
-  useEffect(() => {
-    if (!organization?.primary_color) return;
-
-    const hsl = hexToHSL(organization.primary_color);
-    if (!hsl) return; // invalid color — keep default theme
-
-    document.documentElement.style.setProperty("--primary", hsl);
-    document.documentElement.style.setProperty("--ring", hsl);
-
-    return () => {
-      document.documentElement.style.removeProperty("--primary");
-      document.documentElement.style.removeProperty("--ring");
-    };
-  }, [organization?.primary_color]);
-
+  const { appName, logoUrl, primaryColor, faviconUrl } = useWhiteLabel();
   return {
-    logoUrl: organization?.logo_url ?? null,
-    companyName: organization?.name ?? "nortyx",
-    primaryColor: organization?.primary_color ?? "#3B82F6",
+    /** Display name — respects custom_app_name white-label override. */
+    companyName: appName,
+    logoUrl,
+    primaryColor,
+    faviconUrl,
   };
 }
