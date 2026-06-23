@@ -160,7 +160,7 @@ export async function getAllPlans(): Promise<PlanRow[]> {
     .select("*")
     .order("price", { ascending: true });
   if (error) throw error;
-  return (data ?? []) as PlanRow[];
+  return (data ?? []) as unknown as PlanRow[];
 }
 
 export async function upsertPlan(plan: Partial<PlanRow> & { name: string }): Promise<PlanRow> {
@@ -170,7 +170,7 @@ export async function upsertPlan(plan: Partial<PlanRow> & { name: string }): Pro
     .select()
     .single();
   if (error) throw error;
-  return data as PlanRow;
+  return data as unknown as PlanRow;
 }
 
 export async function togglePlanActive(id: string, is_active: boolean): Promise<void> {
@@ -218,7 +218,7 @@ export async function getAdminLogs(limit = 50): Promise<SuperAdminLog[]> {
     .order("created_at", { ascending: false })
     .limit(limit);
   if (error) throw error;
-  return (data ?? []) as SuperAdminLog[];
+  return (data ?? []) as unknown as SuperAdminLog[];
 }
 
 // ── Impersonation ─────────────────────────────────────────────────────────────
