@@ -52,7 +52,7 @@ const Auth = () => {
 
   useEffect(() => {
     document.title = branding?.name ? `${branding.name} — Login` : "Nortyx — Login";
-  }, [branding?.app_name]);
+  }, [branding?.name]);
 
   useEffect(() => {
     if (user) navigate("/", { replace: true });
